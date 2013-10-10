@@ -45,6 +45,8 @@ class BgpProvisioner(object):
         bgp_addr_fams = AddressFamilies(['inet-vpn'])
         bgp_sess_attrs = [
             BgpSessionAttributes(address_families=bgp_addr_fams)]
+        if router_type == 'mx':
+            bgp_sess_attrs[0].rtarget_strip_private = True
         bgp_sessions = [BgpSession(attributes=bgp_sess_attrs)]
         bgp_peering_attrs = BgpPeeringAttributes(session=bgp_sessions)
 

@@ -85,6 +85,7 @@
         <xsd:element name='bgp-router' type='xsd:string'/>
 	<xsd:element name='address-families' type='AddressFamilies'/>
 	<!-- Configuration items such as import and export policy -->
+	<xsd:element name='rtarget-strip-private' type='xsd:boolean'/>
     </xsd:sequence>
 </xsd:complexType>
 
