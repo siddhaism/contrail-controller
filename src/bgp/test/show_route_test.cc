@@ -282,7 +282,8 @@ protected:
         task_util::WaitForIdle();
 
         BgpPeerTest *peers[3];
-        RibExportPolicy policy(BgpProto::IBGP, RibExportPolicy::BGP, 1, 0);
+        RibExportPolicy policy(BgpProto::IBGP, RibExportPolicy::BGP, 1, -1, 0,
+                               false);
         DB *db_a = a_.get()->database();
 
         for (int j = 0; j < 3; j++) {

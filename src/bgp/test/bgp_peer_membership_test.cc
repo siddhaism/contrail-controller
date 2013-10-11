@@ -33,7 +33,7 @@ public:
                 const BgpNeighborConfig *config)
        : BgpPeer(server, instance, config),
          server_(server),
-         policy_(BgpProto::IBGP, RibExportPolicy::BGP, -1, 0),
+         policy_(BgpProto::IBGP, RibExportPolicy::BGP, -1, -1, 0, false),
          index_(gbl_index++) {
     }
 

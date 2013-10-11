@@ -108,10 +108,12 @@ private:
 };
 
 struct ExtCommunitySpec : public BgpAttribute {
+    typedef boost::array<uint8_t, 8> ExtCommunityValue;
     static const int kSize = -1;
     static const uint8_t kFlags = Optional | Transitive;
     ExtCommunitySpec() : BgpAttribute(ExtendedCommunities, kFlags) { }
     explicit ExtCommunitySpec(const BgpAttribute &rhs) : BgpAttribute(rhs) { }
+    static uint64_t ValueFromArray(const ExtCommunityValue &value);
     std::vector<uint64_t> communities;
     virtual int CompareTo(const BgpAttribute &rhs_attr) const {
         int ret = BgpAttribute::CompareTo(rhs_attr);

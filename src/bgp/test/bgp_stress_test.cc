@@ -1031,7 +1031,8 @@ void BgpStressTest::AddBgpRoutes(int family, int peer_id, int nroutes,
 
 void BgpStressTest::AddAllBgpRoutes(int nroutes, int ntargets) {
     bool fed = false;
-    RibExportPolicy policy(BgpProto::IBGP, RibExportPolicy::BGP, 1, 0);
+    RibExportPolicy policy(BgpProto::IBGP, RibExportPolicy::BGP, 1, -1, 0,
+                           false);
 
     BOOST_FOREACH(BgpNullPeer *npeer, peers_) {
         if (!npeer) continue;
@@ -1126,7 +1127,8 @@ void BgpStressTest::DeleteBgpRoutes(int family, int peer_id, int nroutes,
 
 void BgpStressTest::DeleteAllBgpRoutes(int nroutes, int ntargets, int npeers,
                                     int nagents) {
-    RibExportPolicy policy(BgpProto::IBGP, RibExportPolicy::BGP, 1, 0);
+    RibExportPolicy policy(BgpProto::IBGP, RibExportPolicy::BGP, 1, -1, 0,
+                           false);
 
     BOOST_FOREACH(BgpNullPeer *npeer, peers_) {
         if (!npeer) continue;

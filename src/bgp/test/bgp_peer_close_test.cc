@@ -611,7 +611,8 @@ void BgpPeerCloseTest::AddRoutes(BgpTable *table, BgpNullPeer *npeer) {
 }
 
 void BgpPeerCloseTest::AddAllRoutes() {
-    RibExportPolicy policy(BgpProto::IBGP, RibExportPolicy::BGP, 1, 0);
+    RibExportPolicy policy(BgpProto::IBGP, RibExportPolicy::BGP, 1, -1, 0,
+                           false);
 
     BOOST_FOREACH(BgpNullPeer *npeer, peers_) {
         for (int i = 0; i < n_families_; i++) {

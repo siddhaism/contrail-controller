@@ -30,9 +30,12 @@ protected:
 // Basic tests for RibOut find/locate/delete.
 TEST_F(BgpTableTest, RiboutBasic) {
     RibOut *ribout1 = NULL, *ribout2 = NULL, *ribout3 = NULL, *temp = NULL;
-    RibExportPolicy policy1(BgpProto::IBGP, RibExportPolicy::BGP, 1, 0);
-    RibExportPolicy policy2(BgpProto::IBGP, RibExportPolicy::BGP, 2, 0);
-    RibExportPolicy policy3(BgpProto::IBGP, RibExportPolicy::BGP, 3, 0);
+    RibExportPolicy policy1(BgpProto::IBGP, RibExportPolicy::BGP, 1, -1, 0,
+                            false);
+    RibExportPolicy policy2(BgpProto::IBGP, RibExportPolicy::BGP, 2, -1, 0,
+                            false);
+    RibExportPolicy policy3(BgpProto::IBGP, RibExportPolicy::BGP, 3, -1, 0,
+                            false);
 
     // Create 3 ribouts.
     ribout2 = rt_table_->RibOutLocate(&mgr_, policy2);
@@ -135,9 +138,12 @@ TEST_F(BgpTableTest, RiboutBasic) {
 // Different AS numbers result in creation of different RibOuts.
 TEST_F(BgpTableTest, RiboutAS) {
     RibOut *ribout1 = NULL, *ribout2 = NULL, *ribout3 = NULL, *temp = NULL;
-    RibExportPolicy policy1(BgpProto::EBGP, RibExportPolicy::BGP, 101, -1, 0);
-    RibExportPolicy policy2(BgpProto::EBGP, RibExportPolicy::BGP, 102, -1, 0);
-    RibExportPolicy policy3(BgpProto::EBGP, RibExportPolicy::BGP, 103, -1, 0);
+    RibExportPolicy policy1(BgpProto::EBGP, RibExportPolicy::BGP, 101, -1, 0,
+                            false);
+    RibExportPolicy policy2(BgpProto::EBGP, RibExportPolicy::BGP, 102, -1, 0,
+                            false);
+    RibExportPolicy policy3(BgpProto::EBGP, RibExportPolicy::BGP, 103, -1, 0,
+                            false);
 
     // Create 3 ribouts.
     ribout1 = rt_table_->RibOutLocate(&mgr_, policy1);

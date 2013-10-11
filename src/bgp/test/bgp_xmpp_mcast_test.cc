@@ -60,7 +60,8 @@ public:
             BgpXmppChannelManager *manager) : 
         BgpXmppChannel(channel, server, manager), count_(0) {
             bgp_policy_ = RibExportPolicy(BgpProto::XMPP,
-                                          RibExportPolicy::XMPP, -1, 0);
+                                          RibExportPolicy::XMPP, -1, -1, 0,
+                                          false);
     }
 
     virtual void ReceiveUpdate(const XmppStanza::XmppMessage *msg) {

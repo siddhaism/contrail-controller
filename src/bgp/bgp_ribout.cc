@@ -50,6 +50,12 @@ bool RibExportPolicy::operator<(const RibExportPolicy &rhs) const {
     if (cluster_id > rhs.cluster_id) {
         return false;
     }
+    if (!rtarget_strip_private && rhs.rtarget_strip_private) {
+        return true;
+    }
+    if (rtarget_strip_private && !rhs.rtarget_strip_private) {
+        return false;
+    }
     return false;
 }
 

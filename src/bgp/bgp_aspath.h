@@ -70,6 +70,8 @@ struct AsPathSpec : public BgpAttribute {
 
 class AsPath {
 public:
+    static const uint16_t kAsPathPrivate = 0xfc00;
+
     AsPath(AsPathDB *aspath_db) : aspath_db_(aspath_db) { refcount_ = 0; }
     explicit AsPath(AsPathDB *aspath_db, const AsPathSpec &spec)
         : aspath_db_(aspath_db), path_(spec) {

@@ -108,7 +108,7 @@ protected:
 
     void ConfigureBgpRouter() {
         SCOPED_TRACE(__FUNCTION__);
-        string content = FileRead("src/bgp/testdata/bgpc_a.xml");
+        string content = FileRead("controller/src/bgp/testdata/bgpc_a.xml");
         Replace(&content, "%(port_a)d", a_->session_manager()->GetPort());
         Replace(&content, "%(port_b)d", b_->session_manager()->GetPort());
         if (peer_type_ == "IBGP") {
@@ -267,7 +267,8 @@ protected:
     void SetupRoutingInstancePeers(RoutingInstance *a_red,
                                    RoutingInstance *a_blue,
                                    RoutingInstance *b_blue) {
-        RibExportPolicy policy(BgpProto::IBGP, RibExportPolicy::BGP, 1, 0);
+        RibExportPolicy policy(BgpProto::IBGP, RibExportPolicy::BGP, 1, -1, 0,
+                               false);
         autogen::BgpRouter rtr_config;
         autogen::BgpRouterParams params;
         params.address = "127.0.0.1";

@@ -180,7 +180,7 @@ protected:
 
     void CreateRibOut(BgpProto::BgpPeerType type,
             RibExportPolicy::Encoding encoding, as_t as_number = 0) {
-        RibExportPolicy policy(type, encoding, as_number, -1, 0);
+        RibExportPolicy policy(type, encoding, as_number, -1, 0, false);
         ribout_ = table_->RibOutLocate(&mgr_, policy);
     }
 

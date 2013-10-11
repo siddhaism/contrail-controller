@@ -129,11 +129,41 @@ BgpRoute *InetVpnTable::RouteReplicate(BgpServer *server,
     return dest_route;
 }
 
+static void RTargetStripPrivate(UpdateInfo *uinfo) {
+    const BgpAttr *attr = uinfo->roattr.attr();
+    const ExtCommunity *comm = attr->ext_community();
+    ExtCommunitySpec cspec;
+    bool changed = false;
+
+    for (ExtCommunity::ExtCommunityList::const_iterator iter =
+                 comm->communities().begin();
+         iter != comm->communities().end(); ++iter) {
+        const ExtCommunity::ExtCommunityValue &value = *iter;
+        if (ExtCommunity::is_route_target(value)) {
+            uint16_t asn = (value[2] << 8) | value[3];
+            if (asn >= AsPath::kAsPathPrivate) {
+                changed = true;
+                continue;
+            }
+        }
+        cspec.communities.push_back(ExtCommunitySpec::ValueFromArray(value));
+    }
+    if (changed) {
+        BgpAttr *spec = new BgpAttr(*attr);
+        spec->set_ext_community(&cspec);
+        BgpAttrPtr nattr_ptr = attr->attr_db()->Locate(spec);
+        uinfo->roattr.set_attr(nattr_ptr);
+    }
+}
+
 bool InetVpnTable::Export(RibOut *ribout, Route *route,
         const RibPeerSet &peerset, UpdateInfoSList &uinfo_slist) {
     BgpRoute *bgp_route = static_cast<BgpRoute *> (route);
     UpdateInfo *uinfo = GetUpdateInfo(ribout, bgp_route, peerset);
     if (!uinfo) return false;
+    if (ribout->ExportPolicy().rtarget_strip_private) {
+        RTargetStripPrivate(uinfo);
+    }
     uinfo_slist->push_front(*uinfo);
 
     return true;

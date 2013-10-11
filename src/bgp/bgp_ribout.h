@@ -256,23 +256,16 @@ struct RibExportPolicy {
     
     RibExportPolicy()
         : type(BgpProto::IBGP), encoding(BGP),
-          as_number(0), affinity(-1), cluster_id(0) {
+        as_number(0), affinity(-1), cluster_id(0),
+        rtarget_strip_private(false) {
     }
 
     RibExportPolicy(BgpProto::BgpPeerType type, Encoding encoding,
-            int affinity, u_int32_t cluster_id)
-        : type(type), encoding(encoding), as_number(0),
-          affinity(affinity), cluster_id(cluster_id) {
-        if (encoding == XMPP)
-            assert(type == BgpProto::XMPP);
-        if (encoding == BGP)
-            assert(type == BgpProto::IBGP || type == BgpProto::EBGP);
-    }
-
-    RibExportPolicy(BgpProto::BgpPeerType type, Encoding encoding,
-            as_t as_number, int affinity, u_int32_t cluster_id)
+                    as_t as_number, int affinity, u_int32_t cluster_id,
+                    bool rtarget_strip_private)
         : type(type), encoding(encoding), as_number(as_number),
-          affinity(affinity), cluster_id(cluster_id) {
+        affinity(affinity), cluster_id(cluster_id),
+        rtarget_strip_private(rtarget_strip_private) {
         if (encoding == XMPP)
             assert(type == BgpProto::XMPP);
         if (encoding == BGP)
@@ -286,6 +279,7 @@ struct RibExportPolicy {
     as_t as_number;
     int affinity;
     uint32_t cluster_id;
+    bool rtarget_strip_private;
 };
 
 //

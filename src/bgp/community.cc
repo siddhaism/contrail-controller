@@ -56,6 +56,15 @@ std::string ExtCommunitySpec::ToString() const {
     return std::string(repr);
 }
 
+uint64_t ExtCommunitySpec::ValueFromArray(const ExtCommunityValue &value) {
+    uint64_t result = 0;
+    for (unsigned int i = 0; i < value.size(); i++) {
+        uint64_t n = value[i];
+        result |= (n << ((7 - i) * 8));
+    }
+    return result;
+}
+
 void ExtCommunitySpec::ToCanonical(BgpAttr *attr) {
     attr->set_ext_community(this);
 }
