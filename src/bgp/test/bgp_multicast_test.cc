@@ -40,7 +40,7 @@ public:
     }
     virtual ~XmppPeerMock() { }
 
-    void AddRoute(InetMcastTable *table, string group_str, string source_str) {
+    void AddRoute(BgpTable *table, string group_str, string source_str) {
         boost::system::error_code ec;
         RouteDistinguisher rd(address_.to_ulong(), 65535);
         Ip4Address group = Ip4Address::from_string(group_str.c_str(), ec);
@@ -54,11 +54,11 @@ public:
         table->Enqueue(&req);
     }
 
-    void AddRoute(InetMcastTable *table, string group_str) {
+    void AddRoute(BgpTable *table, string group_str) {
         AddRoute(table, group_str, "0.0.0.0");
     }
 
-    void DelRoute(InetMcastTable *table, string group_str, string source_str) {
+    void DelRoute(BgpTable *table, string group_str, string source_str) {
         boost::system::error_code ec;
         RouteDistinguisher rd(address_.to_ulong(), 65535);
         Ip4Address group = Ip4Address::from_string(group_str.c_str(), ec);
@@ -71,7 +71,7 @@ public:
         table->Enqueue(&req);
     }
 
-    void DelRoute(InetMcastTable *table, string group_str) {
+    void DelRoute(BgpTable *table, string group_str) {
         DelRoute(table, group_str, "0.0.0.0");
     }
 
@@ -128,17 +128,17 @@ protected:
         scheduler->Start();
         task_util::WaitForIdle();
 
-        red_table_ = static_cast<InetMcastTable *>(
+        red_table_ = static_cast<BgpTable *>(
             server_.database()->FindTable("red.inetmcast.0"));
-        red_tm_ = red_table_->tree_manager_;
+        red_tm_ = ((InetMcastTable *) red_table_)->tree_manager_;
         TASK_UTIL_EXPECT_EQ(red_table_, red_tm_->table_);
         TASK_UTIL_EXPECT_EQ(DB::PartitionCount(),
                             (int)red_tm_->partitions_.size());
         TASK_UTIL_EXPECT_NE(-1, red_tm_->listener_id_);
 
-        green_table_ = static_cast<InetMcastTable *>(
+        green_table_ = static_cast<BgpTable *>(
             server_.database()->FindTable("green.inetmcast.0"));
-        green_tm_ = green_table_->tree_manager_;
+        green_tm_ = ((InetMcastTable *) green_table_)->tree_manager_;
         TASK_UTIL_EXPECT_EQ(green_table_, green_tm_->table_);
         TASK_UTIL_EXPECT_EQ(DB::PartitionCount(),
                             (int)green_tm_->partitions_.size());
@@ -163,7 +163,7 @@ protected:
         }
     }
 
-    void AddRoutePeers(InetMcastTable *table,
+    void AddRoutePeers(BgpTable *table,
             string group_str, string source_str, bool even, bool odd) {
         for (vector<XmppPeerMock *>::iterator it = peers_.begin();
              it != peers_.end(); ++it) {
@@ -174,34 +174,34 @@ protected:
         }
     }
 
-    void AddRouteAllPeers(InetMcastTable *table,
+    void AddRouteAllPeers(BgpTable *table,
             string group_str, string source_str) {
         AddRoutePeers(table, group_str, source_str, true, true);
     }
 
-    void AddRouteAllPeers(InetMcastTable *table, string group_str) {
+    void AddRouteAllPeers(BgpTable *table, string group_str) {
         AddRouteAllPeers(table, group_str, "0.0.0.0");
     }
 
-    void AddRouteEvenPeers(InetMcastTable *table,
+    void AddRouteEvenPeers(BgpTable *table,
             string group_str, string source_str) {
         AddRoutePeers(table, group_str, source_str, true, false);
     }
 
-    void AddRouteEvenPeers(InetMcastTable *table, string group_str) {
+    void AddRouteEvenPeers(BgpTable *table, string group_str) {
         AddRouteEvenPeers(table, group_str, "0.0.0.0");
     }
 
-    void AddRouteOddPeers(InetMcastTable *table,
+    void AddRouteOddPeers(BgpTable *table,
             string group_str, string source_str) {
         AddRoutePeers(table, group_str, source_str, false, true);
     }
 
-    void AddRouteOddPeers(InetMcastTable *table, string group_str) {
+    void AddRouteOddPeers(BgpTable *table, string group_str) {
         AddRouteOddPeers(table, group_str, "0.0.0.0");
     }
 
-    void DelRoutePeers(InetMcastTable *table,
+    void DelRoutePeers(BgpTable *table,
             string group_str, string source_str, bool even, bool odd) {
         for (vector<XmppPeerMock *>::iterator it = peers_.begin();
              it != peers_.end(); ++it) {
@@ -212,34 +212,34 @@ protected:
         }
     }
 
-    void DelRouteAllPeers(InetMcastTable *table,
+    void DelRouteAllPeers(BgpTable *table,
             string group_str, string source_str) {
         DelRoutePeers(table, group_str, source_str, true, true);
     }
 
-    void DelRouteAllPeers(InetMcastTable *table, string group_str) {
+    void DelRouteAllPeers(BgpTable *table, string group_str) {
         DelRouteAllPeers(table, group_str, "0.0.0.0");
     }
 
-    void DelRouteEvenPeers(InetMcastTable *table,
+    void DelRouteEvenPeers(BgpTable *table,
             string group_str, string source_str) {
         DelRoutePeers(table, group_str, source_str, true, false);
     }
 
-    void DelRouteEvenPeers(InetMcastTable *table, string group_str) {
+    void DelRouteEvenPeers(BgpTable *table, string group_str) {
         DelRouteEvenPeers(table, group_str, "0.0.0.0");
     }
 
-    void DelRouteOddPeers(InetMcastTable *table,
+    void DelRouteOddPeers(BgpTable *table,
             string group_str, string source_str) {
         DelRoutePeers(table, group_str, source_str, false, true);
     }
 
-    void DelRouteOddPeers(InetMcastTable *table, string group_str) {
+    void DelRouteOddPeers(BgpTable *table, string group_str) {
         DelRouteOddPeers(table, group_str, "0.0.0.0");
     }
 
-    void VerifyRouteCount(InetMcastTable *table, size_t count) {
+    void VerifyRouteCount(BgpTable *table, size_t count) {
         TASK_UTIL_EXPECT_EQ(count, table->Size());
     }
 
@@ -253,7 +253,7 @@ protected:
         TASK_UTIL_EXPECT_EQ(count, total);
     }
 
-    void VerifyForwarderProperties(InetMcastTable *table,
+    void VerifyForwarderProperties(BgpTable *table,
             McastForwarder *forwarder) {
         ConcurrencyScope scope("db::DBTable");
 
@@ -272,7 +272,7 @@ protected:
         EXPECT_LE(olist->elements.size(), McastTreeManager::kDegree + 1);
     }
 
-    void VerifyOnlyForwarderProperties(InetMcastTable *table,
+    void VerifyOnlyForwarderProperties(BgpTable *table,
             McastForwarder *forwarder) {
         ConcurrencyScope scope("db::DBTable");
 
@@ -324,7 +324,7 @@ protected:
                 return;
             }
         }
-        TASK_UTIL_EXPECT_TRUE(count == 0);
+        TASK_UTIL_EXPECT_EQ(0, count);
     }
 
     void VerifyForwarderCount(McastTreeManager *tm,
@@ -343,8 +343,8 @@ protected:
 
     EventManager evm_;
     BgpServer server_;
-    InetMcastTable *red_table_;
-    InetMcastTable *green_table_;
+    BgpTable *red_table_;
+    BgpTable *green_table_;
     McastTreeManager *red_tm_;
     McastTreeManager *green_tm_;
     scoped_ptr<BgpInstanceConfig> master_cfg_;

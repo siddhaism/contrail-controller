@@ -55,6 +55,21 @@ void BgpMessage::StartReach(const RibOutAttr *roattr, const BgpRoute *route) {
         update.path_attributes.push_back(path);
     }
 
+#ifdef TODO
+    if (attr->multicast_edge_discovery()) {
+        MulticastEdgeDiscoverySpec *mespec =
+            new MulticastEdgeDiscoverySpec(attr->multicast_edge_discovery());
+        update.path_attributes.push_back(mespec);
+    }
+
+    // Encode 'Multicast Edge Forwarding Path Attribute' list.
+    if (attr->olist()) {
+        MulticastEdgeForwardingSpec *mfspec =
+            new MulticastEdgeForwardingSpec(attr->olist());
+        update.path_attributes.push_back(mfspec);
+    }
+#endif
+
     if (attr->community() && attr->community()->communities().size()) {
         CommunitySpec *comm = new CommunitySpec;
         comm->communities = attr->community()->communities();

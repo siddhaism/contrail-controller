@@ -7,6 +7,7 @@
           <address-families>
               <family>inet-vpn</family>
               <family>e-vpn</family>
+              <family>inet-mvpn</family>
           </address-families>
           <session to='remote1'>
               <address-families>

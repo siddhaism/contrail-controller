@@ -914,6 +914,7 @@ TEST_F(BgpConfigTest, AddressFamilies2) {
     TASK_UTIL_EXPECT_EQ(2, peer->families().size());
     TASK_UTIL_EXPECT_TRUE(peer->LookupFamily(Address::INETVPN));
     TASK_UTIL_EXPECT_TRUE(peer->LookupFamily(Address::EVPN));
+    TASK_UTIL_EXPECT_TRUE(peer->LookupFamily(Address::INETMVPN));
 
     boost::replace_all(content, "<config>", "<delete>");
     boost::replace_all(content, "</config>", "</delete>");

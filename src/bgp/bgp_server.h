@@ -68,6 +68,8 @@ public:
             return inetvpn_replicator_.get();
         if (family == Address::EVPN)
             return evpn_replicator_.get();
+        if (family == Address::INETMVPN)
+            return inetmvpn_replicator_.get();
 
         assert(false);
         return NULL;
@@ -140,6 +142,7 @@ private:
     boost::scoped_ptr<BgpConditionListener> condition_listener_;
     boost::scoped_ptr<RoutePathReplicator> inetvpn_replicator_;
     boost::scoped_ptr<RoutePathReplicator> evpn_replicator_;
+    boost::scoped_ptr<RoutePathReplicator> inetmvpn_replicator_;
     boost::scoped_ptr<ServiceChainMgr> service_chain_mgr_;
 
     // configuration

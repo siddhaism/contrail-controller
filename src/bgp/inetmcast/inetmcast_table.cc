@@ -15,6 +15,8 @@
 #include "bgp/bgp_route.h"
 #include "bgp/ipeer.h"
 #include "bgp/inetmcast/inetmcast_route.h"
+#include "bgp/inetmvpn/inetmvpn_route.h"
+#include "bgp/origin-vn/origin_vn.h"
 #include "bgp/routing-instance/routing_instance.h"
 #include "db/db_table_partition.h"
 
@@ -66,9 +68,74 @@ DBTableBase *InetMcastTable::CreateTable(DB *db, const std::string &name) {
 }
 
 BgpRoute *InetMcastTable::RouteReplicate(BgpServer *server,
-        BgpTable *src_table, BgpRoute *src_rt, const BgpPath *path,
+        BgpTable *src_table, BgpRoute *src_rt, const BgpPath *src_path,
         ExtCommunityPtr community) {
-    return NULL;
+    if (src_table->family() != Address::INETMVPN)
+        return NULL;
+
+    OriginVn origin_vn(server->autonomous_system(),
+        routing_instance()->virtual_network_index());
+    if (!community->ContainsOriginVn(origin_vn.GetExtCommunity()))
+        return NULL;
+
+    InetMcastRoute *inetmcast= dynamic_cast<InetMcastRoute *>(src_rt);
+    boost::scoped_ptr<InetMcastPrefix> inetmcast_prefix;
+
+    if (inetmcast) {
+        inetmcast_prefix.reset(
+            new InetMcastPrefix(inetmcast->GetPrefix().route_distinguisher(),
+            inetmcast->GetPrefix().group(), inetmcast->GetPrefix().source()));
+    } else {
+        InetMVpnRoute *inetmvpn = dynamic_cast<InetMVpnRoute *>(src_rt);
+        assert(inetmvpn);
+        inetmcast_prefix.reset(
+            new InetMcastPrefix(inetmvpn->GetPrefix().route_distinguisher(),
+            inetmvpn->GetPrefix().group(), inetmvpn->GetPrefix().source()));
+    }
+
+    InetMcastRoute rt_key(*inetmcast_prefix);
+    DBTablePartition *rtp =
+        static_cast<DBTablePartition *>(GetTablePartition(&rt_key));
+    BgpRoute *dest_route = static_cast<BgpRoute *>(rtp->Find(&rt_key));
+    if (dest_route == NULL) {
+        dest_route = new InetMcastRoute(rt_key.GetPrefix());
+        rtp->Add(dest_route);
+    } else {
+        dest_route->ClearDelete();
+    }
+
+    // Replace the extended community with the one provided.
+    BgpAttrPtr new_attr = server->attr_db()->ReplaceExtCommunityAndLocate(
+        src_path->GetAttr(), community);
+
+    // Check whether peer already has a path.
+    BgpPath *dest_path =
+        dest_route->FindSecondaryPath(src_rt, src_path->GetSource(),
+                                      src_path->GetPeer(), 
+                                      src_path->GetPathId());
+    if (dest_path != NULL) {
+        if ((new_attr != dest_path->GetAttr()) ||
+            (src_path->GetLabel() != dest_path->GetLabel())) {
+            assert(dest_route->RemoveSecondaryPath(src_rt,
+                       src_path->GetSource(), src_path->GetPeer(),
+                       src_path->GetPathId()));
+        } else {
+            return dest_route;
+        }
+    }
+
+    BgpSecondaryPath *replicated_path =
+        new BgpSecondaryPath(src_path->GetPeer(), src_path->GetPathId(),
+                             src_path->GetSource(), new_attr,
+                             src_path->GetFlags(), src_path->GetLabel());
+    replicated_path->SetReplicateInfo(src_table, src_rt);
+    dest_route->InsertPath(replicated_path);
+
+    // Notify the route even if the best path may not have changed. For XMPP
+    // peers, we support sending multiple ECMP next-hops for a single route.
+    rtp->Notify(dest_route);
+
+    return dest_route;
 }
 
 bool InetMcastTable::Export(RibOut *ribout, Route *route,

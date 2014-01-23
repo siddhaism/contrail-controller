@@ -22,6 +22,7 @@ env.Append(LIBPATH = ['#/' + Dir('..').path,
                       '../../bgp/inetmcast',
                       '../../bgp/enet',
                       '../../bgp/evpn',
+                      '../../bgp/inetmvpn',
                       '../../bgp/l3vpn',
                       '../../control-node',
                       '../../db',
@@ -68,12 +69,14 @@ if sys.platform == 'darwin':
     bgp_inetmcast = Dir('../inetmcast').path + '/libbgp_inetmcast.a'
     bgp_enet = Dir('../enet').path + '/libbgp_enet.a'
     bgp_evpn = Dir('../evpn').path + '/libbgp_evpn.a'
+    bgp_inetmvpn = Dir('../inetmvpn').path + '/libbgp_inetmvpn.a'
     bgp_l3vpn = Dir('../l3vpn').path + '/libbgp_l3vpn.a'
     env.Prepend(LINKFLAGS =
                 ['-Wl,-force_load,' + bgp_inet,
                  '-Wl,-force_load,' + bgp_inetmcast,
                  '-Wl,-force_load,' + bgp_enet,
                  '-Wl,-force_load,' + bgp_evpn,
+                 '-Wl,-force_load,' + bgp_inetmvpn,
                  '-Wl,-force_load,' + bgp_l3vpn])
 else:
     env.Prepend(LINKFLAGS =
@@ -83,10 +86,11 @@ else:
                  '-lbgp_inetmcast',
                  '-lbgp_enet',
                  '-lbgp_evpn',
+                 '-lbgp_inetmvpn',
                  '-lbgp_l3vpn',
                  '-Wl,--no-whole-archive'])
 
-env.Append(LIBS = ['bgp_enet', 'bgp_evpn'])
+env.Append(LIBS = ['bgp_enet', 'bgp_evpn', 'bgp_inetmvpn'])
 env.Append(LIBS = ['bgp_inet', 'bgp_inetmcast', 'bgp_l3vpn'])
 env.Append(LIBS = ['route', 'net', 'routing_instance', 'rtarget'])
 env.Append(LIBS = ['origin_vn', 'security_group', 'tunnel_encap'])

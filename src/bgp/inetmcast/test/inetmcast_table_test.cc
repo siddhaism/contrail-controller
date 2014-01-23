@@ -24,7 +24,7 @@ using namespace boost;
 
 class McastTreeManagerMock : public McastTreeManager {
 public:
-    McastTreeManagerMock(InetMcastTable *table) : McastTreeManager(table) {
+    McastTreeManagerMock(BgpTable *table) : McastTreeManager(table) {
     }
     ~McastTreeManagerMock() { }
 

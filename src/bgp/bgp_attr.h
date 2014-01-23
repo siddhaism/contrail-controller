@@ -338,6 +338,10 @@ public:
                                                uint32_t local_pref);
     BgpAttrPtr ReplaceSourceRdAndLocate(const BgpAttr *attr,
                                         RouteDistinguisher source_rd);
+    BgpAttrPtr ReplaceMulticastEdgeDiscoveryAndLocate(const BgpAttr *attr,
+                                        BgpAttrPtr edge_discovery_attribute) {
+        return attr;
+    }
     BgpAttrPtr UpdateNexthopAndLocate(const BgpAttr *attr, uint16_t afi, 
                                       uint8_t safi, IpAddress &addr);
     BgpServer *server() { return server_; }

@@ -20,6 +20,7 @@ env.Append(LIBPATH = env['TOP'] + '/bgp/inet')
 env.Append(LIBPATH = env['TOP'] + '/bgp/inetmcast')
 env.Append(LIBPATH = env['TOP'] + '/bgp/enet')
 env.Append(LIBPATH = env['TOP'] + '/bgp/evpn')
+env.Append(LIBPATH = env['TOP'] + '/bgp/inetmvpn')
 env.Append(LIBPATH = env['TOP'] + '/bgp/test')
 env.Append(LIBPATH = env['TOP'] + '/bgp/l3vpn')
 env.Append(LIBPATH = env['TOP'] + '/bgp/origin-vn')
@@ -66,6 +67,7 @@ env.Prepend(LIBS = [
                     'xmpp',
                     'bgp_enet',
                     'bgp_evpn',
+                    'bgp_inetmvpn',
                     'xmpp_unicast',
                     'xmpp_multicast',
                     'xmpp_enet',
@@ -79,6 +81,7 @@ if sys.platform != 'darwin':
     env.Prepend(LINKFLAGS = ['-Wl,--whole-archive',
                              '-lbgp_enet',
                              '-lbgp_evpn',
+                             '-lbgp_inetmvpn',
                              '-lbgp_l3vpn',
                              '-ltask_test',
                              '-Wl,--no-whole-archive'])
@@ -87,6 +90,8 @@ else:
     env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_enet])
     lib_evpn = Dir('../../evpn').path + '/libbgp_evpn.a'
     env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_evpn])
+    lib_inetmvpn = Dir('../../inetmvpn').path + '/libbgp_inetmvpn.a'
+    env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_inetmvpn])
     lib_l3vpn = Dir('../../l3vpn').path + '/libbgp_l3vpn.a'
     env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_l3vpn])
 

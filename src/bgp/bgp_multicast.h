@@ -18,10 +18,10 @@
 #include "net/address.h"
 #include "net/rd.h"
 
+class BgpRoute;
+class BgpTable;
 class DBEntryBase;
 class DBTablePartBase;
-class InetMcastRoute;
-class InetMcastTable;
 class McastForwarder;
 class McastManagerPartition;
 class McastTreeManager;
@@ -66,10 +66,10 @@ typedef std::vector<McastForwarder *> McastForwarderList;
 //
 class McastForwarder : public DBState {
 public:
-    McastForwarder(InetMcastRoute *route);
+    McastForwarder(BgpRoute *route);
     ~McastForwarder();
 
-    bool Update(InetMcastRoute *route);
+    bool Update(BgpRoute *route);
     std::string ToString() const;
 
     McastForwarder *FindLink(McastForwarder *forwarder);
@@ -80,27 +80,30 @@ public:
     void AllocateLabel();
     void ReleaseLabel();
 
-    UpdateInfo *GetUpdateInfo(InetMcastTable *table);
+    UpdateInfo *GetUpdateInfo(BgpTable *table);
 
     uint32_t label() const { return label_; }
     Ip4Address address() const { return address_; }
     std::vector<std::string> encap() const { return encap_; }
-    InetMcastRoute *route() { return route_; }
+    BgpRoute *route() { return route_; }
     RouteDistinguisher route_distinguisher() const { return rd_; }
 
     bool empty() { return tree_links_.empty(); }
+    bool forest_node() { return forest_node_; }
+    void set_forest_node(bool forest_node) { forest_node_ = forest_node; }
 
 private:
     friend class BgpMulticastTest;
     friend class ShowMulticastManagerDetailHandler;
 
-    InetMcastRoute *route_;
+    BgpRoute *route_;
     LabelBlockPtr label_block_;
     uint32_t label_;
     RouteDistinguisher rd_;
     Ip4Address address_;
     std::vector<std::string> encap_;
     McastForwarderList tree_links_;
+    bool forest_node_;
 
     DISALLOW_COPY_AND_ASSIGN(McastForwarder);
 };
@@ -237,6 +240,7 @@ public:
     void EnqueueSGEntry(McastSGEntry *sg_entry);
 
     DBTablePartBase *GetTablePartition();
+    McastTreeManager *GetTreeManager() const { return tree_manager_; }
 
     bool empty() { return sg_list_.empty(); }
     size_t size() { return sg_list_.size(); }
@@ -289,7 +293,7 @@ class McastTreeManager {
 public:
     static const int kDegree = 4;
 
-    McastTreeManager(InetMcastTable *table);
+    McastTreeManager(BgpTable *table);
     virtual ~McastTreeManager();
 
     virtual void Initialize();
@@ -297,15 +301,17 @@ public:
 
     McastManagerPartition *GetPartition(int part_id);
 
-    virtual UpdateInfo *GetUpdateInfo(InetMcastRoute *route);
+    virtual UpdateInfo *GetUpdateInfo(BgpRoute *route);
     DBTablePartBase *GetTablePartition(size_t part_id);
 
     void ManagedDelete();
     void Shutdown();
     bool MayDelete() const;
     void MayResumeDelete();
+    bool IsVpn() const;
 
     LifetimeActor *deleter();
+    bool ShouldReplicate(BgpRoute *route, BgpAttrPtr attr);
 
 private:
     friend class BgpMulticastTest;
@@ -318,7 +324,7 @@ private:
     void FreePartitions();
     void RouteListener(DBTablePartBase *tpart, DBEntryBase *db_entry);
 
-    InetMcastTable *table_;
+    BgpTable *table_;
     int listener_id_;
     PartitionList partitions_;
 

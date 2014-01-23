@@ -52,6 +52,8 @@ Address::Family BgpAf::AfiSafiToFamily(uint8_t afi, uint8_t safi) {
         return Address::INETVPN;
     if (afi == BgpAf::L2Vpn && safi == BgpAf::EVpn)
         return Address::EVPN;
+    if (afi == BgpAf::IPv4 && safi == BgpAf::McastVpn)
+        return Address::INETMVPN;
 
     return Address::UNSPEC;
 }

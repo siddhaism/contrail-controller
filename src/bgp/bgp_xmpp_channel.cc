@@ -1401,6 +1401,8 @@ void BgpXmppChannel::ProcessSubscriptionRequest(
             continue;
         if (table->family() == Address::EVPN)
             continue;
+        if (table->family() == Address::INETMVPN)
+            continue;
 
         if (add_change) {
             RoutingTableMembershipRequestMap::iterator loc =

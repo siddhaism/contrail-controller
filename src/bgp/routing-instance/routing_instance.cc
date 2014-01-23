@@ -460,6 +460,7 @@ void RoutingInstance::ProcessConfig(BgpServer *server) {
     if (name_ == BgpConfigManager::kMasterInstance) {
         InetVpnTableCreate(server);
         EvpnTableCreate(server);
+        InetmvpnTableCreate(server);
 
         BgpTable *table_inet = static_cast<BgpTable *>(
                 server->database()->CreateTable("inet.0"));
@@ -502,6 +503,13 @@ void RoutingInstance::ProcessConfig(BgpServer *server) {
         AddTable(table_inetmcast);
         RTINSTANCE_LOG_TABLE(Create, this, table_inetmcast,
             SandeshLevel::SYS_DEBUG, RTINSTANCE_LOG_FLAG_ALL);
+
+        RoutePathReplicator *inetmvpn_replicator =
+            server->replicator(Address::INETMVPN);
+        BOOST_FOREACH(RouteTarget rt, export_) {
+            inetmvpn_replicator->Join(table_inetmcast, rt, false);
+            inetmvpn_replicator->Join(table_inetmcast, rt, true);
+        }
 
         // Create foo.enet.0.
         BgpTable *table_enet = static_cast<BgpTable *>(
@@ -556,9 +564,10 @@ void RoutingInstance::UpdateConfig(BgpServer *server,
 
     // Do a diff walk of Routing Instance config and Routing Instance.
     //
-    // Note that for EVPN we use the export targets as both import and
-    // import targets and ignore the routing instance import targets.
-    // This is done because we do not want to leak routes between VNs.
+    // Note that for EVPN and INETMVPN, we use the export targets as both
+    // import and import targets and ignore the routing instance import
+    // targets. This is done because we do not want to leak routes between
+    // VNs.
     BgpInstanceConfig::RouteTargetList::const_iterator cfg_it =
         cfg->import_list().begin();
     RoutingInstance::RouteTargetList::const_iterator rt_it = import_.begin();
@@ -570,6 +579,10 @@ void RoutingInstance::UpdateConfig(BgpServer *server,
     BgpTable *enet_table = GetTable(Address::ENET);
     RoutePathReplicator *evpn_replicator =
         server->replicator(Address::EVPN);
+
+    BgpTable *inetmcast_table = GetTable(Address::INETMCAST);
+    RoutePathReplicator *inetmvpn_replicator =
+        server->replicator(Address::INETMVPN);
 
     RoutingInstanceInfo info = GetDataCollection("");
     std::vector<std::string> add_import_rt, remove_import_rt;
@@ -627,15 +640,23 @@ void RoutingInstance::UpdateConfig(BgpServer *server,
             export_.insert(cfg_rtarget);
             add_export_rt.push_back(*cfg_it);
             inetvpn_replicator->Join(inet_table, cfg_rtarget, false);
+
             evpn_replicator->Join(enet_table, cfg_rtarget, false);
             evpn_replicator->Join(enet_table, cfg_rtarget, true);
+
+            inetmvpn_replicator->Join(inetmcast_table, cfg_rtarget, false);
+            inetmvpn_replicator->Join(inetmcast_table, cfg_rtarget, true);
             cfg_it++;
         } else if (cfg_rtarget.GetExtCommunity() > rt_it->GetExtCommunity()) {
             rt_next_it++;
             remove_export_rt.push_back(rt_it->ToString());
             inetvpn_replicator->Leave(inet_table, *rt_it, false);
+
             evpn_replicator->Leave(enet_table, *rt_it, false);
             evpn_replicator->Leave(enet_table, *rt_it, true);
+
+            inetmvpn_replicator->Leave(inetmcast_table, *rt_it, false);
+            inetmvpn_replicator->Leave(inetmcast_table, *rt_it, true);
             export_.erase(rt_it);
             rt_it = rt_next_it;
         } else {
@@ -651,6 +672,9 @@ void RoutingInstance::UpdateConfig(BgpServer *server,
         inetvpn_replicator->Join(inet_table, cfg_rtarget, false);
         evpn_replicator->Join(enet_table, cfg_rtarget, false);
         evpn_replicator->Join(enet_table, cfg_rtarget, true);
+
+        inetmvpn_replicator->Join(inetmcast_table, cfg_rtarget, false);
+        inetmvpn_replicator->Join(inetmcast_table, cfg_rtarget, true);
     }
     for (rt_next_it = rt_it; rt_it != export_.end(); rt_it = rt_next_it) {
         rt_next_it++;
@@ -658,6 +682,10 @@ void RoutingInstance::UpdateConfig(BgpServer *server,
         inetvpn_replicator->Leave(inet_table, *rt_it, false);
         evpn_replicator->Leave(enet_table, *rt_it, false);
         evpn_replicator->Leave(enet_table, *rt_it, true);
+
+        inetmvpn_replicator->Leave(inetmcast_table, *rt_it, false);
+        inetmvpn_replicator->Leave(inetmcast_table, *rt_it, true);
+
         export_.erase(rt_it);
     }
 
@@ -767,10 +795,22 @@ void RoutingInstance::ClearRouteTarget() {
     if (enet_table == NULL) {
         return;
     }
-    RoutePathReplicator *evpn_replicator = server()->replicator(Address::EVPN);
+    RoutePathReplicator *evpn_replicator =
+        server()->replicator(Address::EVPN);
     BOOST_FOREACH(RouteTarget rt, export_) {
         evpn_replicator->Leave(enet_table, rt, true);
         evpn_replicator->Leave(enet_table, rt, false);
+    }
+
+    BgpTable *inetmcast_table = GetTable(Address::INETMCAST);
+    if (inetmcast_table == NULL) {
+        return;
+    }
+    RoutePathReplicator *inetmvpn_replicator =
+        server()->replicator(Address::INETMVPN);
+    BOOST_FOREACH(RouteTarget rt, export_) {
+        inetmvpn_replicator->Leave(inetmcast_table, rt, true);
+        inetmvpn_replicator->Leave(inetmcast_table, rt, false);
     }
 
     import_.clear();
@@ -810,6 +850,27 @@ BgpTable *RoutingInstance::EvpnTableCreate(BgpServer *server) {
     // For all the RouteTarget in the server, add the VPN table as
     // importer and exporter
     RoutePathReplicator *replicator = server->replicator(Address::EVPN);
+    for (RoutePathReplicator::RtGroupMap::const_iterator it =
+         replicator->GetRtGroupMap().begin();
+        it != replicator->GetRtGroupMap().end(); ++it) {
+        replicator->Join(vpntbl, it->first, true);
+        replicator->Join(vpntbl, it->first, false);
+    }
+    return vpntbl;
+}
+
+BgpTable *RoutingInstance::InetmvpnTableCreate(BgpServer *server) {
+    BgpTable *vpntbl = static_cast<BgpTable *>(
+            server->database()->CreateTable("bgp.inetmvpn.0"));
+
+    RTINSTANCE_LOG_TABLE(Create, this, vpntbl,
+        SandeshLevel::SYS_DEBUG, RTINSTANCE_LOG_FLAG_ALL);
+
+    AddTable(vpntbl);
+
+    // For all the RouteTarget in the server, add the VPN table as
+    // importer and exporter
+    RoutePathReplicator *replicator = server->replicator(Address::INETMVPN);
     for (RoutePathReplicator::RtGroupMap::const_iterator it =
          replicator->GetRtGroupMap().begin();
         it != replicator->GetRtGroupMap().end(); ++it) {
@@ -871,6 +932,8 @@ std::string RoutingInstance::GetTableNameFromVrf(std::string name,
         table_name = "bgp.l3vpn.0";
     } else if (fmly == Address::EVPN) {
         table_name = "bgp.evpn.0";
+    } else if (fmly == Address::INETMVPN) {
+        table_name = "bgp.inetmvpn.0";
     } else if (name == BgpConfigManager::kMasterInstance) {
         table_name = Address::FamilyToString(fmly) + ".0";
     } else {

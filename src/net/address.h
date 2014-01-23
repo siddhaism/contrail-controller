@@ -29,6 +29,7 @@ public:
         INET6MCAST = 9,
         ENET = 10,
         EVPN = 11,
+        INETMVPN = 12,
     };
 
     Address();

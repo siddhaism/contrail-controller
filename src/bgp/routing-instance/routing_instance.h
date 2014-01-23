@@ -120,6 +120,7 @@ private:
 
     BgpTable *InetVpnTableCreate(BgpServer *server);
     BgpTable *EvpnTableCreate(BgpServer *server);
+    BgpTable *InetmvpnTableCreate(BgpServer *server);
 
     std::string name_;
     int index_;

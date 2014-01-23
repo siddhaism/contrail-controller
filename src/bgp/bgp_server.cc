@@ -207,6 +207,7 @@ BgpServer::BgpServer(EventManager *evm)
       condition_listener_(new BgpConditionListener(this)),
       inetvpn_replicator_(new RoutePathReplicator(this, Address::INETVPN)),
       evpn_replicator_(new RoutePathReplicator(this, Address::EVPN)),
+      inetmvpn_replicator_(new RoutePathReplicator(this, Address::INETMVPN)),
       service_chain_mgr_(new ServiceChainMgr(this)),
       config_mgr_(BgpObjectFactory::Create<BgpConfigManager>(this)),
       updater_(new ConfigUpdater(this)) {
