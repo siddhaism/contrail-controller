@@ -315,7 +315,7 @@ static bool ParseBgpRouter(const string &instance, const xml_node &node,
     string identifier;
     xml_attribute name = node.attribute("name");
     if (!property->XmlParse(node)) {
-        // TODO: log warning
+        assert(0);
         return false;
     }
     if (property->autonomous_system == 0)
@@ -334,6 +334,7 @@ static bool ParseBgpRouter(const string &instance, const xml_node &node,
         }
     } else {
         // TODO: log warning
+        assert(0);
         return true;
     }
 
@@ -563,6 +564,7 @@ bool BgpConfigParser::Parse(const std::string &content)  {
         BGP_LOG_STR(BgpMessage, SandeshLevel::SYS_WARN, BGP_LOG_FLAG_SYSLOG,
                     "Unable to load XML document. (status="
                      << result.status << ", offset=" << result.offset << ")");
+        assert(false);
         return false;
     }
 
