@@ -37,6 +37,7 @@ public:
     static Family FamilyFromString(std::string family);
     static std::string FamilyToString(Family fmly);
     static Family FamilyFromRoutingTableName(std::string name);
+    static std::string FamilyToTableString(Family family);
 
 private:
     IpAddress addr_;    

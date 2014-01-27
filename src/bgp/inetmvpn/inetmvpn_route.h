@@ -7,14 +7,46 @@
 
 #include <set>
 
+#include <boost/system/error_code.hpp>
+
 #include "base/util.h"
 #include "bgp/bgp_attr.h"
 #include "bgp/bgp_attr_base.h"
 #include "bgp/bgp_route.h"
-#include "bgp/inetmvpn/inetmvpn_address.h"
 #include "net/address.h"
 #include "net/bgp_af.h"
-#include "route/route.h"
+#include "net/rd.h"
+
+class InetMVpnPrefix {
+public:
+    InetMVpnPrefix();
+    explicit InetMVpnPrefix(const BgpProtoPrefix &prefix);
+    InetMVpnPrefix(const RouteDistinguisher &rd,
+                   const Ip4Address &group, const Ip4Address &source);
+    InetMVpnPrefix(const RouteDistinguisher &rd, as4_t as_number,
+                   const Ip4Address &group, const Ip4Address &source);
+    InetMVpnPrefix(const RouteDistinguisher &rd, const Ip4Address &router_id,
+                   const Ip4Address &group, const Ip4Address &source);
+    static InetMVpnPrefix FromString(const std::string &str,
+                                     boost::system::error_code *errorp = NULL);
+    std::string ToString() const;
+
+    uint8_t type() const { return type_; }
+    RouteDistinguisher route_distinguisher() const { return rd_; }
+    as4_t as_number() const { return as_number_; }
+    Ip4Address router_id() const { return router_id_; }
+    Ip4Address group() const { return group_; }
+    Ip4Address source() const { return source_; }
+    void BuildProtoPrefix(BgpProtoPrefix *prefix) const;
+
+private:
+    uint8_t type_;
+    RouteDistinguisher rd_;
+    as4_t as_number_;
+    Ip4Address router_id_;
+    Ip4Address group_;
+    Ip4Address source_;
+};
 
 class InetMVpnRoute : public BgpRoute {
 public:
@@ -30,7 +62,7 @@ public:
     virtual KeyPtr GetDBRequestKey() const;
     virtual void SetKey(const DBRequestKey *reqkey);
     virtual void BuildProtoPrefix(BgpProtoPrefix *prefix,
-                                  uint32_t router_id) const;
+                                  uint32_t label) const;
     virtual void BuildBgpProtoNextHop(std::vector<uint8_t> &nh, 
                                       IpAddress nexthop) const;
 

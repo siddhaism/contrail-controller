@@ -953,7 +953,7 @@ void BgpPeer::ProcessUpdate(const BgpProto::Update *msg) {
 
             vector<BgpProtoPrefix *>::const_iterator it;
             for (it = nlri->nlri.begin(); it < nlri->nlri.end(); it++) {
-                if ((*it)->type != 8) {
+                if ((*it)->type != 7 && (*it)->type != 8) {
                     BGP_LOG_PEER(Message, this, SandeshLevel::SYS_WARN,
                         BGP_LOG_FLAG_ALL, BGP_PEER_DIR_IN,
                         "INETMVPN: Unsupported route type " << (*it)->type);
@@ -962,7 +962,7 @@ void BgpPeer::ProcessUpdate(const BgpProto::Update *msg) {
                 DBRequest req;
                 req.oper = oper;
                 if (oper == DBRequest::DB_ENTRY_ADD_CHANGE)
-                    req.data.reset(new EvpnTable::RequestData(attr, flags,
+                    req.data.reset(new InetMVpnTable::RequestData(attr, flags,
                                                               0));
                 req.key.reset(new InetMVpnTable::RequestKey(
                                   InetMVpnPrefix(**it), this));

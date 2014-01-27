@@ -493,22 +493,22 @@ void RoutingInstance::ProcessConfig(BgpServer *server) {
             inetvpn_replicator->Join(table_inet, rt, false);
         }
 
-        // Create foo.inetmcast.0.
-        BgpTable *table_inetmcast = static_cast<BgpTable *>(
-            server->database()->CreateTable((name_ + ".inetmcast.0")));
-        if (table_inetmcast == NULL) {
+        // Create foo.inetmvpn.0.
+        BgpTable *table_inetmvpn = static_cast<BgpTable *>(
+            server->database()->CreateTable((name_ + ".inetmvpn.0")));
+        if (table_inetmvpn == NULL) {
             // TODO: log
             return;
         }
-        AddTable(table_inetmcast);
-        RTINSTANCE_LOG_TABLE(Create, this, table_inetmcast,
+        AddTable(table_inetmvpn);
+        RTINSTANCE_LOG_TABLE(Create, this, table_inetmvpn,
             SandeshLevel::SYS_DEBUG, RTINSTANCE_LOG_FLAG_ALL);
 
         RoutePathReplicator *inetmvpn_replicator =
             server->replicator(Address::INETMVPN);
         BOOST_FOREACH(RouteTarget rt, export_) {
-            inetmvpn_replicator->Join(table_inetmcast, rt, false);
-            inetmvpn_replicator->Join(table_inetmcast, rt, true);
+            inetmvpn_replicator->Join(table_inetmvpn, rt, false);
+            inetmvpn_replicator->Join(table_inetmvpn, rt, true);
         }
 
         // Create foo.enet.0.
@@ -579,8 +579,7 @@ void RoutingInstance::UpdateConfig(BgpServer *server,
     BgpTable *enet_table = GetTable(Address::ENET);
     RoutePathReplicator *evpn_replicator =
         server->replicator(Address::EVPN);
-
-    BgpTable *inetmcast_table = GetTable(Address::INETMCAST);
+    BgpTable *inetmvpn_table = GetTable(Address::INETMVPN);
     RoutePathReplicator *inetmvpn_replicator =
         server->replicator(Address::INETMVPN);
 
@@ -644,8 +643,8 @@ void RoutingInstance::UpdateConfig(BgpServer *server,
             evpn_replicator->Join(enet_table, cfg_rtarget, false);
             evpn_replicator->Join(enet_table, cfg_rtarget, true);
 
-            inetmvpn_replicator->Join(inetmcast_table, cfg_rtarget, false);
-            inetmvpn_replicator->Join(inetmcast_table, cfg_rtarget, true);
+            inetmvpn_replicator->Join(inetmvpn_table, cfg_rtarget, false);
+            inetmvpn_replicator->Join(inetmvpn_table, cfg_rtarget, true);
             cfg_it++;
         } else if (cfg_rtarget.GetExtCommunity() > rt_it->GetExtCommunity()) {
             rt_next_it++;
@@ -655,8 +654,8 @@ void RoutingInstance::UpdateConfig(BgpServer *server,
             evpn_replicator->Leave(enet_table, *rt_it, false);
             evpn_replicator->Leave(enet_table, *rt_it, true);
 
-            inetmvpn_replicator->Leave(inetmcast_table, *rt_it, false);
-            inetmvpn_replicator->Leave(inetmcast_table, *rt_it, true);
+            inetmvpn_replicator->Leave(inetmvpn_table, *rt_it, false);
+            inetmvpn_replicator->Leave(inetmvpn_table, *rt_it, true);
             export_.erase(rt_it);
             rt_it = rt_next_it;
         } else {
@@ -673,8 +672,8 @@ void RoutingInstance::UpdateConfig(BgpServer *server,
         evpn_replicator->Join(enet_table, cfg_rtarget, false);
         evpn_replicator->Join(enet_table, cfg_rtarget, true);
 
-        inetmvpn_replicator->Join(inetmcast_table, cfg_rtarget, false);
-        inetmvpn_replicator->Join(inetmcast_table, cfg_rtarget, true);
+        inetmvpn_replicator->Join(inetmvpn_table, cfg_rtarget, false);
+        inetmvpn_replicator->Join(inetmvpn_table, cfg_rtarget, true);
     }
     for (rt_next_it = rt_it; rt_it != export_.end(); rt_it = rt_next_it) {
         rt_next_it++;
@@ -683,8 +682,8 @@ void RoutingInstance::UpdateConfig(BgpServer *server,
         evpn_replicator->Leave(enet_table, *rt_it, false);
         evpn_replicator->Leave(enet_table, *rt_it, true);
 
-        inetmvpn_replicator->Leave(inetmcast_table, *rt_it, false);
-        inetmvpn_replicator->Leave(inetmcast_table, *rt_it, true);
+        inetmvpn_replicator->Leave(inetmvpn_table, *rt_it, false);
+        inetmvpn_replicator->Leave(inetmvpn_table, *rt_it, true);
 
         export_.erase(rt_it);
     }
@@ -802,15 +801,15 @@ void RoutingInstance::ClearRouteTarget() {
         evpn_replicator->Leave(enet_table, rt, false);
     }
 
-    BgpTable *inetmcast_table = GetTable(Address::INETMCAST);
-    if (inetmcast_table == NULL) {
+    BgpTable *inetmvpn_table = GetTable(Address::INETMVPN);
+    if (inetmvpn_table == NULL) {
         return;
     }
     RoutePathReplicator *inetmvpn_replicator =
         server()->replicator(Address::INETMVPN);
     BOOST_FOREACH(RouteTarget rt, export_) {
-        inetmvpn_replicator->Leave(inetmcast_table, rt, true);
-        inetmvpn_replicator->Leave(inetmcast_table, rt, false);
+        inetmvpn_replicator->Leave(inetmvpn_table, rt, true);
+        inetmvpn_replicator->Leave(inetmvpn_table, rt, false);
     }
 
     import_.clear();
@@ -914,11 +913,9 @@ void RoutingInstance::DestroyDBTable(DBTable *dbtable) {
     server()->database()->RemoveTable(table);
     RemoveTable(table);
 
+
     //
     // Make sure that there are no routes left in this table
-    //
-    // This currently fails as we do not wait for routes to get completely
-    // deleted yet.. Uncomment this assert once that part is fixed
     //
     assert(table->Size() == 0);
 
@@ -928,16 +925,18 @@ void RoutingInstance::DestroyDBTable(DBTable *dbtable) {
 std::string RoutingInstance::GetTableNameFromVrf(std::string name, 
                                           Address::Family fmly) {
     std::string table_name;
-    if (fmly == Address::INETVPN) {
-        table_name = "bgp.l3vpn.0";
-    } else if (fmly == Address::EVPN) {
-        table_name = "bgp.evpn.0";
-    } else if (fmly == Address::INETMVPN) {
-        table_name = "bgp.inetmvpn.0";
-    } else if (name == BgpConfigManager::kMasterInstance) {
-        table_name = Address::FamilyToString(fmly) + ".0";
+    if (name == BgpConfigManager::kMasterInstance) {
+        if (fmly == Address::INETVPN) {
+            table_name = "bgp.l3vpn.0";
+        } else if (fmly == Address::INETMVPN) {
+            table_name = "bgp.inetmvpn.0";
+        } else if (fmly == Address::EVPN) {
+            table_name = "bgp.evpn.0";
+        } else {
+            table_name = Address::FamilyToTableString(fmly) + ".0";
+        }
     } else {
-        table_name = name + "." + Address::FamilyToString(fmly) + ".0";
+        table_name = name + "." + Address::FamilyToTableString(fmly) + ".0";
     }
     return table_name;
 }

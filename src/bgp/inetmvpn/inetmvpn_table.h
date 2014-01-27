@@ -7,7 +7,6 @@
 
 #include "bgp/bgp_attr.h"
 #include "bgp/bgp_table.h"
-#include "bgp/inetmvpn/inetmvpn_address.h"
 #include "bgp/inetmvpn/inetmvpn_route.h"
 
 class BgpServer;

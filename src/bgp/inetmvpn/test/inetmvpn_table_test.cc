@@ -9,303 +9,263 @@
 
 #include "base/logging.h"
 #include "base/task.h"
+#include "base/task_annotations.h"
 #include "base/test/task_test_util.h"
-#include "bgp/bgp_attr.h"
-#include "bgp/bgp_config.h"
+#include "bgp/bgp_factory.h"
 #include "bgp/bgp_log.h"
-#include "bgp/bgp_server.h"
-#include "bgp/inetmvpn/inetmvpn_route.h"
-#include "bgp/routing-instance/routing_instance.h"
+#include "bgp/bgp_multicast.h"
+#include "bgp/test/bgp_server_test_util.h"
 #include "control-node/control_node.h"
-#include "db/db.h"
 #include "io/event_manager.h"
 #include "testing/gunit.h"
 
-class BgpPeerMock : public IPeer {
+using namespace std;
+using namespace boost;
+
+class McastTreeManagerMock : public McastTreeManager {
 public:
-    virtual std::string ToString() const { return "test-peer"; }
-    virtual std::string ToUVEKey() const { return "test-peer"; }
-    virtual bool SendUpdate(const uint8_t *msg, size_t msgsize) { return true; }
-    virtual BgpServer *server() { return NULL; }
-    virtual IPeerClose *peer_close() { return NULL; }
-    virtual IPeerDebugStats *peer_stats() { return NULL; }
-    virtual bool IsReady() const { return true; }
-    virtual bool IsXmppPeer() const { return false; }
-    virtual void Close() { }
-    BgpProto::BgpPeerType PeerType() const { return BgpProto::IBGP; }
-    virtual uint32_t bgp_identifier() const { return 0; }
-    virtual const std::string GetStateName() const { return "UNKNOWN"; }
-    virtual void UpdateRefCount(int count) { }
-    virtual tbb::atomic<int> GetRefCount() const {
-        tbb::atomic<int> count;
-        count = 0;
-        return count;
+    McastTreeManagerMock(BgpTable *table) : McastTreeManager(table) {
     }
+    ~McastTreeManagerMock() { }
+
+    virtual void Initialize() { }
+    virtual void Terminate() { }
+
+    virtual UpdateInfo *GetUpdateInfo(BgpRoute *route) { return NULL; }
+
 private:
 };
+
+static const int kRouteCount = 255;
 
 class InetMVpnTableTest : public ::testing::Test {
 protected:
     InetMVpnTableTest()
-            : server_(&evm_), rib_(NULL) {
+        : server_(&evm_), blue_(NULL) {
     }
-              
+
     virtual void SetUp() {
-        master_cfg_.reset(new BgpInstanceConfig(BgpConfigManager::kMasterInstance));
-        server_.routing_instance_mgr()->CreateRoutingInstance(
-                master_cfg_.get());
-        RoutingInstance *rti =
-                server_.routing_instance_mgr()->GetRoutingInstance(
-                    BgpConfigManager::kMasterInstance);
-        ASSERT_TRUE(rti != NULL);
+        ConcurrencyScope scope("bgp::Config");
 
-        rib_ = static_cast<InetMVpnTable *>(rti->GetTable(Address::INETMVPN));
-        ASSERT_TRUE(rib_ != NULL);
+        adc_notification_ = 0;
+        del_notification_ = 0;
 
-        tid_ = rib_->Register(
-            boost::bind(&InetMVpnTableTest::VpnTableListener, this, _1, _2));
+        master_cfg_.reset(BgpTestUtil::CreateBgpInstanceConfig(
+            BgpConfigManager::kMasterInstance, "", ""));
+        blue_cfg_.reset(BgpTestUtil::CreateBgpInstanceConfig(
+            "blue", "target:1.2.3.4:1", "target:1.2.3.4:1"));
+
+        TaskScheduler *scheduler = TaskScheduler::GetInstance();
+        scheduler->Stop();
+        server_.routing_instance_mgr()->CreateRoutingInstance(blue_cfg_.get());
+        scheduler->Start();
+        task_util::WaitForIdle();
+
+        blue_ = static_cast<InetMVpnTable *>(
+            server_.database()->FindTable("blue.inetmvpn.0"));
+        TASK_UTIL_EXPECT_EQ(Address::INETMVPN, blue_->family());
+
+        tid_ = blue_->Register(
+            boost::bind(&InetMVpnTableTest::TableListener, this, _1, _2));
     }
 
     virtual void TearDown() {
-        rib_->Unregister(tid_);
+        blue_->Unregister(tid_);
         server_.Shutdown();
-        task_util::WaitForIdle();
-        evm_.Shutdown();
         task_util::WaitForIdle();
     }
 
-    void VpnTableListener(DBTablePartBase *root, DBEntryBase *entry) {
+    void AddRoute(string prefix_str) {
+        InetMVpnPrefix prefix(InetMVpnPrefix::FromString(prefix_str));
+
+        BgpAttrSpec attrs;
+        DBRequest addReq;
+        addReq.key.reset(new InetMVpnTable::RequestKey(prefix, NULL));
+        BgpAttrPtr attr = server_.attr_db()->Locate(attrs);
+        addReq.data.reset(new InetMVpnTable::RequestData(attr, 0, 0));
+        addReq.oper = DBRequest::DB_ENTRY_ADD_CHANGE;
+        blue_->Enqueue(&addReq);
+    }
+
+    void DelRoute(string prefix_str) {
+        InetMVpnPrefix prefix(InetMVpnPrefix::FromString(prefix_str));
+
+        DBRequest delReq;
+        delReq.key.reset(new InetMVpnTable::RequestKey(prefix, NULL));
+        delReq.oper = DBRequest::DB_ENTRY_DELETE;
+        blue_->Enqueue(&delReq);
+    }
+
+    void VerifyRouteExists(string prefix_str) {
+        InetMVpnPrefix prefix(InetMVpnPrefix::FromString(prefix_str));
+        InetMVpnTable::RequestKey key(prefix, NULL);
+        InetMVpnRoute *rt = dynamic_cast<InetMVpnRoute *>(blue_->Find(&key));
+        TASK_UTIL_EXPECT_TRUE(rt != NULL);
+        TASK_UTIL_EXPECT_EQ(1, rt->count());
+    }
+
+    void VerifyRouteNoExists(string prefix_str) {
+        InetMVpnPrefix prefix(InetMVpnPrefix::FromString(prefix_str));
+        InetMVpnTable::RequestKey key(prefix, NULL);
+        InetMVpnRoute *rt = static_cast<InetMVpnRoute *>(blue_->Find(&key));
+        TASK_UTIL_EXPECT_TRUE(rt == NULL);
+    }
+
+    void TableListener(DBTablePartBase *tpart, DBEntryBase *entry) {
         bool del_notify = entry->IsDeleted();
-        if (del_notify)
+        if (del_notify) {
             del_notification_++;
-        else
+        } else {
             adc_notification_++;
+        }
     }
 
     EventManager evm_;
     BgpServer server_;
-    InetMVpnTable *rib_;
+    InetMVpnTable *blue_;
     DBTableBase::ListenerId tid_;
-    std::auto_ptr<BgpInstanceConfig> master_cfg_;
+    scoped_ptr<BgpInstanceConfig> master_cfg_;
+    scoped_ptr<BgpInstanceConfig> blue_cfg_;
 
     tbb::atomic<long> adc_notification_;
     tbb::atomic<long> del_notification_;
 };
 
-TEST_F(InetMVpnTableTest, Basic) {
-    boost::system::error_code ec;
-    adc_notification_ = 0;
-    del_notification_ = 0;
-    // Create a route prefix
-    InetMVpnPrefix prefix(InetMVpnPrefix::FromString(
-                "123:456:192.168.24.0/24", ec));
-
-    // Create a set of route attributes
-    BgpAttrSpec attrs;
-
-    EXPECT_EQ(rib_, server_.database()->FindTable("bgp.inetmvpn.0"));
-
-    // Enqueue the update
-    DBRequest addReq;
-    addReq.key.reset(new InetMVpnTable::RequestKey(prefix, NULL));
-    BgpAttrPtr attr = server_.attr_db()->Locate(attrs);
-    addReq.data.reset(new InetMVpnTable::RequestData(attr, 0, 20));
-    addReq.oper = DBRequest::DB_ENTRY_ADD_CHANGE;
-    rib_->Enqueue(&addReq);
-
+TEST_F(InetMVpnTableTest, AddDeleteSingleRoute) {
+    AddRoute("0-10.1.1.1:65535-0,192.168.1.255,0.0.0.0");
     task_util::WaitForIdle();
+    VerifyRouteExists("0-10.1.1.1:65535-0,192.168.1.255,0.0.0.0");
+    TASK_UTIL_EXPECT_EQ(adc_notification_, 1);
 
-    EXPECT_EQ(adc_notification_, 1);
-
-    InetMVpnTable::RequestKey key(prefix, NULL);
-    Route *rt_entry = static_cast<Route *>(rib_->Find(&key));
-    EXPECT_TRUE(rt_entry != NULL);
-
-
-    // Enqueue the delete
-    DBRequest delReq;
-    delReq.key.reset(new InetMVpnTable::RequestKey(prefix, NULL));
-    delReq.oper = DBRequest::DB_ENTRY_DELETE;
-    rib_->Enqueue(&delReq);
-
+    DelRoute("0-10.1.1.1:65535-0,192.168.1.255,0.0.0.0");
     task_util::WaitForIdle();
-
-    EXPECT_EQ(del_notification_, 1);
-
-    rt_entry = static_cast<Route *>(rib_->Find(&key));
-    EXPECT_TRUE(rt_entry == NULL);
+    TASK_UTIL_EXPECT_EQ(del_notification_, 1);
+    VerifyRouteNoExists("0-10.1.1.1:65535-0,192.168.1.255,0.0.0.0");
 }
 
-
-TEST_F(InetMVpnTableTest, DupDelete) {
-    boost::system::error_code ec;
-    adc_notification_ = 0;
-    del_notification_ = 0;
-    // Create a route prefix
-    InetMVpnPrefix prefix(InetMVpnPrefix::FromString(
-                "123:456:192.168.24.0/24", ec));
-
-    // Create a set of route attributes
-    BgpAttrSpec attrs;
-
-    EXPECT_EQ(rib_, server_.database()->FindTable("bgp.inetmvpn.0"));
-
-    // Enqueue the update
-    DBRequest addReq;
-    addReq.key.reset(new InetMVpnTable::RequestKey(prefix, NULL));
-    BgpAttrPtr attr = server_.attr_db()->Locate(attrs);
-    addReq.data.reset(new InetMVpnTable::RequestData(attr, 0, 20));
-    addReq.oper = DBRequest::DB_ENTRY_ADD_CHANGE;
-    rib_->Enqueue(&addReq);
+// Prefixes differ only in the IP address field of the RD.
+TEST_F(InetMVpnTableTest, AddDeleteMultipleRoute1) {
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1." << idx << ":65535-0,224.168.1.255,192.168.1.1";
+        AddRoute(repr.str());
+    }
     task_util::WaitForIdle();
 
-    EXPECT_EQ(adc_notification_, 1);
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1." << idx << ":65535-0,224.168.1.255,192.168.1.1";
+        VerifyRouteExists(repr.str());
+    }
+    TASK_UTIL_EXPECT_EQ(adc_notification_, kRouteCount);
 
-    InetMVpnTable::RequestKey key(prefix, NULL);
-    Route *rt_entry = static_cast<Route *>(rib_->Find(&key));
-    EXPECT_TRUE(rt_entry != NULL);
-
-
-    rt_entry->SetState(rib_, tid_, NULL);
-
-    // Enqueue the delete
-    DBRequest delReq;
-    delReq.key.reset(new InetMVpnTable::RequestKey(prefix, NULL));
-    delReq.oper = DBRequest::DB_ENTRY_DELETE;
-    rib_->Enqueue(&delReq);
-    task_util::WaitForIdle();
-    EXPECT_EQ(del_notification_, 1);
-
-    // Enqueue a duplicate the delete
-    delReq.key.reset(new InetMVpnTable::RequestKey(prefix, NULL));
-    delReq.oper = DBRequest::DB_ENTRY_DELETE;
-    rib_->Enqueue(&delReq);
-    task_util::WaitForIdle();
-    EXPECT_EQ(del_notification_, 1);
-
-    rt_entry = static_cast<Route *>(rib_->Find(&key));
-    EXPECT_TRUE(rt_entry != NULL);
-
-    rt_entry->ClearState(rib_, tid_);
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1." << idx << ":65535-0,224.168.1.255,192.168.1.1";
+        DelRoute(repr.str());
+    }
     task_util::WaitForIdle();
 
-    rt_entry = static_cast<Route *>(rib_->Find(&key));
-    EXPECT_TRUE(rt_entry == NULL);
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1." << idx << ":65535-0,224.168.1.255,192.168.1.1";
+        VerifyRouteNoExists(repr.str());
+    }
+    TASK_UTIL_EXPECT_EQ(del_notification_, kRouteCount);
 }
 
-TEST_F(InetMVpnTableTest, TableNotification) {
-    BgpPeerMock peer1;
-    BgpPeerMock peer2;
-    BgpPeerMock peer3;
-    boost::system::error_code ec;
-
-    adc_notification_ = 0;
-    del_notification_ = 0;
-    // Create a route prefix
-    InetMVpnPrefix prefix(InetMVpnPrefix::FromString(
-                "123:456:192.168.24.0/24", ec));
-
-    // Create a set of route attributes
-    BgpAttrSpec attrs;
-
-    EXPECT_EQ(rib_, server_.database()->FindTable("bgp.inetmvpn.0"));
-
-    // Enqueue the update
-    BgpAttrDB *db = server_.attr_db();
-    DBRequest addReq;
-
-    addReq.key.reset(new InetMVpnTable::RequestKey(prefix, &peer1));
-    BgpAttr *attr1 = new BgpAttr(db, attrs);
-    attr1->set_local_pref(10);
-
-    addReq.data.reset(new InetMVpnTable::RequestData(attr1, 0, 20));
-    addReq.oper = DBRequest::DB_ENTRY_ADD_CHANGE;
-    rib_->Enqueue(&addReq);
-    TASK_UTIL_EXPECT_EQ(1, adc_notification_);
-
-    InetMVpnTable::RequestKey key(prefix, NULL);
-    TASK_UTIL_EXPECT_TRUE(static_cast<BgpRoute *>(rib_->Find(&key)) != NULL);
-    BgpRoute *rt = static_cast<BgpRoute *>(rib_->Find(&key));
-    TASK_UTIL_EXPECT_EQ(rt->FindPath(BgpPath::BGP_XMPP, &peer1, 0),
-                                     rt->BestPath());
-
-    //
-    // Add another non-best path and make sure that notification is still
-    // received
-    //
-    addReq.key.reset(new InetMVpnTable::RequestKey(prefix, &peer2));
-    BgpAttr *attr2 = new BgpAttr(db, attrs);
-    attr2->set_local_pref(5);
-
-    addReq.data.reset(new InetMVpnTable::RequestData(attr2, 0, 20));
-    addReq.oper = DBRequest::DB_ENTRY_ADD_CHANGE;
-    rib_->Enqueue(&addReq);
-    TASK_UTIL_EXPECT_EQ(2, adc_notification_);
-    TASK_UTIL_EXPECT_EQ(rt->FindPath(BgpPath::BGP_XMPP, &peer1, 0),
-                        rt->BestPath());
-
-    //
-    // Add new best path and make sure that notification is still received
-    //
-    addReq.key.reset(new InetMVpnTable::RequestKey(prefix, &peer3));
-    BgpAttr *attr3 = new BgpAttr(db, attrs);
-    attr3->set_local_pref(15);
-
-    addReq.data.reset(new InetMVpnTable::RequestData(attr3, 0, 20));
-    addReq.oper = DBRequest::DB_ENTRY_ADD_CHANGE;
-    rib_->Enqueue(&addReq);
-    TASK_UTIL_EXPECT_EQ(3, adc_notification_);
-    TASK_UTIL_EXPECT_EQ(rt->FindPath(BgpPath::BGP_XMPP, &peer3, 0),
-                        rt->BestPath());
-
-    //
-    // Delete all the paths
-    //
-    DBRequest delReq;
-
-    delReq.key.reset(new InetMVpnTable::RequestKey(prefix, &peer3));
-    delReq.oper = DBRequest::DB_ENTRY_DELETE;
-    rib_->Enqueue(&delReq);
-    TASK_UTIL_EXPECT_EQ(4, adc_notification_);
-    TASK_UTIL_EXPECT_EQ(rt->FindPath(BgpPath::BGP_XMPP, &peer1, 0),
-                                     rt->BestPath());
-
-    delReq.key.reset(new InetMVpnTable::RequestKey(prefix, &peer2));
-    delReq.oper = DBRequest::DB_ENTRY_DELETE;
-    rib_->Enqueue(&delReq);
-    TASK_UTIL_EXPECT_EQ(5, adc_notification_);
-    TASK_UTIL_EXPECT_EQ(rt->FindPath(BgpPath::BGP_XMPP, &peer1, 0),
-                                     rt->BestPath());
-
-    delReq.key.reset(new InetMVpnTable::RequestKey(prefix, &peer1));
-    delReq.oper = DBRequest::DB_ENTRY_DELETE;
-    rib_->Enqueue(&delReq);
-    TASK_UTIL_EXPECT_EQ(5, adc_notification_);
-    TASK_UTIL_EXPECT_EQ(1, del_notification_);
-
-    //
-    // Make sure that the route itself is gone by now as all the paths have
-    // been deleted
-    //
-    InetMVpnTable::RequestKey key2(prefix, NULL);
-    TASK_UTIL_EXPECT_TRUE(static_cast<BgpRoute *>(rib_->Find(&key2)) == NULL);
-}
-
-static void SetUp() {
-    bgp_log_test::init();
-    ControlNode::SetDefaultSchedulingPolicy();
-}
-
-static void TearDown() {
+// Prefixes differ only in the group field.
+TEST_F(InetMVpnTableTest, AddDeleteMultipleRoute2) {
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1.1:65535-0,224.168.1." << idx << ",192.168.1.1";
+        AddRoute(repr.str());
+    }
     task_util::WaitForIdle();
-    TaskScheduler *scheduler = TaskScheduler::GetInstance();
-    scheduler->Terminate();
+
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1.1:65535-0,224.168.1." << idx << ",192.168.1.1";
+        VerifyRouteExists(repr.str());
+    }
+    TASK_UTIL_EXPECT_EQ(adc_notification_, kRouteCount);
+
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1.1:65535-0,224.168.1." << idx << ",192.168.1.1";
+        DelRoute(repr.str());
+    }
+    task_util::WaitForIdle();
+
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1.1:65535-0,224.168.1." << idx << ",192.168.1.1";
+        VerifyRouteNoExists(repr.str());
+    }
+    TASK_UTIL_EXPECT_EQ(del_notification_, kRouteCount);
+}
+
+// Prefixes differ only in the source field.
+TEST_F(InetMVpnTableTest, AddDeleteMultipleRoute3) {
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1.1:65535-0,224.168.1.255,192.168.1." << idx;
+        AddRoute(repr.str());
+    }
+    task_util::WaitForIdle();
+
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1.1:65535-0,224.168.1.255,192.168.1." << idx;
+        VerifyRouteExists(repr.str());
+    }
+    TASK_UTIL_EXPECT_EQ(adc_notification_, kRouteCount);
+
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1.1:65535-0,224.168.1.255,192.168.1." << idx;
+        DelRoute(repr.str());
+    }
+    task_util::WaitForIdle();
+
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1.1:65535-0,224.168.1.255,192.168.1." << idx;
+        VerifyRouteNoExists(repr.str());
+    }
+    TASK_UTIL_EXPECT_EQ(del_notification_, kRouteCount);
+}
+
+TEST_F(InetMVpnTableTest, Hashing) {
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1.1:65535-0,224.168.1." << idx << ",192.168.1.1";
+        AddRoute(repr.str());
+    }
+    task_util::WaitForIdle();
+
+    for (int idx = 0; idx < DB::PartitionCount(); idx++) {
+        DBTablePartition *tbl_partition =
+            static_cast<DBTablePartition *>(blue_->GetTablePartition(idx));
+        TASK_UTIL_EXPECT_NE(0, tbl_partition->size());
+    }
+
+    for (int idx = 1; idx <= kRouteCount; idx++) {
+        ostringstream repr;
+        repr << "0-10.1.1.1:65535-0,224.168.1." << idx << ",192.168.1.1";
+        DelRoute(repr.str());
+    }
+    task_util::WaitForIdle();
 }
 
 int main(int argc, char **argv) {
+    bgp_log_test::init();
     ::testing::InitGoogleTest(&argc, argv);
-    SetUp();
+    ControlNode::SetDefaultSchedulingPolicy();
+    BgpObjectFactory::Register<McastTreeManager>(
+        boost::factory<McastTreeManagerMock *>());
     int result = RUN_ALL_TESTS();
-    TearDown();
+    TaskScheduler::GetInstance()->Terminate();
     return result;
 }
+

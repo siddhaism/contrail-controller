@@ -46,9 +46,9 @@ env.Prepend(LIBS = [
                     'control_node',
                     'origin_vn',
                     'routing_instance',
-                    'rtarget',                    
-                    'security_group',                    
-                    'tunnel_encap',                    
+                    'rtarget',
+                    'security_group',
+                    'tunnel_encap',
                     'ifmap_vnc',
                     'bgp_schema',
                     'sandesh',
@@ -106,14 +106,9 @@ inetmvpn_table_test = env.Program('inetmvpn_table_test',
                                  ['inetmvpn_table_test.cc'])
 env.Alias('src/bgp/inetmvpn:inetmvpn_table_test', inetmvpn_table_test)
 
-inetmvpn_peer_test = env.Program('inetmvpn_peer_test',
-                                 ['inetmvpn_peer_test.cc'])
-env.Alias('src/bgp/inetmvpn:inetmvpn_peer_test', inetmvpn_peer_test)
-
 test_suite = [
     inetmvpn_prefix_test,
     inetmvpn_table_test,
-    inetmvpn_peer_test
 ]
 
 test = env.TestSuite('bgp-test', test_suite)

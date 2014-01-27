@@ -59,6 +59,22 @@ static const std::map<string, Address::Family>
         ("evpn", Address::EVPN)
         ("inetmvpn", Address::INETMVPN);
 
+static const std::map<Address::Family, string>
+    toTableName = boost::assign::map_list_of
+        (Address::UNSPEC, "unspecified")
+        (Address::INET, "inet")
+        (Address::INET6, "inet6")
+        (Address::INETVPN, "inetvpn")
+        (Address::INET6VPN, "inet6vpn")
+        (Address::RTARGET, "rtarget")
+        (Address::INETFLOW, "inetflow")
+        (Address::INETVPNFLOW, "invpnflow")
+        (Address::INETMCAST, "inetmcast")
+        (Address::INET6MCAST, "inet6mcast")
+        (Address::ENET, "enet")
+        (Address::EVPN, "evpn")
+        (Address::INETMVPN, "inetmvpn");
+
 Address::Family Address::FamilyFromString(std::string family) {
     return fromString.find(family)->second;
 }
@@ -74,6 +90,10 @@ Address::Family Address::FamilyFromRoutingTableName(std::string name) {
     if (pos2 == string::npos) pos2 = 0;
 
     return fromTableName.find(name.substr(pos2, pos1 - pos2))->second;
+}
+
+std::string Address::FamilyToTableString(Address::Family family) {
+    return toTableName.find(family)->second;
 }
 
 static int CountDots(const string &str) {
