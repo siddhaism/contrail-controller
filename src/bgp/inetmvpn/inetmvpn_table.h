@@ -50,6 +50,8 @@ public:
     virtual void set_routing_instance(RoutingInstance *rtinstance);
 
 private:
+    friend class BgpMulticastTest;
+
     virtual BgpRoute *TableFind(DBTablePartition *rtp, 
                                 const DBRequestKey *prefix);
     McastTreeManager *tree_manager_;

@@ -208,6 +208,14 @@ string InetMVpnPrefix::ToString() const {
     return repr;
 }
 
+string InetMVpnPrefix::ToXmppIdString() const {
+    assert(type_ == 0);
+    string repr = rd_.ToString();
+    repr += ":" + group_.to_string();
+    repr += "," + source_.to_string();
+    return repr;
+}
+
 InetMVpnRoute::InetMVpnRoute(const InetMVpnPrefix &prefix) : prefix_(prefix) {
 }
 
@@ -225,6 +233,10 @@ int InetMVpnRoute::CompareTo(const Route &rhs) const {
 
 string InetMVpnRoute::ToString() const {
     return prefix_.ToString();
+}
+
+string InetMVpnRoute::ToXmppIdString() const {
+    return prefix_.ToXmppIdString();
 }
 
 void InetMVpnRoute::SetKey(const DBRequestKey *reqkey) {

@@ -22,6 +22,7 @@ TEST_F(InetMVpnPrefixTest, BuildNativePrefix) {
     Ip4Address source(Ip4Address::from_string("192.168.1.1", ec));
     InetMVpnPrefix prefix(rd, group, source);
     EXPECT_EQ(prefix.ToString(), "0-10.1.1.1:65535-0,224.1.2.3,192.168.1.1");
+    EXPECT_EQ(prefix.ToXmppIdString(), "10.1.1.1:65535:224.1.2.3,192.168.1.1");
     EXPECT_EQ(0, prefix.type());
     EXPECT_EQ(prefix.route_distinguisher().ToString(), "10.1.1.1:65535");
     EXPECT_EQ(0, prefix.as_number());
@@ -34,6 +35,7 @@ TEST_F(InetMVpnPrefixTest, ParseNativePrefix) {
     string prefix_str("0-10.1.1.1:65535-0,224.1.2.3,192.168.1.1");
     InetMVpnPrefix prefix(InetMVpnPrefix::FromString(prefix_str));
     EXPECT_EQ(prefix.ToString(), "0-10.1.1.1:65535-0,224.1.2.3,192.168.1.1");
+    EXPECT_EQ(prefix.ToXmppIdString(), "10.1.1.1:65535:224.1.2.3,192.168.1.1");
     EXPECT_EQ(0, prefix.type());
     EXPECT_EQ(prefix.route_distinguisher().ToString(), "10.1.1.1:65535");
     EXPECT_EQ(0, prefix.as_number());

@@ -18,10 +18,10 @@
 #include "net/address.h"
 #include "net/rd.h"
 
-class BgpRoute;
-class BgpTable;
 class DBEntryBase;
 class DBTablePartBase;
+class InetMVpnRoute;
+class InetMVpnTable;
 class McastForwarder;
 class McastManagerPartition;
 class McastTreeManager;
@@ -66,10 +66,10 @@ typedef std::vector<McastForwarder *> McastForwarderList;
 //
 class McastForwarder : public DBState {
 public:
-    McastForwarder(BgpRoute *route);
+    McastForwarder(InetMVpnRoute *route);
     ~McastForwarder();
 
-    bool Update(BgpRoute *route);
+    bool Update(InetMVpnRoute *route);
     std::string ToString() const;
 
     McastForwarder *FindLink(McastForwarder *forwarder);
@@ -80,12 +80,12 @@ public:
     void AllocateLabel();
     void ReleaseLabel();
 
-    UpdateInfo *GetUpdateInfo(BgpTable *table);
+    UpdateInfo *GetUpdateInfo(InetMVpnTable *table);
 
     uint32_t label() const { return label_; }
     Ip4Address address() const { return address_; }
     std::vector<std::string> encap() const { return encap_; }
-    BgpRoute *route() { return route_; }
+    InetMVpnRoute *route() { return route_; }
     RouteDistinguisher route_distinguisher() const { return rd_; }
 
     bool empty() { return tree_links_.empty(); }
@@ -96,7 +96,7 @@ private:
     friend class BgpMulticastTest;
     friend class ShowMulticastManagerDetailHandler;
 
-    BgpRoute *route_;
+    InetMVpnRoute *route_;
     LabelBlockPtr label_block_;
     uint32_t label_;
     RouteDistinguisher rd_;
@@ -144,12 +144,12 @@ struct McastForwarderCompare {
 // WorkQueue. Note that the WorkQueue cannot contain more than one reference
 // to a given McastSGEntry.
 //
-// A set of pointers to McastForwarders is maintatined to keep track of the
+// A set of pointers to McastForwarders is maintained to keep track of the
 // forwarders that have sent joins for this (G,S).  The set is keyed by the
 // RouteDistinguisher of the McastForwarders. It's used to build distribution
 // tree for this McastSGEntry. The McastSGEntry is enqueued on the WorkQueue
 // in the McastManagerPartition when a McastForwarder is added or deleted,
-// so that the distribution tree gets updtaed.
+// so that the distribution tree gets updated.
 //
 class McastSGEntry {
 public:
@@ -219,7 +219,7 @@ struct McastSGEntryCompare {
 // always under a single partition.
 //
 // A McastManagerPartition keeps a set of pointers to McastSGEntrys for the
-// (G,S) states that fall under the parition. The set is keyed by the group
+// (G,S) states that fall under the partition. The set is keyed by the group
 // and source addresses.
 //
 // A WorkQueue of pointers to McastSGEntrys is used to keep track of entries
@@ -275,7 +275,7 @@ private:
 // we send the label and OList information for a (G,S) to the XMPP peers.
 //
 // A McastTableManager keeps a vector of pointers to McastManagerPartitions.
-// The number of paritions is the same as the DB partition count. Each such
+// The number of partitions is the same as the DB partition count. Each such
 // partition contains a subset of (G,S) entries learnt from the route table.
 // The concurrency model is that each McastManagerPartition can be updated
 // with membership information and can build distribution trees independently
@@ -293,7 +293,7 @@ class McastTreeManager {
 public:
     static const int kDegree = 4;
 
-    McastTreeManager(BgpTable *table);
+    McastTreeManager(InetMVpnTable *table);
     virtual ~McastTreeManager();
 
     virtual void Initialize();
@@ -301,7 +301,7 @@ public:
 
     McastManagerPartition *GetPartition(int part_id);
 
-    virtual UpdateInfo *GetUpdateInfo(BgpRoute *route);
+    virtual UpdateInfo *GetUpdateInfo(InetMVpnRoute *route);
     DBTablePartBase *GetTablePartition(size_t part_id);
 
     void ManagedDelete();
@@ -311,7 +311,7 @@ public:
     bool IsVpn() const;
 
     LifetimeActor *deleter();
-    bool ShouldReplicate(BgpRoute *route, BgpAttrPtr attr);
+    bool ShouldReplicate(InetMVpnRoute *route, BgpAttrPtr attr);
 
 private:
     friend class BgpMulticastTest;
@@ -324,7 +324,7 @@ private:
     void FreePartitions();
     void RouteListener(DBTablePartBase *tpart, DBEntryBase *db_entry);
 
-    BgpTable *table_;
+    InetMVpnTable *table_;
     int listener_id_;
     PartitionList partitions_;
 

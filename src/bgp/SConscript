@@ -71,7 +71,6 @@ libbgp = env.Library('bgp',
 env.SConscript('enet/SConscript', exports='BuildEnv', duplicate = 0)
 env.SConscript('evpn/SConscript', exports='BuildEnv', duplicate = 0)
 env.SConscript('inet/SConscript', exports='BuildEnv', duplicate = 0)
-env.SConscript('inetmcast/SConscript', exports='BuildEnv', duplicate = 0)
 env.SConscript('l3vpn/SConscript', exports='BuildEnv', duplicate = 0)
 env.SConscript('inetmvpn/SConscript', exports='BuildEnv', duplicate = 0)
 env.SConscript('origin-vn/SConscript', exports='BuildEnv', duplicate = 0)

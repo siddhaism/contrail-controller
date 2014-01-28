@@ -16,8 +16,8 @@ class BgpNeighborConfig;
 class BgpPeer;
 class BgpServer;
 class BgpSessionManager;
-class BgpTable;
 class EventManager;
+class InetMVpnTable;
 class IPeer;
 class McastTreeManager;
 class PeerManager;
@@ -33,7 +33,7 @@ class BgpObjectFactory : public Factory<BgpObjectFactory> {
     FACTORY_TYPE_N1(BgpObjectFactory, BgpConfigListener, BgpConfigManager *);
     FACTORY_TYPE_N1(BgpObjectFactory, BgpConfigManager, BgpServer *);
     FACTORY_TYPE_N1(BgpObjectFactory, BgpExport, RibOut *);
-    FACTORY_TYPE_N1(BgpObjectFactory, McastTreeManager, BgpTable *);
+    FACTORY_TYPE_N1(BgpObjectFactory, McastTreeManager, InetMVpnTable *);
     FACTORY_TYPE_N1(BgpObjectFactory, PeerCloseManager, IPeer *);
     FACTORY_TYPE_N1(BgpObjectFactory, PeerManager, RoutingInstance *);
     FACTORY_TYPE_N1(BgpObjectFactory, PeerRibMembershipManager, BgpServer *);

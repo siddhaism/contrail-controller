@@ -12,7 +12,6 @@
 #include "bgp/bgp_route.h"
 #include "bgp/bgp_server.h"
 #include "bgp/inet/inet_table.h"
-#include "bgp/inetmcast/inetmcast_route.h"
 #include "bgp/inetmvpn/inetmvpn_route.h"
 #include "bgp/routing-instance/routing_instance.h"
 #include "db/db_table_partition.h"
@@ -74,8 +73,32 @@ BgpRoute *InetMVpnTable::RouteReplicate(BgpServer *server,
 }
 
 bool InetMVpnTable::Export(RibOut *ribout, Route *route,
-        const RibPeerSet &peerset, UpdateInfoSList &uinfo_slist) {
-    return false;
+    const RibPeerSet &peerset, UpdateInfoSList &uinfo_slist) {
+    if (ribout->IsEncodingBgp())
+        return BgpTable::Export(ribout, route, peerset, uinfo_slist);
+
+    InetMVpnRoute *inetmvpn_route = dynamic_cast<InetMVpnRoute *>(route);
+    if (inetmvpn_route->GetPrefix().type() != 0)
+        return false;
+
+    if (!tree_manager_ || tree_manager_->deleter()->IsDeleted())
+        return false;
+
+    const IPeer *peer = inetmvpn_route->BestPath()->GetPeer();
+    if (!peer || !ribout->IsRegistered(const_cast<IPeer *>(peer)))
+        return false;
+
+    size_t peerbit = ribout->GetPeerIndex(const_cast<IPeer *>(peer));
+    if (!peerset.test(peerbit))
+        return false;
+
+    UpdateInfo *uinfo = tree_manager_->GetUpdateInfo(inetmvpn_route);
+    if (!uinfo)
+        return false;
+
+    uinfo->target.set(peerbit);
+    uinfo_slist->push_front(*uinfo);
+    return true;
 }
 
 void InetMVpnTable::CreateTreeManager() {

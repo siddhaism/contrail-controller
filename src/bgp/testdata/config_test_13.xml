@@ -6,8 +6,8 @@
           <autonomous-system>1</autonomous-system>
           <address-families>
               <family>inet-vpn</family>
-              <family>e-vpn</family>
               <family>inet-mvpn</family>
+              <family>e-vpn</family>
           </address-families>
       </bgp-router>
       <bgp-router name='remote1'>

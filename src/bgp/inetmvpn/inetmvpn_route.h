@@ -30,6 +30,7 @@ public:
     static InetMVpnPrefix FromString(const std::string &str,
                                      boost::system::error_code *errorp = NULL);
     std::string ToString() const;
+    std::string ToXmppIdString() const;
 
     uint8_t type() const { return type_; }
     RouteDistinguisher route_distinguisher() const { return rd_; }
@@ -54,10 +55,9 @@ public:
     virtual int CompareTo(const Route &rhs) const;
 
     virtual std::string ToString() const;
+    virtual std::string ToXmppIdString() const;
 
-    const InetMVpnPrefix &GetPrefix() const {
-        return prefix_;
-    }
+    const InetMVpnPrefix &GetPrefix() const { return prefix_; }
 
     virtual KeyPtr GetDBRequestKey() const;
     virtual void SetKey(const DBRequestKey *reqkey);
@@ -74,6 +74,7 @@ public:
 
     virtual u_int16_t Afi() const { return BgpAf::IPv4; }
     virtual u_int8_t Safi() const { return BgpAf::McastVpn; }
+    virtual u_int8_t XmppSafi() const { return BgpAf::Mcast; }
 
 private:
     InetMVpnPrefix prefix_;

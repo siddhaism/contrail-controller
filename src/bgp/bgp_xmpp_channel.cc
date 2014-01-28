@@ -21,7 +21,7 @@
 #include "bgp/bgp_ribout.h"
 #include "bgp/bgp_server.h"
 #include "bgp/inet/inet_table.h"
-#include "bgp/inetmcast/inetmcast_table.h"
+#include "bgp/inetmvpn/inetmvpn_table.h"
 #include "bgp/enet/enet_table.h"
 #include "bgp/ipeer.h"
 #include "bgp/origin-vn/origin_vn.h"
@@ -500,7 +500,7 @@ void BgpXmppChannel::ProcessMcastItem(std::string vrf_name,
     //Build the key to the Multicast DBTable
     PeerRibMembershipManager *mgr = bgp_server_->membership_mgr();
     if (rt_instance != NULL) {
-        table = rt_instance->GetTable(Address::INETMCAST);
+        table = rt_instance->GetTable(Address::INETMVPN);
         if (table == NULL) {
             BGP_LOG_PEER_INSTANCE(Peer(), vrf_name,
                     SandeshLevel::SYS_WARN, BGP_LOG_FLAG_ALL,
@@ -548,11 +548,11 @@ void BgpXmppChannel::ProcessMcastItem(std::string vrf_name,
     }
 
     RouteDistinguisher mc_rd(peer_->bgp_identifier(), instance_id);
-    InetMcastPrefix mc_prefix(mc_rd, grp_address.to_v4(), src_address.to_v4());
+    InetMVpnPrefix mc_prefix(mc_rd, grp_address.to_v4(), src_address.to_v4());
 
     //Build and enqueue a DB request for route-addition
     DBRequest req;
-    req.key.reset(new InetMcastTable::RequestKey(mc_prefix, peer_.get()));
+    req.key.reset(new InetMVpnTable::RequestKey(mc_prefix, peer_.get()));
 
     uint32_t flags = 0;
     ExtCommunitySpec ext;
@@ -628,7 +628,7 @@ void BgpXmppChannel::ProcessMcastItem(std::string vrf_name,
             attrs.push_back(&ext);
 
         BgpAttrPtr attr = bgp_server_->attr_db()->Locate(attrs);
-        req.data.reset(new InetMcastTable::RequestData(attr, flags, 0));
+        req.data.reset(new InetMVpnTable::RequestData(attr, flags, 0));
         stats_[0].reach++;
     } else {
         req.oper = DBRequest::DB_ENTRY_DELETE;
@@ -643,7 +643,7 @@ void BgpXmppChannel::ProcessMcastItem(std::string vrf_name,
         DBRequest *request_entry = new DBRequest();
         request_entry->Swap(&req);
         std::string table_name =
-            RoutingInstance::GetTableNameFromVrf(vrf_name, Address::INETMCAST);
+            RoutingInstance::GetTableNameFromVrf(vrf_name, Address::INETMVPN);
         defer_q_.insert(std::make_pair(std::make_pair(vrf_name, table_name),
                                        request_entry));
         return;
@@ -1337,10 +1337,13 @@ void BgpXmppChannel::ProcessDeferredSubscribeRequest(std::string vrf_name,
          it != rt_list.end(); ++it) {
 
         BgpTable *table = it->second;
-        if (table->family() == Address::INETVPN) {
-            //Do not register to inetvpn table
+        if (table->family() == Address::INETVPN)
             continue;
-        }
+        if (table->family() == Address::EVPN)
+            continue;
+        if (rt_instance->IsDefaultRoutingInstance() &&
+            table->family() == Address::INETMVPN)
+            continue;
 
         RegisterTable(table, instance_id);
 
@@ -1391,7 +1394,6 @@ void BgpXmppChannel::ProcessSubscriptionRequest(
         return;
     }
 
-    // TODO: handle missing inet/inetmcast etc tables??
     RoutingInstance::RouteTableList const rt_list = rt_instance->GetTables();
     for (RoutingInstance::RouteTableList::const_iterator it = rt_list.begin();
          it != rt_list.end(); ++it) {
@@ -1401,7 +1403,8 @@ void BgpXmppChannel::ProcessSubscriptionRequest(
             continue;
         if (table->family() == Address::EVPN)
             continue;
-        if (table->family() == Address::INETMVPN)
+        if (rt_instance->IsDefaultRoutingInstance() &&
+            table->family() == Address::INETMVPN)
             continue;
 
         if (add_change) {

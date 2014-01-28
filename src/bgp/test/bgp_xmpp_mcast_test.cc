@@ -8,8 +8,8 @@
 #include "bgp/bgp_sandesh.h"
 #include "bgp/bgp_session_manager.h"
 #include "bgp/bgp_xmpp_channel.h"
-#include "bgp/inetmcast/inetmcast_route.h"
-#include "bgp/inetmcast/inetmcast_table.h"
+#include "bgp/inetmvpn/inetmvpn_route.h"
+#include "bgp/inetmvpn/inetmvpn_table.h"
 #include "bgp/test/bgp_server_test_util.h"
 #include "io/test/event_manager_test.h"
 #include "control-node/control_node.h"
@@ -237,40 +237,40 @@ protected:
 TEST_F(BgpXmppMcastErrorTest, BadGroupAddress) {
     agent_a_->AddMcastRoute("blue", "225.0.0,10.1.1.1", "7.7.7.7", "1000-2000");
     task_util::WaitForIdle();
-    InetMcastTable *blue_table_ = static_cast<InetMcastTable *>(
-        bs_x_->database()->FindTable("blue.inetmcast.0"));
+    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
+        bs_x_->database()->FindTable("blue.inetmvpn.0"));
     EXPECT_TRUE(blue_table_->Size() == 0);
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadSourceAddress) {
     agent_a_->AddMcastRoute("blue", "225.0.0.1,10.1.1", "7.7.7.7", "1000-2000");
     task_util::WaitForIdle();
-    InetMcastTable *blue_table_ = static_cast<InetMcastTable *>(
-        bs_x_->database()->FindTable("blue.inetmcast.0"));
+    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
+        bs_x_->database()->FindTable("blue.inetmvpn.0"));
     EXPECT_TRUE(blue_table_->Size() == 0);
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadNexthopAddress) {
     agent_a_->AddMcastRoute("blue", "225.0.0.1,10.1.1.1", "7.7", "1000-2000");
     task_util::WaitForIdle();
-    InetMcastTable *blue_table_ = static_cast<InetMcastTable *>(
-        bs_x_->database()->FindTable("blue.inetmcast.0"));
+    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
+        bs_x_->database()->FindTable("blue.inetmvpn.0"));
     EXPECT_TRUE(blue_table_->Size() == 0);
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadLabelBlock1) {
     agent_a_->AddMcastRoute("blue", "225.0.0.1,10.1.1.1", "7.7.7.7", "100,200");
     task_util::WaitForIdle();
-    InetMcastTable *blue_table_ = static_cast<InetMcastTable *>(
-        bs_x_->database()->FindTable("blue.inetmcast.0"));
+    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
+        bs_x_->database()->FindTable("blue.inetmvpn.0"));
     EXPECT_TRUE(blue_table_->Size() == 0);
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadLabelBlock2) {
     agent_a_->AddMcastRoute("blue", "225.0.0.1,10.1.1.1", "7.7.7.7", "1-2-3");
     task_util::WaitForIdle();
-    InetMcastTable *blue_table_ = static_cast<InetMcastTable *>(
-        bs_x_->database()->FindTable("blue.inetmcast.0"));
+    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
+        bs_x_->database()->FindTable("blue.inetmvpn.0"));
     EXPECT_TRUE(blue_table_->Size() == 0);
 }
 
@@ -387,13 +387,13 @@ TEST_F(BgpXmppMcastSubscriptionTest, SubsequentSubscribeUnsubscribe) {
     VerifyOListElem(agent_b_.get(), "blue", mroute, 1, "7.7.7.7");
 
     // Verify that agent a mcast route was added with instance_id = 2.
-    InetMcastTable *blue_table_ = static_cast<InetMcastTable *>(
-            bs_x_->database()->FindTable("blue.inetmcast.0"));
-    const char *route = "127.0.0.1:2:225.0.0.1,0.0.0.0";
-    InetMcastPrefix prefix(InetMcastPrefix::FromString(route));
-    InetMcastTable::RequestKey key(prefix, NULL);
+    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
+            bs_x_->database()->FindTable("blue.inetmvpn.0"));
+    const char *route = "0-127.0.0.1:2-0,225.0.0.1,0.0.0.0";
+    InetMVpnPrefix prefix(InetMVpnPrefix::FromString(route));
+    InetMVpnTable::RequestKey key(prefix, NULL);
     TASK_UTIL_EXPECT_TRUE(
-        dynamic_cast<InetMcastRoute *>(blue_table_->Find(&key)) != NULL);
+        dynamic_cast<InetMVpnRoute *>(blue_table_->Find(&key)) != NULL);
 
     // Delete mcast route for all agents.
     agent_a_->DeleteMcastRoute("blue", mroute);
@@ -641,12 +641,12 @@ TEST_F(BgpXmppMcastMultiAgentTest, Introspect) {
     task_util::WaitForIdle();
     TASK_UTIL_EXPECT_EQ(1, validate_done_);
 
-    // Now get blue.inetmcast.0.
+    // Now get blue.inetmvpn.0.
     result = list_of(3);
     Sandesh::set_response_callback(boost::bind(ValidateShowRouteResponse, _1,
                                    result));
     show_req = new ShowRouteReq;
-    show_req->set_routing_table("blue.inetmcast.0");
+    show_req->set_routing_table("blue.inetmvpn.0");
     validate_done_ = 0;
     show_req->HandleRequest();
     show_req->Release();
@@ -664,12 +664,12 @@ TEST_F(BgpXmppMcastMultiAgentTest, Introspect) {
     TASK_UTIL_EXPECT_EQ(0, agent_b_->McastRouteCount());
     TASK_UTIL_EXPECT_EQ(0, agent_c_->McastRouteCount());
 
-    // Get blue.inetmcast.0 again.
+    // Get blue.inetmvpn.0 again.
     result.resize(0);
     Sandesh::set_response_callback(boost::bind(ValidateShowRouteResponse, _1,
                                    result));
     show_req = new ShowRouteReq;
-    show_req->set_routing_table("blue.inetmcast.0");
+    show_req->set_routing_table("blue.inetmvpn.0");
     validate_done_ = 0;
     show_req->HandleRequest();
     show_req->Release();

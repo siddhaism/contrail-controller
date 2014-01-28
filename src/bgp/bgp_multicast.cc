@@ -11,10 +11,8 @@
 #include "bgp/bgp_route.h"
 #include "bgp/bgp_table.h"
 #include "bgp/ipeer.h"
-#include "bgp/inetmcast/inetmcast_table.h"
 #include "bgp/inetmvpn/inetmvpn_table.h"
 #include "bgp/routing-instance/routing_instance.h"
-#include "route/route.h"
 
 class McastTreeManager::DeleteActor : public LifetimeActor {
 public:
@@ -35,15 +33,7 @@ public:
     }
 
     virtual void Destroy() {
-        InetMcastTable *inetMcastTable =
-            dynamic_cast<InetMcastTable *>(tree_manager_->table_);
-        if (inetMcastTable) {
-            inetMcastTable->DestroyTreeManager();
-        } else {
-            InetMVpnTable *inetMvpnTable = dynamic_cast<InetMVpnTable *>(
-                    tree_manager_->table_);
-            inetMvpnTable->DestroyTreeManager();
-        }
+        tree_manager_->table_->DestroyTreeManager();
     }
 
 private:
@@ -53,18 +43,10 @@ private:
 //
 // Constructor for McastForwarder. We get the address of the forwarder
 // from the nexthop. The RD also ought to contain the same information.
-// The LabelBlockPtr from the InetMcastRoute is copied for convenience.
+// The LabelBlockPtr from the InetMVpnRoute is copied for convenience.
 //
-McastForwarder::McastForwarder(BgpRoute *route)
-    : route_(route), label_(0) {
-
-    InetMcastRoute *mroute = dynamic_cast<InetMcastRoute *>(route);
-    if (mroute) {
-        rd_ = mroute->GetPrefix().route_distinguisher();
-    } else {
-        InetMVpnRoute *mvroute = dynamic_cast<InetMVpnRoute *>(route);
-        rd_ = mvroute->GetPrefix().route_distinguisher();
-    }
+McastForwarder::McastForwarder(InetMVpnRoute *route)
+    : route_(route), label_(0), rd_(route->GetPrefix().route_distinguisher()) {
     const BgpPath *path = route->BestPath();
     label_block_ = path->GetAttr()->label_block();
     address_ = path->GetAttr()->nexthop().to_v4();
@@ -82,10 +64,10 @@ McastForwarder::~McastForwarder() {
 }
 
 //
-// Update the` McastForwarder based on information in the InetMcastRoute.
+// Update the` McastForwarder based on information in the InetMVpnRoute.
 // Return true if something changed.
 //
-bool McastForwarder::Update(BgpRoute *route) {
+bool McastForwarder::Update(InetMVpnRoute *route) {
     McastForwarder forwarder(route);
     bool changed = false;
     if (label_block_ != forwarder.label_block_) {
@@ -177,14 +159,14 @@ void McastForwarder::ReleaseLabel() {
 
 //
 // Construct an UpdateInfo with the RibOutAttr that needs to be advertised to
-// the IPeer for the InetMcastRoute associated with this McastForwarder. This
-// is used the Export method of the InetMcastTable.  The target RibPeerSet is
+// the IPeer for the InetMVpnRoute associated with this McastForwarder. This
+// is used the Export method of the InetMVpnTable.  The target RibPeerSet is
 // in the UpdateInfo is assumed to be filled in by the caller.
 //
 // The main functionality here is to transform the McastForwarderList for the
 // distribution tree into a BgpOList.
 //
-UpdateInfo *McastForwarder::GetUpdateInfo(BgpTable *table) {
+UpdateInfo *McastForwarder::GetUpdateInfo(InetMVpnTable *table) {
     CHECK_CONCURRENCY("db::DBTable");
 
     // Bail if the tree has not been
@@ -198,7 +180,7 @@ UpdateInfo *McastForwarder::GetUpdateInfo(BgpTable *table) {
         olist->elements.push_back(elem);
     }
 
-    if (dynamic_cast<InetMcastTable *>(table)) {
+    if (dynamic_cast<InetMVpnTable *>(table)) {
 
         // Check if there are additional links from additional (bgp) paths.
         for (Route::PathList::iterator it =
@@ -299,7 +281,7 @@ void McastSGEntry::UpdateTree() {
     if (partition_->GetTreeManager()->IsVpn()) degree--;
 
     // First get rid of the previous distribution tree and enqueue all the
-    // associated InetMcastRoutes for notification.  Note that DBListeners
+    // associated InetMVpnRoutes for notification.  Note that DBListeners
     // will not get invoked until after this routine is done.
     for (ForwarderSet::iterator it = forwarders_.begin();
         it != forwarders_.end(); ++it) {
@@ -422,7 +404,7 @@ bool McastManagerPartition::ProcessSGEntry(McastSGEntry *sg_entry) {
 }
 
 //
-// Get the DBTablePartBase for the InetMcastTable for our partition id.
+// Get the DBTablePartBase for the InetMVpnTable for our partition id.
 //
 DBTablePartBase *McastManagerPartition::GetTablePartition() {
     return tree_manager_->GetTablePartition(part_id_);
@@ -431,7 +413,7 @@ DBTablePartBase *McastManagerPartition::GetTablePartition() {
 //
 // Constructor for McastTreeManager.
 //
-McastTreeManager::McastTreeManager(BgpTable *table)
+McastTreeManager::McastTreeManager(InetMVpnTable *table)
     : table_(table), table_delete_ref_(this, table->deleter()) {
     deleter_.reset(new DeleteActor(this));
 }
@@ -444,7 +426,7 @@ McastTreeManager::~McastTreeManager() {
 
 //
 // Initialize the McastTreeManager. We allocate the McastManagerPartitions
-// and register a DBListener for the InetMcastTable.
+// and register a DBListener for the InetMVpnTable.
 //
 void McastTreeManager::Initialize() {
     AllocPartitions();
@@ -454,7 +436,7 @@ void McastTreeManager::Initialize() {
 
 //
 // Terminate the McastTreeManager. We free the McastManagerPartitions
-// and unregister from the InetMcastTable.
+// and unregister from the InetMVpnTable.
 //
 void McastTreeManager::Terminate() {
     table_->Unregister(listener_id_);
@@ -485,17 +467,17 @@ McastManagerPartition *McastTreeManager::GetPartition(int part_id) {
 }
 
 //
-// Get the DBTablePartBase for the InetMcastTable for given partition id.
+// Get the DBTablePartBase for the InetMVpnTable for given partition id.
 //
 DBTablePartBase *McastTreeManager::GetTablePartition(size_t part_id) {
     return table_->GetTablePartition(part_id);
 }
 
 //
-// Construct export state for the given InetMcastRoute. Note that the route
+// Construct export state for the given InetMVpnRoute. Note that the route
 // only needs to be exported to the IPeer from which it was learnt.
 //
-UpdateInfo *McastTreeManager::GetUpdateInfo(BgpRoute *route) {
+UpdateInfo *McastTreeManager::GetUpdateInfo(InetMVpnRoute *route) {
     CHECK_CONCURRENCY("db::DBTable");
 
     DBState *dbstate = route->GetState(table_, listener_id_);
@@ -509,7 +491,7 @@ UpdateInfo *McastTreeManager::GetUpdateInfo(BgpRoute *route) {
 
 // Only replicate if this route's McastForwarder is the right most and bottom
 // most child in the multicast distribution tree.
-bool McastTreeManager::ShouldReplicate(BgpRoute *route,
+bool McastTreeManager::ShouldReplicate(InetMVpnRoute *route,
                                        BgpAttrPtr edge_discovery_attribute) {
     DBState *dbstate = route->GetState(table_, listener_id_);
     McastForwarder *forwarder = dynamic_cast<McastForwarder *>(dbstate);
@@ -522,7 +504,7 @@ bool McastTreeManager::ShouldReplicate(BgpRoute *route,
 }
 
 //
-// DBListener callback handler for the InetMcastTable. It creates or deletes
+// DBListener callback handler for the InetMVpnTable. It creates or deletes
 // the associated McastForwarder as appropriate. Also creates a McastSGEntry
 // if one doesn't already exist.  However, McastSGEntrys don't get deleted
 // from here.  They only get deleted from the WorkQueue callback routine.
@@ -532,21 +514,7 @@ void McastTreeManager::RouteListener(
     CHECK_CONCURRENCY("db::DBTable");
 
     McastManagerPartition *partition = partitions_[tpart->index()];
-    BgpRoute *route = dynamic_cast<BgpRoute *>(db_entry);
-    InetMcastRoute *mroute = dynamic_cast<InetMcastRoute *>(db_entry);
-
-    Ip4Address group;
-    Ip4Address source;
-
-    if (mroute) {
-        source = mroute->GetPrefix().source();
-        source = mroute->GetPrefix().group();
-    } else {
-        InetMVpnRoute *mvroute = dynamic_cast<InetMVpnRoute *>(db_entry);
-        source = mvroute->GetPrefix().source();
-        source = mvroute->GetPrefix().group();
-    }
-
+    InetMVpnRoute *route = dynamic_cast<InetMVpnRoute *>(db_entry);
 
     DBState *dbstate = route->GetState(table_, listener_id_);
     if (!dbstate) {
@@ -558,7 +526,7 @@ void McastTreeManager::RouteListener(
 
         // Create a new McastForwarder and associate it with the route.
         McastSGEntry *sg_entry = partition->LocateSGEntry(
-            group, source);
+            route->GetPrefix().group(), route->GetPrefix().source());
         McastForwarder *forwarder = new McastForwarder(route);
         sg_entry->AddForwarder(forwarder);
         route->SetState(table_, listener_id_, forwarder);
@@ -566,7 +534,7 @@ void McastTreeManager::RouteListener(
     } else {
 
         McastSGEntry *sg_entry = partition->FindSGEntry(
-            group, source);
+            route->GetPrefix().group(), route->GetPrefix().source());
         assert(sg_entry);
         McastForwarder *forwarder = dynamic_cast<McastForwarder *>(dbstate);
         assert(forwarder);
