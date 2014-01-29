@@ -69,7 +69,71 @@ DBTableBase *InetMVpnTable::CreateTable(DB *db, const std::string &name) {
 BgpRoute *InetMVpnTable::RouteReplicate(BgpServer *server,
         BgpTable *src_table, BgpRoute *src_rt, const BgpPath *src_path,
         ExtCommunityPtr community) {
-    return NULL;
+    assert(src_table->family() == Address::INETMVPN);
+
+    InetMVpnTable *src_mvpn_table = dynamic_cast<InetMVpnTable *>(src_table);
+    if (!IsDefault() && !src_mvpn_table->IsDefault())
+        return NULL;
+
+    InetMVpnRoute *mroute = dynamic_cast<InetMVpnRoute *>(src_rt);
+    assert(mroute);
+
+    if (mroute->GetPrefix().type() == 0)
+        return NULL;
+
+    InetMVpnPrefix mprefix(mroute->GetPrefix());
+    if (mroute->GetPrefix().type() == 8) {
+        if (IsDefault()) {
+            mprefix.set_route_distinguisher(src_path->GetAttr()->source_rd());
+        } else {
+            mprefix.set_route_distinguisher(RouteDistinguisher::null_rd);
+        }
+    }
+    InetMVpnRoute rt_key(mprefix);
+
+    DBTablePartition *rtp =
+        static_cast<DBTablePartition *>(GetTablePartition(&rt_key));
+    BgpRoute *dest_route = static_cast<BgpRoute *>(rtp->Find(&rt_key));
+    if (dest_route == NULL) {
+        dest_route = new InetMVpnRoute(mprefix);
+        rtp->Add(dest_route);
+    } else {
+        dest_route->ClearDelete();
+    }
+
+    BgpAttrPtr new_attr =
+        server->attr_db()->ReplaceExtCommunityAndLocate(src_path->GetAttr(),
+                                                        community);
+
+    // Check whether peer already has a path
+    BgpPath *dest_path = dest_route->FindSecondaryPath(src_rt,
+            src_path->GetSource(), src_path->GetPeer(),
+            src_path->GetPathId());
+    if (dest_path != NULL) {
+        if (new_attr != dest_path->GetAttr()) {
+            // Update Attributes and notify (if needed)
+            bool success = dest_route->RemoveSecondaryPath(src_rt,
+                src_path->GetSource(), src_path->GetPeer(),
+                src_path->GetPathId());
+            assert(success);
+        } else {
+            return dest_route;
+        }
+    }
+
+    // Create replicated path and insert it on the route
+    BgpSecondaryPath *replicated_path =
+        new BgpSecondaryPath(src_path->GetPeer(), src_path->GetPathId(),
+                             src_path->GetSource(), new_attr,
+                             src_path->GetFlags(), src_path->GetLabel());
+    replicated_path->SetReplicateInfo(src_table, src_rt);
+    dest_route->InsertPath(replicated_path);
+
+    // Trigger notification only if the inserted path is selected
+    if (replicated_path == dest_route->front())
+        rtp->Notify(dest_route);
+
+    return dest_route;
 }
 
 bool InetMVpnTable::Export(RibOut *ribout, Route *route,
@@ -120,6 +184,10 @@ McastTreeManager *InetMVpnTable::GetTreeManager() {
 void InetMVpnTable::set_routing_instance(RoutingInstance *rtinstance) {
     BgpTable::set_routing_instance(rtinstance);
     CreateTreeManager();
+}
+
+bool InetMVpnTable::IsDefault() const {
+    return routing_instance()->IsDefaultRoutingInstance();
 }
 
 static void RegisterFactory() {

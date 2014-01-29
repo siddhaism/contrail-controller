@@ -38,6 +38,8 @@ public:
     Ip4Address router_id() const { return router_id_; }
     Ip4Address group() const { return group_; }
     Ip4Address source() const { return source_; }
+    void set_route_distinguisher(RouteDistinguisher rd) { rd_ = rd; }
+
     void BuildProtoPrefix(BgpProtoPrefix *prefix) const;
 
 private:

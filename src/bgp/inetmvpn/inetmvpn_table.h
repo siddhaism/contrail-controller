@@ -49,6 +49,8 @@ public:
     McastTreeManager *GetTreeManager();
     virtual void set_routing_instance(RoutingInstance *rtinstance);
 
+    bool IsDefault() const;
+
 private:
     friend class BgpMulticastTest;
 
