@@ -389,7 +389,7 @@ TEST_F(BgpXmppMcastSubscriptionTest, SubsequentSubscribeUnsubscribe) {
     // Verify that agent a mcast route was added with instance_id = 2.
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
             bs_x_->database()->FindTable("blue.inetmvpn.0"));
-    const char *route = "0-127.0.0.1:2-0,225.0.0.1,0.0.0.0";
+    const char *route = "0-127.0.0.1:2-0.0.0.0,225.0.0.1,0.0.0.0";
     InetMVpnPrefix prefix(InetMVpnPrefix::FromString(route));
     InetMVpnTable::RequestKey key(prefix, NULL);
     TASK_UTIL_EXPECT_TRUE(

@@ -20,52 +20,49 @@ TEST_F(InetMVpnPrefixTest, BuildNativePrefix) {
     RouteDistinguisher rd(RouteDistinguisher::FromString("10.1.1.1:65535"));
     Ip4Address group(Ip4Address::from_string("224.1.2.3", ec));
     Ip4Address source(Ip4Address::from_string("192.168.1.1", ec));
-    InetMVpnPrefix prefix(rd, group, source);
-    EXPECT_EQ(prefix.ToString(), "0-10.1.1.1:65535-0,224.1.2.3,192.168.1.1");
-    EXPECT_EQ(prefix.ToXmppIdString(), "10.1.1.1:65535:224.1.2.3,192.168.1.1");
-    EXPECT_EQ(0, prefix.type());
-    EXPECT_EQ(prefix.route_distinguisher().ToString(), "10.1.1.1:65535");
-    EXPECT_EQ(0, prefix.as_number());
-    EXPECT_EQ("0.0.0.0", prefix.router_id().to_string());
-    EXPECT_EQ(prefix.group().to_string(), "224.1.2.3");
-    EXPECT_EQ(prefix.source().to_string(), "192.168.1.1");
-}
-
-TEST_F(InetMVpnPrefixTest, ParseNativePrefix) {
-    string prefix_str("0-10.1.1.1:65535-0,224.1.2.3,192.168.1.1");
-    InetMVpnPrefix prefix(InetMVpnPrefix::FromString(prefix_str));
-    EXPECT_EQ(prefix.ToString(), "0-10.1.1.1:65535-0,224.1.2.3,192.168.1.1");
-    EXPECT_EQ(prefix.ToXmppIdString(), "10.1.1.1:65535:224.1.2.3,192.168.1.1");
-    EXPECT_EQ(0, prefix.type());
-    EXPECT_EQ(prefix.route_distinguisher().ToString(), "10.1.1.1:65535");
-    EXPECT_EQ(0, prefix.as_number());
-    EXPECT_EQ("0.0.0.0", prefix.router_id().to_string());
-    EXPECT_EQ(prefix.group().to_string(), "224.1.2.3");
-    EXPECT_EQ(prefix.source().to_string(), "192.168.1.1");
-}
-
-TEST_F(InetMVpnPrefixTest, BuildCMcastPrefix) {
-    boost::system::error_code ec;
-    RouteDistinguisher rd(RouteDistinguisher::FromString("10.1.1.1:65535"));
-    Ip4Address group(Ip4Address::from_string("224.1.2.3", ec));
-    Ip4Address source(Ip4Address::from_string("192.168.1.1", ec));
-    InetMVpnPrefix prefix(rd, 65412, group, source);
-    EXPECT_EQ("7-10.1.1.1:65535-65412,224.1.2.3,192.168.1.1", prefix.ToString());
-    EXPECT_EQ(7, prefix.type());
+    InetMVpnPrefix prefix(InetMVpnPrefix::NativeRoute, rd, group, source);
+    EXPECT_EQ("0-10.1.1.1:65535-0.0.0.0,224.1.2.3,192.168.1.1", prefix.ToString());
+    EXPECT_EQ("10.1.1.1:65535:224.1.2.3,192.168.1.1", prefix.ToXmppIdString());
+    EXPECT_EQ(InetMVpnPrefix::NativeRoute, prefix.type());
     EXPECT_EQ("10.1.1.1:65535", prefix.route_distinguisher().ToString());
-    EXPECT_EQ(65412, prefix.as_number());
     EXPECT_EQ("0.0.0.0", prefix.router_id().to_string());
     EXPECT_EQ("224.1.2.3", prefix.group().to_string());
     EXPECT_EQ("192.168.1.1", prefix.source().to_string());
 }
 
-TEST_F(InetMVpnPrefixTest, ParseCMcastPrefix) {
-    string prefix_str("7-10.1.1.1:65535-65412,224.1.2.3,192.168.1.1");
+TEST_F(InetMVpnPrefixTest, ParseNativePrefix) {
+    string prefix_str("0-10.1.1.1:65535-0.0.0.0,224.1.2.3,192.168.1.1");
     InetMVpnPrefix prefix(InetMVpnPrefix::FromString(prefix_str));
-    EXPECT_EQ(7, prefix.type());
+    EXPECT_EQ("0-10.1.1.1:65535-0.0.0.0,224.1.2.3,192.168.1.1", prefix.ToString());
+    EXPECT_EQ("10.1.1.1:65535:224.1.2.3,192.168.1.1", prefix.ToXmppIdString());
+    EXPECT_EQ(InetMVpnPrefix::NativeRoute, prefix.type());
     EXPECT_EQ("10.1.1.1:65535", prefix.route_distinguisher().ToString());
-    EXPECT_EQ(65412, prefix.as_number());
     EXPECT_EQ("0.0.0.0", prefix.router_id().to_string());
+    EXPECT_EQ("224.1.2.3", prefix.group().to_string());
+    EXPECT_EQ("192.168.1.1", prefix.source().to_string());
+}
+
+TEST_F(InetMVpnPrefixTest, BuildCMcastPrefix) {
+    boost::system::error_code ec;
+    RouteDistinguisher rd(RouteDistinguisher::FromString("10.1.1.1:65535"));
+    Ip4Address router_id(Ip4Address::from_string("9.8.7.6", ec));
+    Ip4Address group(Ip4Address::from_string("224.1.2.3", ec));
+    Ip4Address source(Ip4Address::from_string("192.168.1.1", ec));
+    InetMVpnPrefix prefix(InetMVpnPrefix::CMcastRoute, rd, router_id, group, source);
+    EXPECT_EQ("1-10.1.1.1:65535-9.8.7.6,224.1.2.3,192.168.1.1", prefix.ToString());
+    EXPECT_EQ(InetMVpnPrefix::CMcastRoute, prefix.type());
+    EXPECT_EQ("10.1.1.1:65535", prefix.route_distinguisher().ToString());
+    EXPECT_EQ("9.8.7.6", prefix.router_id().to_string());
+    EXPECT_EQ("224.1.2.3", prefix.group().to_string());
+    EXPECT_EQ("192.168.1.1", prefix.source().to_string());
+}
+
+TEST_F(InetMVpnPrefixTest, ParseCMcastPrefix) {
+    string prefix_str("1-10.1.1.1:65535-9.8.7.6,224.1.2.3,192.168.1.1");
+    InetMVpnPrefix prefix(InetMVpnPrefix::FromString(prefix_str));
+    EXPECT_EQ(InetMVpnPrefix::CMcastRoute, prefix.type());
+    EXPECT_EQ("10.1.1.1:65535", prefix.route_distinguisher().ToString());
+    EXPECT_EQ("9.8.7.6", prefix.router_id().to_string());
     EXPECT_EQ("224.1.2.3", prefix.group().to_string());
     EXPECT_EQ("192.168.1.1", prefix.source().to_string());
 }
@@ -73,25 +70,23 @@ TEST_F(InetMVpnPrefixTest, ParseCMcastPrefix) {
 TEST_F(InetMVpnPrefixTest, BuildTreePrefix) {
     boost::system::error_code ec;
     RouteDistinguisher rd(RouteDistinguisher::FromString("10.1.1.1:65535"));
+    Ip4Address router_id(Ip4Address::from_string("9.8.7.6", ec));
     Ip4Address group(Ip4Address::from_string("224.1.2.3", ec));
     Ip4Address source(Ip4Address::from_string("192.168.1.1", ec));
-    Ip4Address router_id(Ip4Address::from_string("9.8.7.6", ec));
-    InetMVpnPrefix prefix(rd, router_id, group, source);
-    EXPECT_EQ("8-10.1.1.1:65535-9.8.7.6,224.1.2.3,192.168.1.1", prefix.ToString());
-    EXPECT_EQ(8, prefix.type());
+    InetMVpnPrefix prefix(InetMVpnPrefix::TreeRoute, rd, router_id, group, source);
+    EXPECT_EQ("2-10.1.1.1:65535-9.8.7.6,224.1.2.3,192.168.1.1", prefix.ToString());
+    EXPECT_EQ(InetMVpnPrefix::TreeRoute, prefix.type());
     EXPECT_EQ("10.1.1.1:65535", prefix.route_distinguisher().ToString());
-    EXPECT_EQ(0, prefix.as_number());
     EXPECT_EQ("9.8.7.6", prefix.router_id().to_string());
     EXPECT_EQ("224.1.2.3", prefix.group().to_string());
     EXPECT_EQ("192.168.1.1", prefix.source().to_string());
 }
 
 TEST_F(InetMVpnPrefixTest, ParseTreePrefix) {
-    string prefix_str("8-10.1.1.1:65535-9.8.7.6,224.1.2.3,192.168.1.1");
+    string prefix_str("2-10.1.1.1:65535-9.8.7.6,224.1.2.3,192.168.1.1");
     InetMVpnPrefix prefix(InetMVpnPrefix::FromString(prefix_str));
-    EXPECT_EQ(8, prefix.type());
+    EXPECT_EQ(InetMVpnPrefix::TreeRoute, prefix.type());
     EXPECT_EQ("10.1.1.1:65535", prefix.route_distinguisher().ToString());
-    EXPECT_EQ(0, prefix.as_number());
     EXPECT_EQ("9.8.7.6", prefix.router_id().to_string());
     EXPECT_EQ("224.1.2.3", prefix.group().to_string());
     EXPECT_EQ("192.168.1.1", prefix.source().to_string());

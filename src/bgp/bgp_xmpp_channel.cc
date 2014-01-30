@@ -548,7 +548,8 @@ void BgpXmppChannel::ProcessMcastItem(std::string vrf_name,
     }
 
     RouteDistinguisher mc_rd(peer_->bgp_identifier(), instance_id);
-    InetMVpnPrefix mc_prefix(mc_rd, grp_address.to_v4(), src_address.to_v4());
+    InetMVpnPrefix mc_prefix(InetMVpnPrefix::NativeRoute, mc_rd,
+        grp_address.to_v4(), src_address.to_v4());
 
     //Build and enqueue a DB request for route-addition
     DBRequest req;

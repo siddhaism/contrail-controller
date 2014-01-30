@@ -19,22 +19,28 @@
 
 class InetMVpnPrefix {
 public:
+    enum RouteType {
+        NativeRoute = 0,
+        CMcastRoute = 1,
+        TreeRoute = 2,
+    };
+
     InetMVpnPrefix();
     explicit InetMVpnPrefix(const BgpProtoPrefix &prefix);
-    InetMVpnPrefix(const RouteDistinguisher &rd,
+    InetMVpnPrefix(uint8_t type, const RouteDistinguisher &rd,
                    const Ip4Address &group, const Ip4Address &source);
-    InetMVpnPrefix(const RouteDistinguisher &rd, as4_t as_number,
-                   const Ip4Address &group, const Ip4Address &source);
-    InetMVpnPrefix(const RouteDistinguisher &rd, const Ip4Address &router_id,
+    InetMVpnPrefix(uint8_t type, const RouteDistinguisher &rd,
+                   const Ip4Address &router_id,
                    const Ip4Address &group, const Ip4Address &source);
     static InetMVpnPrefix FromString(const std::string &str,
                                      boost::system::error_code *errorp = NULL);
     std::string ToString() const;
     std::string ToXmppIdString() const;
+    static bool IsValidForBgp(uint8_t type);
+    static bool IsValid(uint8_t type);
 
     uint8_t type() const { return type_; }
     RouteDistinguisher route_distinguisher() const { return rd_; }
-    as4_t as_number() const { return as_number_; }
     Ip4Address router_id() const { return router_id_; }
     Ip4Address group() const { return group_; }
     Ip4Address source() const { return source_; }
@@ -45,7 +51,6 @@ public:
 private:
     uint8_t type_;
     RouteDistinguisher rd_;
-    as4_t as_number_;
     Ip4Address router_id_;
     Ip4Address group_;
     Ip4Address source_;

@@ -78,16 +78,14 @@ BgpRoute *InetMVpnTable::RouteReplicate(BgpServer *server,
     InetMVpnRoute *mroute = dynamic_cast<InetMVpnRoute *>(src_rt);
     assert(mroute);
 
-    if (mroute->GetPrefix().type() == 0)
+    if (mroute->GetPrefix().type() == InetMVpnPrefix::NativeRoute)
         return NULL;
 
     InetMVpnPrefix mprefix(mroute->GetPrefix());
-    if (mroute->GetPrefix().type() == 8) {
-        if (IsDefault()) {
-            mprefix.set_route_distinguisher(src_path->GetAttr()->source_rd());
-        } else {
-            mprefix.set_route_distinguisher(RouteDistinguisher::null_rd);
-        }
+    if (IsDefault()) {
+        mprefix.set_route_distinguisher(src_path->GetAttr()->source_rd());
+    } else {
+        mprefix.set_route_distinguisher(RouteDistinguisher::null_rd);
     }
     InetMVpnRoute rt_key(mprefix);
 
@@ -142,7 +140,7 @@ bool InetMVpnTable::Export(RibOut *ribout, Route *route,
         return BgpTable::Export(ribout, route, peerset, uinfo_slist);
 
     InetMVpnRoute *inetmvpn_route = dynamic_cast<InetMVpnRoute *>(route);
-    if (inetmvpn_route->GetPrefix().type() != 0)
+    if (inetmvpn_route->GetPrefix().type() != InetMVpnPrefix::NativeRoute)
         return false;
 
     if (!tree_manager_ || tree_manager_->deleter()->IsDeleted())
