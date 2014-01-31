@@ -905,9 +905,9 @@ public:
         ShowMulticastTree tree;
         tree.set_group(sg->group().to_string());
         tree.set_source(sg->source().to_string());
-        for (McastSGEntry::ForwarderSet::const_iterator it =
-             sg->forwarders_.begin();
-             it != sg->forwarders_.end(); it++) {
+        for (McastSGEntry::ForwarderList::const_iterator it =
+             sg->forwarder_lists_[0].begin();
+             it != sg->forwarder_lists_[0].end(); it++) {
             FillMulticastForwarderInfo(&tree, *it);
         }
         data->tree_list.push_back(tree);

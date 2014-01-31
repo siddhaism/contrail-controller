@@ -9,7 +9,6 @@
 #include "base/task_annotations.h"
 #include "bgp/bgp_path.h"
 #include "bgp/bgp_route.h"
-#include "bgp/bgp_table.h"
 #include "bgp/ipeer.h"
 #include "bgp/inetmvpn/inetmvpn_table.h"
 #include "bgp/routing-instance/routing_instance.h"
@@ -48,8 +47,14 @@ private:
 McastForwarder::McastForwarder(InetMVpnRoute *route)
     : route_(route), label_(0), rd_(route->GetPrefix().route_distinguisher()) {
     const BgpPath *path = route->BestPath();
-    label_block_ = path->GetAttr()->label_block();
-    address_ = path->GetAttr()->nexthop().to_v4();
+    if (route_->GetPrefix().type() == InetMVpnPrefix::NativeRoute) {
+        level_ = McastTreeManager::LevelLocal;
+        address_ = path->GetAttr()->nexthop().to_v4();
+        label_block_ = path->GetAttr()->label_block();
+    } else {
+        level_ = McastTreeManager::LevelGlobal;
+    }
+
     if (path->GetAttr()->ext_community())
         encap_ = path->GetAttr()->ext_community()->GetTunnelEncap();
 }
@@ -180,37 +185,6 @@ UpdateInfo *McastForwarder::GetUpdateInfo(InetMVpnTable *table) {
         olist->elements.push_back(elem);
     }
 
-    if (dynamic_cast<InetMVpnTable *>(table)) {
-
-        // Check if there are additional links from additional (bgp) paths.
-        for (Route::PathList::iterator it =
-               ((Route *) route_)->GetPathList().begin();
-             it != ((Route *) route_)->GetPathList().end(); ++it) {
-            BgpPath *path = dynamic_cast<BgpPath *>(it.operator->());
-
-            // Skip primary paths.
-            if (!dynamic_cast<BgpSecondaryPath *>(path)) continue;
-
-            // XXX Stop if non-active paths are found.
-            if (!path->IsFeasible()) break;
-
-            // Decode 'Multicast Edge Forwarding attribute from the path and
-            // add additional links to the olist.
-#ifdef TODO
-            MulticastEdgeForwarding *attr =
-                path->GetAttr()->multicast_edge_forwarding();
-            if (!attr) continue;
-
-            for (MulticastEdgeForwarding::EdgeList::iterator
-                    it = attr.edges.begin(); it != attr.edges.end(); ++it) {
-                BgpOListElem elem((*it)->address(), (*it)->label(),
-                                  (*it)->encap());
-                olist->elements.push_back(elem);
-            }
-#endif
-        }
-    }
-
     BgpAttrOList olist_attr = BgpAttrOList(olist);
     BgpAttrSpec attr_spec;
     attr_spec.push_back(&olist_attr);
@@ -251,7 +225,9 @@ std::string McastSGEntry::ToString() const {
 // of the distribution tree.
 //
 void McastSGEntry::AddForwarder(McastForwarder *forwarder) {
-    forwarders_.insert(forwarder);
+    uint8_t level = forwarder->level();
+    forwarder_lists_[level].insert(forwarder);
+    update_needed_[level] = true;
     partition_->EnqueueSGEntry(this);
 }
 
@@ -260,7 +236,9 @@ void McastSGEntry::AddForwarder(McastForwarder *forwarder) {
 // of the distribution tree.
 //
 void McastSGEntry::DeleteForwarder(McastForwarder *forwarder) {
-    forwarders_.erase(forwarder);
+    uint8_t level = forwarder->level();
+    forwarder_lists_[level].erase(forwarder);
+    update_needed_[level] = true;
     partition_->EnqueueSGEntry(this);
 }
 
@@ -273,43 +251,43 @@ void McastSGEntry::DeleteForwarder(McastForwarder *forwarder) {
 // than other criteria such as minimizing disruption of traffic, minimizing
 // the cost/weight of the tree etc.
 //
-void McastSGEntry::UpdateTree() {
+void McastSGEntry::UpdateTree(uint8_t level) {
     CHECK_CONCURRENCY("db::DBTable");
 
-    int degree = McastTreeManager::kDegree;
+    if (!update_needed_[level])
+        return;
 
-    if (partition_->GetTreeManager()->IsVpn()) degree--;
+    int degree = McastTreeManager::kDegree;
+    ForwarderList *forwarders = &forwarder_lists_[level];
 
     // First get rid of the previous distribution tree and enqueue all the
     // associated InetMVpnRoutes for notification.  Note that DBListeners
     // will not get invoked until after this routine is done.
-    for (ForwarderSet::iterator it = forwarders_.begin();
-        it != forwarders_.end(); ++it) {
+    for (ForwarderList::iterator it = forwarders->begin();
+         it != forwarders->end(); ++it) {
        (*it)->FlushLinks();
        (*it)->ReleaseLabel();
-       (*it)->set_forest_node(false);
        partition_->GetTablePartition()->Notify((*it)->route());
     }
 
     // Don't need to build a tree unless we have at least 2 McastForwarders.
-    if (forwarders_.size() <= 1)
+    if (forwarders->size() <= 1)
         return;
 
 
     // Create a vector of pointers to the McastForwarders in sorted order. We
-    // resort to this because std:set doesn't support random access iterators.
+    // resort to this because std::set doesn't support random access iterators.
     McastForwarderList vec;
-    vec.reserve(forwarders_.size());
-    for (ForwarderSet::iterator it = forwarders_.begin();
-         it != forwarders_.end(); ++it) {
+    vec.reserve(forwarders->size());
+    for (ForwarderList::iterator it = forwarders->begin();
+         it != forwarders->end(); ++it) {
         vec.push_back(*it);
     }
 
     // Go through each McastForwarder in the vector and link it to it's parent
     // McastForwarder in the k-ary tree. We also add a link from the parent to
     // the entry in question.
-    for (McastForwarderList::iterator it = vec.begin(); it != vec.end();
-            ++it) {
+    for (McastForwarderList::iterator it = vec.begin(); it != vec.end(); ++it) {
         (*it)->AllocateLabel();
         int idx = it - vec.begin();
         if (idx == 0)
@@ -320,12 +298,22 @@ void McastSGEntry::UpdateTree() {
         assert(parent_it != vec.end());
         (*it)->AddLink(*parent_it);
         (*parent_it)->AddLink(*it);
-
-        // Enable the last entry in the tree as stiching point to connect
-        // to other trees (via BGP).
-        if ((it + 1)  == vec.end())
-            (*it)->set_forest_node(true);
     }
+}
+
+void McastSGEntry::UpdateTree() {
+    for (uint8_t level = McastTreeManager::LevelFirst;
+         level < McastTreeManager::LevelCount; ++level) {
+        UpdateTree(level);
+    }
+}
+
+bool McastSGEntry::empty() const {
+    if (!forwarder_lists_[McastTreeManager::LevelLocal].empty())
+        return false;
+    if (!forwarder_lists_[McastTreeManager::LevelGlobal].empty())
+        return false;
+    return true;
 }
 
 //
@@ -489,20 +477,6 @@ UpdateInfo *McastTreeManager::GetUpdateInfo(InetMVpnRoute *route) {
     return forwarder->GetUpdateInfo(table_);
 }
 
-// Only replicate if this route's McastForwarder is the right most and bottom
-// most child in the multicast distribution tree.
-bool McastTreeManager::ShouldReplicate(InetMVpnRoute *route,
-                                       BgpAttrPtr edge_discovery_attribute) {
-    DBState *dbstate = route->GetState(table_, listener_id_);
-    McastForwarder *forwarder = dynamic_cast<McastForwarder *>(dbstate);
-
-    if (!forwarder || !forwarder->forest_node()) return false;
-
-    // Allocate a label range and encode it in a 'Multicast Edge Discovery'
-    // attribute.
-    return true;
-}
-
 //
 // DBListener callback handler for the InetMVpnTable. It creates or deletes
 // the associated McastForwarder as appropriate. Also creates a McastSGEntry
@@ -604,6 +578,3 @@ LifetimeActor *McastTreeManager::deleter() {
     return deleter_.get();
 }
 
-bool McastTreeManager::IsVpn() const {
-    return dynamic_cast<InetMVpnTable *>(table_) != NULL;
-}

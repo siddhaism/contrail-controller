@@ -71,6 +71,7 @@ public:
 
     bool Update(InetMVpnRoute *route);
     std::string ToString() const;
+    uint8_t GetLevel() const;
 
     McastForwarder *FindLink(McastForwarder *forwarder);
     void AddLink(McastForwarder *forwarder);
@@ -82,6 +83,7 @@ public:
 
     UpdateInfo *GetUpdateInfo(InetMVpnTable *table);
 
+    uint8_t level() const { return level_; }
     uint32_t label() const { return label_; }
     Ip4Address address() const { return address_; }
     std::vector<std::string> encap() const { return encap_; }
@@ -89,21 +91,19 @@ public:
     RouteDistinguisher route_distinguisher() const { return rd_; }
 
     bool empty() { return tree_links_.empty(); }
-    bool forest_node() { return forest_node_; }
-    void set_forest_node(bool forest_node) { forest_node_ = forest_node; }
 
 private:
     friend class BgpMulticastTest;
     friend class ShowMulticastManagerDetailHandler;
 
     InetMVpnRoute *route_;
+    uint8_t level_;
     LabelBlockPtr label_block_;
     uint32_t label_;
     RouteDistinguisher rd_;
     Ip4Address address_;
     std::vector<std::string> encap_;
     McastForwarderList tree_links_;
-    bool forest_node_;
 
     DISALLOW_COPY_AND_ASSIGN(McastForwarder);
 };
@@ -171,18 +171,21 @@ public:
     void set_on_work_queue() { on_work_queue_ = true; }
     void clear_on_work_queue() { on_work_queue_ = false; }
 
-    bool empty() { return forwarders_.empty(); }
+    bool empty() const;
 
 private:
     friend class BgpMulticastTest;
     friend class ShowMulticastManagerDetailHandler;
 
-    typedef std::set<McastForwarder *, McastForwarderCompare> ForwarderSet;
+    typedef std::set<McastForwarder *, McastForwarderCompare> ForwarderList;
+
+    void UpdateTree(uint8_t level);
 
     McastManagerPartition *partition_;
     Ip4Address group_, source_;
     bool on_work_queue_;
-    ForwarderSet forwarders_;
+    ForwarderList forwarder_lists_[2];
+    bool update_needed_[2];
 
     DISALLOW_COPY_AND_ASSIGN(McastSGEntry);
 };
@@ -293,6 +296,13 @@ class McastTreeManager {
 public:
     static const int kDegree = 4;
 
+    enum TreeLevel {
+        LevelFirst = 0,
+        LevelLocal = 0,
+        LevelGlobal = 1,
+        LevelCount = 2,
+    };
+
     McastTreeManager(InetMVpnTable *table);
     virtual ~McastTreeManager();
 
@@ -308,10 +318,8 @@ public:
     void Shutdown();
     bool MayDelete() const;
     void MayResumeDelete();
-    bool IsVpn() const;
 
     LifetimeActor *deleter();
-    bool ShouldReplicate(InetMVpnRoute *route, BgpAttrPtr attr);
 
 private:
     friend class BgpMulticastTest;
