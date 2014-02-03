@@ -143,6 +143,38 @@ struct BgpMpNlri : public BgpAttribute {
     std::vector<BgpProtoPrefix *> nlri;
 };
 
+#if 0
+struct BgpAttrEdgeDiscovery : public BgpAttribute {
+    static const int kSize = -1;
+    static const uint8_t kFlags = Optional | Transitive;
+    BgpAttrEdgeDiscovery() : BgpAttribute(McastEdgeDiscovery, kFlags) { }
+    explicit BgpAttrEdgeDiscovery(const BgpAttribute &rhs)
+        : BgpAttrEdgeDiscovery(rhs) { }
+    explicit BgpAttrEdgeDiscovery(const BgpAttrEdgeDiscovery &rhs) :
+            BgpAttribute(BgpAttribute::McastEdgeDiscovery, kFlags) {
+        for (size_t i = 0; i < rhs.edge_list.size(); i++) {
+            Edge *edge = new Edge;
+            *edge = *rhs.edge_list[i];
+            edge_list.push_back(edge);
+        }
+    }
+    ~BgpAttrEdgeDiscovery() {
+        STLDeleteValues(&edge_list);
+    }
+    struct Edge : public ParseObject {
+        int CompareTo(const Edge &rhs) const {
+            return 0;
+        }
+
+    };
+
+    virtual int CompareTo(const BgpAttribute &rhs_attr) const;
+    virtual void ToCanonical(BgpAttr *attr);
+    virtual std::string ToString() const;
+    std::vector<Edge *> edge_list;
+};
+#endif
+
 struct BgpAttrLabelBlock : public BgpAttribute {
     static const int kSize = 0;
     BgpAttrLabelBlock() : BgpAttribute(0, BgpAttribute::LabelBlock, 0) {}
