@@ -458,6 +458,8 @@ void RoutingInstance::ProcessConfig(BgpServer *server) {
 
     // Create BGP Table
     if (name_ == BgpConfigManager::kMasterInstance) {
+        is_default_ = true;
+
         InetVpnTableCreate(server);
         EvpnTableCreate(server);
         InetmvpnTableCreate(server);
@@ -468,8 +470,6 @@ void RoutingInstance::ProcessConfig(BgpServer *server) {
         if (table_inet != NULL) {
             AddTable(table_inet);
         }
-
-        is_default_ = true;
     } else {
 
         // Create foo.inet.0.

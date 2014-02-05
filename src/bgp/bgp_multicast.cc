@@ -45,7 +45,9 @@ private:
 // The LabelBlockPtr from the InetMVpnRoute is copied for convenience.
 //
 McastForwarder::McastForwarder(InetMVpnRoute *route)
-    : route_(route), label_(0), rd_(route->GetPrefix().route_distinguisher()) {
+    : route_(route), label_(0), address_(0),
+      rd_(route->GetPrefix().route_distinguisher()),
+      router_id_(route->GetPrefix().router_id()) {
     const BgpPath *path = route->BestPath();
     if (route_->GetPrefix().type() == InetMVpnPrefix::NativeRoute) {
         level_ = McastTreeManager::LevelLocal;
@@ -204,7 +206,11 @@ McastSGEntry::McastSGEntry(McastManagerPartition *partition,
     : partition_(partition),
       group_(group),
       source_(source),
+      forest_node_(NULL),
+      cmcast_route_(NULL),
       on_work_queue_(false) {
+    update_needed_[0] = false;
+    update_needed_[1] = false;
 }
 
 //
@@ -236,12 +242,98 @@ void McastSGEntry::AddForwarder(McastForwarder *forwarder) {
 // of the distribution tree.
 //
 void McastSGEntry::DeleteForwarder(McastForwarder *forwarder) {
+    if (forwarder == forest_node_)
+        DeleteCMcastRoute();
     uint8_t level = forwarder->level();
     forwarder_lists_[level].erase(forwarder);
     update_needed_[level] = true;
     partition_->EnqueueSGEntry(this);
 }
 
+void McastSGEntry::AddCMcastRoute() {
+    assert(!forest_node_);
+    assert(!cmcast_route_);
+
+    uint8_t level = McastTreeManager::LevelLocal;
+    ForwarderList *forwarders = &forwarder_lists_[level];
+    if (forwarders->rbegin() == forwarders->rend())
+        return;
+
+    forest_node_ = *forwarders->rbegin();
+    BgpTable *table = partition_->GetTreeManager()->table();
+    BgpServer *server = table->routing_instance()->server();
+    Ip4Address router_id(server->bgp_identifier());
+    InetMVpnPrefix prefix(InetMVpnPrefix::CMcastRoute,
+        RouteDistinguisher::null_rd, router_id, group_, source_);
+
+    InetMVpnRoute rt_key(prefix);
+    DBTablePartition *tbl_partition =
+        static_cast<DBTablePartition *>(partition_->GetTablePartition());
+    InetMVpnRoute *route =
+        static_cast<InetMVpnRoute *>(tbl_partition->Find(&rt_key));
+    if (!route) {
+        route = new InetMVpnRoute(prefix);
+        tbl_partition->Add(route);
+    } else {
+        route->ClearDelete();
+    }
+
+    BgpAttrSpec attr_spec;
+    BgpAttrNextHop nexthop(server->bgp_identifier());
+    attr_spec.push_back(&nexthop);
+    BgpAttrSourceRd source_rd(
+        RouteDistinguisher(forest_node_->route()->GetPrefix().route_distinguisher()));
+    attr_spec.push_back(&source_rd);
+    BgpAttrPtr attr = server->attr_db()->Locate(attr_spec);
+
+    BgpPath *path = new BgpPath(0, BgpPath::Local, attr);
+    route->InsertPath(path);
+    tbl_partition->Notify(route);
+    cmcast_route_ = route;
+}
+
+void McastSGEntry::DeleteCMcastRoute() {
+    if (!cmcast_route_)
+        return;
+
+    assert(forest_node_);
+    forest_node_ = NULL;
+    DBTablePartition *tbl_partition =
+        static_cast<DBTablePartition *>(partition_->GetTablePartition());
+    cmcast_route_->RemovePath(BgpPath::Local);
+
+    if (!cmcast_route_->BestPath()) {
+        tbl_partition->Delete(cmcast_route_);
+    } else {
+        tbl_partition->Notify(cmcast_route_);
+    }
+    cmcast_route_ = NULL;
+}
+
+void McastSGEntry::UpdateCMcastRoute() {
+    uint8_t level = McastTreeManager::LevelLocal;
+    ForwarderList *forwarders = &forwarder_lists_[level];
+    McastForwarder *new_forest_node;
+    if (forwarders->rbegin() == forwarders->rend()) {
+        new_forest_node = NULL;
+    } else {
+        new_forest_node = *forwarders->rbegin();
+    }
+
+    if (new_forest_node == forest_node_)
+        return;
+
+    DeleteCMcastRoute();
+    AddCMcastRoute();
+}
+
+void McastSGEntry::UpdateRoutes(uint8_t level) {
+    if (level == McastTreeManager::LevelLocal) {
+        UpdateCMcastRoute();
+    }
+}
+
+//
 //
 // Update the distribution tree for this McastSGEntry.  We traverse all the
 // McastForwarders in sorted order and arrange them in breadth first fashion
@@ -256,6 +348,8 @@ void McastSGEntry::UpdateTree(uint8_t level) {
 
     if (!update_needed_[level])
         return;
+    if (level == McastTreeManager::LevelGlobal)
+        return;
 
     int degree = McastTreeManager::kDegree;
     ForwarderList *forwarders = &forwarder_lists_[level];
@@ -269,11 +363,6 @@ void McastSGEntry::UpdateTree(uint8_t level) {
        (*it)->ReleaseLabel();
        partition_->GetTablePartition()->Notify((*it)->route());
     }
-
-    // Don't need to build a tree unless we have at least 2 McastForwarders.
-    if (forwarders->size() <= 1)
-        return;
-
 
     // Create a vector of pointers to the McastForwarders in sorted order. We
     // resort to this because std::set doesn't support random access iterators.
@@ -299,6 +388,8 @@ void McastSGEntry::UpdateTree(uint8_t level) {
         (*it)->AddLink(*parent_it);
         (*parent_it)->AddLink(*it);
     }
+
+    UpdateRoutes(level);
 }
 
 void McastSGEntry::UpdateTree() {

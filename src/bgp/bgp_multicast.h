@@ -89,6 +89,7 @@ public:
     std::vector<std::string> encap() const { return encap_; }
     InetMVpnRoute *route() { return route_; }
     RouteDistinguisher route_distinguisher() const { return rd_; }
+    Ip4Address router_id() const { return router_id_; }
 
     bool empty() { return tree_links_.empty(); }
 
@@ -100,8 +101,9 @@ private:
     uint8_t level_;
     LabelBlockPtr label_block_;
     uint32_t label_;
-    RouteDistinguisher rd_;
     Ip4Address address_;
+    RouteDistinguisher rd_;
+    Ip4Address router_id_;
     std::vector<std::string> encap_;
     McastForwarderList tree_links_;
 
@@ -114,11 +116,13 @@ private:
 struct McastForwarderCompare {
     bool operator()(const McastForwarder *lhs,
                     const McastForwarder *rhs) const {
-        int cmp =
-            lhs->route_distinguisher().CompareTo(rhs->route_distinguisher());
-        if (cmp < 0)
+        if (lhs->route_distinguisher() < rhs->route_distinguisher())
             return true;
-        if (cmp > 0)
+        if (lhs->route_distinguisher() > rhs->route_distinguisher())
+            return false;
+        if (lhs->router_id() < rhs->router_id())
+            return true;
+        if (lhs->router_id() > rhs->router_id())
             return false;
 
         return false;
@@ -162,6 +166,9 @@ public:
     void AddForwarder(McastForwarder *forwarder);
     void DeleteForwarder(McastForwarder *forwarder);
 
+    void AddCMcastRoute();
+    void DeleteCMcastRoute();
+    void UpdateCMcastRoute();
     void UpdateTree();
 
     Ip4Address group() const { return group_; }
@@ -180,12 +187,15 @@ private:
     typedef std::set<McastForwarder *, McastForwarderCompare> ForwarderList;
 
     void UpdateTree(uint8_t level);
+    void UpdateRoutes(uint8_t level);
 
     McastManagerPartition *partition_;
     Ip4Address group_, source_;
-    bool on_work_queue_;
+    McastForwarder *forest_node_;
+    InetMVpnRoute *cmcast_route_;
     ForwarderList forwarder_lists_[2];
     bool update_needed_[2];
+    bool on_work_queue_;
 
     DISALLOW_COPY_AND_ASSIGN(McastSGEntry);
 };
@@ -313,6 +323,7 @@ public:
 
     virtual UpdateInfo *GetUpdateInfo(InetMVpnRoute *route);
     DBTablePartBase *GetTablePartition(size_t part_id);
+    InetMVpnTable *table() { return table_; }
 
     void ManagedDelete();
     void Shutdown();

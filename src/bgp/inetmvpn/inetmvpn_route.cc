@@ -40,6 +40,7 @@ InetMVpnPrefix::InetMVpnPrefix(uint8_t type, const RouteDistinguisher &rd,
 // +------------------------------------+
 InetMVpnPrefix::InetMVpnPrefix(const BgpProtoPrefix &prefix) {
     assert(IsValidForBgp(prefix.type));
+
     size_t rd_size = RouteDistinguisher::kSize;
     size_t rtid_size = 4;
 
@@ -55,11 +56,12 @@ InetMVpnPrefix::InetMVpnPrefix(const BgpProtoPrefix &prefix) {
     source_ = Ip4Address(get_value(&prefix.prefix[source_offset], 4));
 
     size_t group_offset = source_offset + 4 + 1;
-    source_ = Ip4Address(get_value(&prefix.prefix[group_offset], 4));
+    group_ = Ip4Address(get_value(&prefix.prefix[group_offset], 4));
 }
 
 void InetMVpnPrefix::BuildProtoPrefix(BgpProtoPrefix *prefix) const {
-    assert(IsValidForBgp(prefix->type));
+    assert(IsValidForBgp(type_));
+
     size_t rd_size = RouteDistinguisher::kSize;
     size_t rtid_size = 4;
 

@@ -136,8 +136,14 @@ BgpRoute *InetMVpnTable::RouteReplicate(BgpServer *server,
 
 bool InetMVpnTable::Export(RibOut *ribout, Route *route,
     const RibPeerSet &peerset, UpdateInfoSList &uinfo_slist) {
-    if (ribout->IsEncodingBgp())
-        return BgpTable::Export(ribout, route, peerset, uinfo_slist);
+    if (ribout->IsEncodingBgp()) {
+        BgpRoute *bgp_route = static_cast<BgpRoute *> (route);
+        UpdateInfo *uinfo = GetUpdateInfo(ribout, bgp_route, peerset);
+        if (!uinfo)
+            return false;
+        uinfo_slist->push_front(*uinfo);
+        return true;
+    }
 
     InetMVpnRoute *inetmvpn_route = dynamic_cast<InetMVpnRoute *>(route);
     if (inetmvpn_route->GetPrefix().type() != InetMVpnPrefix::NativeRoute)
@@ -164,12 +170,16 @@ bool InetMVpnTable::Export(RibOut *ribout, Route *route,
 }
 
 void InetMVpnTable::CreateTreeManager() {
+    if (IsDefault())
+        return;
     assert(!tree_manager_);
     tree_manager_ = BgpObjectFactory::Create<McastTreeManager>(this);
     tree_manager_->Initialize();
 }
 
 void InetMVpnTable::DestroyTreeManager() {
+    if (IsDefault())
+        return;
     tree_manager_->Terminate();
     delete tree_manager_;
     tree_manager_ = NULL;
