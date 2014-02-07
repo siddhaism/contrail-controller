@@ -844,6 +844,61 @@ public:
                       BgpPathAttributeExtendedCommunityList> Sequence;
 };
 
+class BgpPathAttributeDiscoveryEdgeAddress :
+    public ProtoElement<BgpPathAttributeDiscoveryEdgeAddress> {
+public:
+    static const int kSize = -1;
+    static bool Verifier(const void *obj, const uint8_t *data,
+                         size_t size, ParseContext *context) {
+        uint8_t value = get_value(data, 1);
+        return (value == 4);
+    }
+    typedef VectorAccessor<EdgeDiscoverySpec::Edge, uint8_t,
+            &EdgeDiscoverySpec::Edge::address> Setter;
+};
+
+class BgpPathAttributeDiscoveryEdgeLabels :
+    public ProtoElement<BgpPathAttributeDiscoveryEdgeLabels> {
+public:
+    static const int kSize = -1;
+    static bool Verifier(const void *obj, const uint8_t *data,
+                         size_t size, ParseContext *context) {
+        uint8_t value = get_value(data, 1);
+        return (value > 0 && value % 8 == 0);
+    }
+    typedef VectorAccessor<EdgeDiscoverySpec::Edge, uint32_t,
+            &EdgeDiscoverySpec::Edge::labels> Setter;
+};
+
+class BgpPathAttributeDiscoveryEdgeList :
+    public ProtoSequence<BgpPathAttributeDiscoveryEdgeList> {
+public:
+    static const int kMinOccurs = 1;
+    static const int kMaxOccurs = -1;
+
+    static bool Verifier(const EdgeDiscoverySpec *obj, const uint8_t *data,
+                         size_t size, ParseContext *context) {
+        return BgpAttributeVerifier<EdgeDiscoverySpec>::Verifier(
+                obj, data, size, context);
+    }
+
+    typedef CollectionAccessor<EdgeDiscoverySpec,
+            vector<EdgeDiscoverySpec::Edge *>,
+            &EdgeDiscoverySpec::edge_list> ContextStorer;
+
+    typedef mpl::list<BgpPathAttributeDiscoveryEdgeAddress,
+            BgpPathAttributeDiscoveryEdgeLabels> Sequence;
+};
+
+class BgpPathAttributeEdgeDiscovery :
+    public ProtoSequence<BgpPathAttributeEdgeDiscovery> {
+public:
+    typedef EdgeDiscoverySpec ContextType;
+    typedef BgpContextSwap<EdgeDiscoverySpec> ContextSwap;
+    typedef mpl::list<BgpPathAttrLength,
+            BgpPathAttributeDiscoveryEdgeList> Sequence;
+};
+
 class BgpPathAttributeReserved : public ProtoElement<BgpPathAttributeReserved> {
 public:
     const static int kSize = 1;
@@ -1121,6 +1176,8 @@ public:
                     BgpPathAttributeMpUnreachNlriSequence>,
           mpl::pair<mpl::int_<BgpAttribute::ExtendedCommunities>,
                     BgpPathAttributeExtendedCommunities>,
+          mpl::pair<mpl::int_<BgpAttribute::McastEdgeDiscovery>,
+                    BgpPathAttributeEdgeDiscovery>,
           mpl::pair<mpl::int_<-1>, BgpPathAttributeUnknown>
     > Choice;
 };

@@ -28,6 +28,7 @@ int BgpAttrOrigin::CompareTo(const BgpAttribute &rhs_attr) const {
     KEY_COMPARE(origin, static_cast<const BgpAttrOrigin &>(rhs_attr).origin);
     return 0;
 }
+
 void BgpAttrOrigin::ToCanonical(BgpAttr *attr) {
     attr->set_origin(static_cast<BgpAttrOrigin::OriginType>(origin));
 }
@@ -142,6 +143,23 @@ int BgpMpNlri::CompareTo(const BgpAttribute &rhs_attr) const {
     return 0;
 }
 void BgpMpNlri::ToCanonical(BgpAttr *attr) {
+}
+
+int EdgeDiscoverySpec::CompareTo(const BgpAttribute &rhs_attr) const {
+    int ret = BgpAttribute::CompareTo(rhs_attr);
+    if (ret != 0) return ret;
+    const EdgeDiscoverySpec &rhs =
+        static_cast<const EdgeDiscoverySpec &>(rhs_attr);
+    KEY_COMPARE(this, &rhs);
+    return 0;
+}
+
+void EdgeDiscoverySpec::ToCanonical(BgpAttr *attr) {
+    attr->set_edge_discovery(this);
+}
+
+std::string EdgeDiscoverySpec::ToString() const {
+    return "";
 }
 
 int BgpAttrOList::CompareTo(const BgpAttribute &rhs_attr) const {
@@ -263,6 +281,12 @@ void BgpAttr::set_ext_community(const ExtCommunitySpec *extcomm) {
         ext_community_ = attr_db_->server()->extcomm_db()->Locate(*extcomm);
     } else {
         ext_community_ = NULL;
+    }
+}
+
+void BgpAttr::set_edge_discovery(const EdgeDiscoverySpec *edspec) {
+    if (edspec) {
+        edge_discovery_.reset(new EdgeDiscovery(*edspec));
     }
 }
 

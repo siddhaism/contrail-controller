@@ -143,22 +143,20 @@ struct BgpMpNlri : public BgpAttribute {
     std::vector<BgpProtoPrefix *> nlri;
 };
 
-#if 0
-struct BgpAttrEdgeDiscovery : public BgpAttribute {
+struct EdgeDiscoverySpec : public BgpAttribute {
     static const int kSize = -1;
     static const uint8_t kFlags = Optional | Transitive;
-    BgpAttrEdgeDiscovery() : BgpAttribute(McastEdgeDiscovery, kFlags) { }
-    explicit BgpAttrEdgeDiscovery(const BgpAttribute &rhs)
-        : BgpAttrEdgeDiscovery(rhs) { }
-    explicit BgpAttrEdgeDiscovery(const BgpAttrEdgeDiscovery &rhs) :
-            BgpAttribute(BgpAttribute::McastEdgeDiscovery, kFlags) {
+    EdgeDiscoverySpec() : BgpAttribute(McastEdgeDiscovery, kFlags) { }
+    explicit EdgeDiscoverySpec(const BgpAttribute &rhs) : BgpAttribute(rhs) { }
+    explicit EdgeDiscoverySpec(const EdgeDiscoverySpec &rhs) :
+        BgpAttribute(BgpAttribute::McastEdgeDiscovery, kFlags) {
         for (size_t i = 0; i < rhs.edge_list.size(); i++) {
             Edge *edge = new Edge;
             *edge = *rhs.edge_list[i];
             edge_list.push_back(edge);
         }
     }
-    ~BgpAttrEdgeDiscovery() {
+    ~EdgeDiscoverySpec() {
         STLDeleteValues(&edge_list);
     }
     struct Edge : public ParseObject {
@@ -166,6 +164,8 @@ struct BgpAttrEdgeDiscovery : public BgpAttribute {
             return 0;
         }
 
+        std::vector<uint8_t> address;
+        std::vector<uint32_t> labels;
     };
 
     virtual int CompareTo(const BgpAttribute &rhs_attr) const;
@@ -173,7 +173,16 @@ struct BgpAttrEdgeDiscovery : public BgpAttribute {
     virtual std::string ToString() const;
     std::vector<Edge *> edge_list;
 };
-#endif
+
+class EdgeDiscovery {
+public:
+    explicit EdgeDiscovery(const EdgeDiscoverySpec &edspec) : edspec_(edspec) {}
+    const EdgeDiscoverySpec &edge_discovery() const { return edspec_; }
+private:
+    EdgeDiscoverySpec edspec_;
+};
+
+typedef boost::scoped_ptr<EdgeDiscovery> EdgeDiscoveryPtr;
 
 struct BgpAttrLabelBlock : public BgpAttribute {
     static const int kSize = 0;
@@ -290,6 +299,7 @@ public:
     void set_community(const CommunitySpec *comm);
     void set_ext_community(ExtCommunityPtr comm);
     void set_ext_community(const ExtCommunitySpec *extcomm);
+    void set_edge_discovery(const EdgeDiscoverySpec *edspec);
     void set_label_block(LabelBlockPtr label_block);
     void set_olist(BgpOListPtr olist);
     friend std::size_t hash_value(BgpAttr const &attr);
@@ -307,6 +317,7 @@ public:
     int as_path_count() const { return as_path_ ? as_path_->AsCount() : 0; }
     const Community *community() const { return community_.get(); }
     const ExtCommunity *ext_community() const { return ext_community_.get(); }
+    const EdgeDiscovery *edge_discovery() const { return edge_discovery_.get(); }
     LabelBlockPtr label_block() const { return label_block_; }
     BgpOListPtr olist() const { return olist_; }
     BgpAttrDB *attr_db() const { return attr_db_; }
@@ -330,6 +341,7 @@ private:
     AsPathPtr as_path_;
     CommunityPtr community_;
     ExtCommunityPtr ext_community_;
+    EdgeDiscoveryPtr edge_discovery_;
     LabelBlockPtr label_block_;
     BgpOListPtr olist_;
 };
