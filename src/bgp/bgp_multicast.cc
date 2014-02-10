@@ -79,7 +79,7 @@ McastForwarder::~McastForwarder() {
 }
 
 //
-// Update the` McastForwarder based on information in the InetMVpnRoute.
+// Update the McastForwarder based on information in the InetMVpnRoute.
 // Return true if something changed.
 //
 bool McastForwarder::Update(InetMVpnRoute *route) {
