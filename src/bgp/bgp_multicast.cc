@@ -86,6 +86,7 @@ bool McastForwarder::Update(InetMVpnRoute *route) {
     McastForwarder forwarder(route);
     bool changed = false;
     if (label_block_ != forwarder.label_block_) {
+        ReleaseLabel();
         label_block_ = forwarder.label_block_;
         changed = true;
     }
@@ -362,10 +363,14 @@ void McastSGEntry::UpdateTree(uint8_t level) {
 
     if (!update_needed_[level])
         return;
-    if (level == McastTreeManager::LevelGlobal)
-        return;
+    update_needed_[level] = false;
 
-    int degree = McastTreeManager::kDegree;
+    int degree;
+    if (level == McastTreeManager::LevelLocal) {
+        degree = McastTreeManager::kDegree;
+    } else {
+        degree = McastTreeManager::kDegree - 1;
+    }
     ForwarderList *forwarders = &forwarder_lists_[level];
 
     // First get rid of the previous distribution tree and enqueue all the
