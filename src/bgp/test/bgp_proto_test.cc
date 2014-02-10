@@ -166,6 +166,18 @@ private:
         msg->path_attributes.push_back(ext_community);
     }
 
+    static void AddEdgeDiscovery(BgpProto::Update *msg) {
+        EdgeDiscoverySpec *edspec = new EdgeDiscoverySpec;
+        for (int i = rand() % 4; i > 0; i--) {
+            boost::system::error_code ec;
+            EdgeDiscoverySpec::Edge *edge = new EdgeDiscoverySpec::Edge;
+            edge->SetAddress(Ip4Address::from_string("10.1.1.1", ec));
+            edge->SetLabels(10000, 20000);
+            edspec->edge_list.push_back(edge);
+        }
+        msg->path_attributes.push_back(edspec);
+    }
+
     static void AddUnknown(BgpProto::Update *msg) {
         BgpAttrUnknown *unk = new BgpAttrUnknown;
         unk->flags = BgpAttribute::Optional;
@@ -189,6 +201,7 @@ std::vector<BuildUpdateMessage::BuildUpdateParam> BuildUpdateMessage::build_para
             (std::make_pair(&BuildUpdateMessage::AddCommunity, 5))
             (std::make_pair(&BuildUpdateMessage::AddMpNlri, 5))
             (std::make_pair(&BuildUpdateMessage::AddExtCommunity, 5))
+            (std::make_pair(&BuildUpdateMessage::AddEdgeDiscovery, 5))
             (std::make_pair(&BuildUpdateMessage::AddUnknown, 5));
 
 

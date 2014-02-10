@@ -49,12 +49,20 @@ McastForwarder::McastForwarder(InetMVpnRoute *route)
       rd_(route->GetPrefix().route_distinguisher()),
       router_id_(route->GetPrefix().router_id()) {
     const BgpPath *path = route->BestPath();
+    const BgpAttr *attr = path->GetAttr();
     if (route_->GetPrefix().type() == InetMVpnPrefix::NativeRoute) {
         level_ = McastTreeManager::LevelLocal;
-        address_ = path->GetAttr()->nexthop().to_v4();
-        label_block_ = path->GetAttr()->label_block();
+        address_ = attr->nexthop().to_v4();
+        label_block_ = attr->label_block();
     } else {
         level_ = McastTreeManager::LevelGlobal;
+        const EdgeDiscoverySpec &edspec =
+            attr->edge_discovery()->edge_discovery();
+        const EdgeDiscoverySpec::Edge *edge = edspec.edge_list[0];
+        address_ = edge->GetAddress();
+        uint32_t first_label, last_label;
+        edge->GetLabels(first_label, last_label);
+        label_block_ = new LabelBlock(first_label, last_label);
     }
 
     if (path->GetAttr()->ext_community())
@@ -284,6 +292,12 @@ void McastSGEntry::AddCMcastRoute() {
     BgpAttrSourceRd source_rd(
         RouteDistinguisher(forest_node_->route()->GetPrefix().route_distinguisher()));
     attr_spec.push_back(&source_rd);
+    EdgeDiscoverySpec edspec;
+    EdgeDiscoverySpec::Edge *edge = new EdgeDiscoverySpec::Edge;
+    edge->SetAddress(forest_node_->address());
+    edge->SetLabels(forest_node_->label(), forest_node_->label());
+    edspec.edge_list.push_back(edge);
+    attr_spec.push_back(&edspec);
     BgpAttrPtr attr = server->attr_db()->Locate(attr_spec);
 
     BgpPath *path = new BgpPath(0, BgpPath::Local, attr);

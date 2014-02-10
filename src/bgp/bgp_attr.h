@@ -164,6 +164,24 @@ struct EdgeDiscoverySpec : public BgpAttribute {
             return 0;
         }
 
+        Ip4Address GetAddress() const {
+            return Ip4Address(get_value(&address[0], 4));
+        }
+        void SetAddress(Ip4Address addr) {
+            address.resize(4, 0);
+            const Ip4Address::bytes_type &addr_bytes = addr.to_bytes();
+            std::copy(addr_bytes.begin(), addr_bytes.begin() + 4,
+                      address.begin());
+        }
+        void GetLabels(uint32_t &first_label, uint32_t &last_label) const {
+            first_label = labels[0];
+            last_label = labels[1];
+        }
+        void SetLabels(uint32_t first_label, uint32_t last_label) {
+            labels.push_back(first_label);
+            labels.push_back(last_label);
+        }
+
         std::vector<uint8_t> address;
         std::vector<uint32_t> labels;
     };
@@ -176,13 +194,30 @@ struct EdgeDiscoverySpec : public BgpAttribute {
 
 class EdgeDiscovery {
 public:
-    explicit EdgeDiscovery(const EdgeDiscoverySpec &edspec) : edspec_(edspec) {}
+    explicit EdgeDiscovery(const EdgeDiscoverySpec &edspec) : edspec_(edspec) {
+        refcount_ = 0;
+    }
     const EdgeDiscoverySpec &edge_discovery() const { return edspec_; }
 private:
+    friend void intrusive_ptr_add_ref(EdgeDiscovery *ediscovery);
+    friend void intrusive_ptr_release(EdgeDiscovery *ediscovery);
+
+    tbb::atomic<int> refcount_;
     EdgeDiscoverySpec edspec_;
 };
 
-typedef boost::scoped_ptr<EdgeDiscovery> EdgeDiscoveryPtr;
+inline void intrusive_ptr_add_ref(EdgeDiscovery *ediscovery) {
+    ediscovery->refcount_.fetch_and_increment();
+}
+
+inline void intrusive_ptr_release(EdgeDiscovery *ediscovery) {
+    int prev = ediscovery->refcount_.fetch_and_decrement();
+    if (prev == 1) {
+        delete ediscovery;
+    }
+}
+
+typedef boost::intrusive_ptr<EdgeDiscovery> EdgeDiscoveryPtr;
 
 struct BgpAttrLabelBlock : public BgpAttribute {
     static const int kSize = 0;

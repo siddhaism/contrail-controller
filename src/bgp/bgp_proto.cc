@@ -844,30 +844,58 @@ public:
                       BgpPathAttributeExtendedCommunityList> Sequence;
 };
 
-class BgpPathAttributeDiscoveryEdgeAddress :
-    public ProtoElement<BgpPathAttributeDiscoveryEdgeAddress> {
+class BgpPathAttributeDiscoveryEdgeAddressLen :
+    public ProtoElement<BgpPathAttributeDiscoveryEdgeAddressLen> {
 public:
-    static const int kSize = -1;
+    static const int kSize = 1;
     static bool Verifier(const void *obj, const uint8_t *data,
                          size_t size, ParseContext *context) {
         uint8_t value = get_value(data, 1);
         return (value == 4);
     }
+    typedef int SequenceLength;
+};
+
+class BgpPathAttributeDiscoveryEdgeAddressValue :
+    public ProtoElement<BgpPathAttributeDiscoveryEdgeAddressValue> {
+public:
+    static const int kSize = -1;
     typedef VectorAccessor<EdgeDiscoverySpec::Edge, uint8_t,
             &EdgeDiscoverySpec::Edge::address> Setter;
 };
 
-class BgpPathAttributeDiscoveryEdgeLabels :
-    public ProtoElement<BgpPathAttributeDiscoveryEdgeLabels> {
+class BgpPathAttributeDiscoveryEdgeAddress :
+    public ProtoSequence<BgpPathAttributeDiscoveryEdgeAddress> {
 public:
-    static const int kSize = -1;
+    typedef mpl::list<BgpPathAttributeDiscoveryEdgeAddressLen,
+            BgpPathAttributeDiscoveryEdgeAddressValue> Sequence;
+};
+
+class BgpPathAttributeDiscoveryEdgeLabelLen :
+    public ProtoElement<BgpPathAttributeDiscoveryEdgeLabelLen> {
+public:
+    static const int kSize = 1;
     static bool Verifier(const void *obj, const uint8_t *data,
                          size_t size, ParseContext *context) {
         uint8_t value = get_value(data, 1);
         return (value > 0 && value % 8 == 0);
     }
+    typedef int SequenceLength;
+};
+
+class BgpPathAttributeDiscoveryEdgeLabelValues :
+    public ProtoElement<BgpPathAttributeDiscoveryEdgeLabelValues> {
+public:
+    static const int kSize = -1;
     typedef VectorAccessor<EdgeDiscoverySpec::Edge, uint32_t,
             &EdgeDiscoverySpec::Edge::labels> Setter;
+};
+
+class BgpPathAttributeDiscoveryEdgeLabels :
+    public ProtoSequence<BgpPathAttributeDiscoveryEdgeLabels> {
+public:
+    typedef mpl::list<BgpPathAttributeDiscoveryEdgeLabelLen,
+            BgpPathAttributeDiscoveryEdgeLabelValues> Sequence;
 };
 
 class BgpPathAttributeDiscoveryEdgeList :

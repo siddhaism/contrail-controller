@@ -250,8 +250,10 @@ BgpAttr::BgpAttr(const BgpAttr &rhs)
       aggregator_as_num_(rhs.aggregator_as_num_),
       aggregator_address_(rhs.aggregator_address_),
       source_rd_(rhs.source_rd_),
-      as_path_(rhs.as_path_), community_(rhs.community_),
+      as_path_(rhs.as_path_),
+      community_(rhs.community_),
       ext_community_(rhs.ext_community_),
+      edge_discovery_(rhs.edge_discovery_),
       label_block_(rhs.label_block_), olist_(rhs.olist_) {
     refcount_ = 0; 
 }
@@ -315,6 +317,7 @@ int BgpAttr::CompareTo(const BgpAttr &rhs) const {
     KEY_COMPARE(atomic_aggregate_, rhs.atomic_aggregate_);
     KEY_COMPARE(aggregator_as_num_, rhs.aggregator_as_num_);
     KEY_COMPARE(aggregator_address_, rhs.aggregator_address_);
+    KEY_COMPARE(edge_discovery_.get(), rhs.edge_discovery_.get());
     KEY_COMPARE(source_rd_, rhs.source_rd_);
     KEY_COMPARE(label_block_.get(), rhs.label_block_.get());
     KEY_COMPARE(olist_.get(), rhs.olist_.get());

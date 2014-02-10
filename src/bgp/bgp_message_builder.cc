@@ -55,13 +55,13 @@ void BgpMessage::StartReach(const RibOutAttr *roattr, const BgpRoute *route) {
         update.path_attributes.push_back(path);
     }
 
-#ifdef TODO
     if (attr->edge_discovery()) {
         EdgeDiscoverySpec *edspec =
-            new EdgeDiscoverySpec(attr->edge_discovery());
+            new EdgeDiscoverySpec(attr->edge_discovery()->edge_discovery());
         update.path_attributes.push_back(edspec);
     }
 
+#ifdef TODO
     if (attr->edge_forwarding()) {
         EdgeForwardingSpec *efspec =
             new EdgeForwardingSpec(attr->edge_forwarding());
