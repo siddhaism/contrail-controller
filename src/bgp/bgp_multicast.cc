@@ -486,17 +486,20 @@ void McastSGEntry::UpdateTree() {
     }
 }
 
+void McastSGEntry::NotifyForestNode() {
+    if (!forest_node_)
+        return;
+    partition_->GetTablePartition()->Notify(forest_node_->route());
+}
+
 bool McastSGEntry::empty() const {
+    if (tree_route_)
+        return false;
     if (!forwarder_lists_[McastTreeManager::LevelLocal].empty())
         return false;
     if (!forwarder_lists_[McastTreeManager::LevelGlobal].empty())
         return false;
     return true;
-}
-
-const BgpServer *McastSGEntry::server() const {
-    BgpTable *table = partition_->GetTreeManager()->table();
-    return table->routing_instance()->server();
 }
 
 //
@@ -666,14 +669,9 @@ UpdateInfo *McastTreeManager::GetUpdateInfo(InetMVpnRoute *route) {
 // if one doesn't already exist.  However, McastSGEntrys don't get deleted
 // from here.  They only get deleted from the WorkQueue callback routine.
 //
-void McastTreeManager::RouteListener(
-        DBTablePartBase *tpart, DBEntryBase *db_entry) {
+void McastTreeManager::TreeNodeListener(McastManagerPartition *partition,
+        InetMVpnRoute *route) {
     CHECK_CONCURRENCY("db::DBTable");
-
-    McastManagerPartition *partition = partitions_[tpart->index()];
-    InetMVpnRoute *route = dynamic_cast<InetMVpnRoute *>(db_entry);
-    if (route->GetPrefix().type() == InetMVpnPrefix::TreeRoute)
-        return;
 
     DBState *dbstate = route->GetState(table_, listener_id_);
     if (!dbstate) {
@@ -713,6 +711,56 @@ void McastTreeManager::RouteListener(
 
     }
 }
+
+void McastTreeManager::TreeResultListener(McastManagerPartition *partition,
+        InetMVpnRoute *route) {
+    CHECK_CONCURRENCY("db::DBTable");
+
+    BgpServer *server = table_->routing_instance()->server();
+    if (route->GetPrefix().router_id().to_ulong() != server->bgp_identifier())
+        return;
+
+    DBState *dbstate = route->GetState(table_, listener_id_);
+    if (!dbstate) {
+
+        // We have no previous DBState for this route.
+        // Bail if the route is deleted or has no best path.
+        if (route->IsDeleted() || !route->BestPath())
+            return;
+
+        McastSGEntry *sg_entry = partition->LocateSGEntry(
+            route->GetPrefix().group(), route->GetPrefix().source());
+        route->SetState(table_, listener_id_, sg_entry);
+        sg_entry->set_tree_route(route);
+        sg_entry->NotifyForestNode();
+
+    } else {
+
+        McastSGEntry *sg_entry = dynamic_cast<McastSGEntry *>(dbstate);
+        assert(sg_entry);
+
+        if (route->IsDeleted() || !route->BestPath()) {
+            sg_entry->clear_tree_route();
+            route->ClearState(table_, listener_id_);
+            partition->EnqueueSGEntry(sg_entry);
+        }
+        sg_entry->NotifyForestNode();
+    }
+}
+
+void McastTreeManager::RouteListener(
+        DBTablePartBase *tpart, DBEntryBase *db_entry) {
+    CHECK_CONCURRENCY("db::DBTable");
+
+    McastManagerPartition *partition = partitions_[tpart->index()];
+    InetMVpnRoute *route = dynamic_cast<InetMVpnRoute *>(db_entry);
+    if (route->GetPrefix().type() == InetMVpnPrefix::TreeRoute) {
+        TreeResultListener(partition, route);
+    } else {
+        TreeNodeListener(partition, route);
+    }
+}
+
 
 //
 // Check if the McastTreeManager can be deleted. This can happen only if all

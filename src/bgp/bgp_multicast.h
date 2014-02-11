@@ -160,7 +160,7 @@ struct McastForwarderCompare {
 // in the McastManagerPartition when a McastForwarder is added or deleted,
 // so that the distribution tree gets updated.
 //
-class McastSGEntry {
+class McastSGEntry : public DBState {
 public:
     McastSGEntry(McastManagerPartition *partition,
                  Ip4Address group, Ip4Address source);
@@ -176,11 +176,13 @@ public:
     void DeleteCMcastRoute();
     void UpdateCMcastRoute();
     void UpdateTree();
+    void NotifyForestNode();
 
     Ip4Address group() const { return group_; }
     Ip4Address source() const { return source_; }
     McastManagerPartition *partition() { return partition_; }
-    const BgpServer *server() const;
+    void set_tree_route(InetMVpnRoute *route) { tree_route_ = route; }
+    void clear_tree_route() { tree_route_ = NULL; }
 
     bool on_work_queue() { return on_work_queue_; }
     void set_on_work_queue() { on_work_queue_ = true; }
@@ -201,6 +203,7 @@ private:
     Ip4Address group_, source_;
     McastForwarder *forest_node_;
     InetMVpnRoute *cmcast_route_;
+    InetMVpnRoute *tree_route_;
     ForwarderList forwarder_lists_[2];
     bool update_needed_[2];
     bool on_work_queue_;
@@ -349,6 +352,10 @@ private:
 
     void AllocPartitions();
     void FreePartitions();
+    void TreeNodeListener(McastManagerPartition *partition,
+        InetMVpnRoute *route);
+    void TreeResultListener(McastManagerPartition *partition,
+        InetMVpnRoute *route);
     void RouteListener(DBTablePartBase *tpart, DBEntryBase *db_entry);
 
     InetMVpnTable *table_;
