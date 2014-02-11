@@ -24,6 +24,7 @@ class InetMVpnRoute;
 class InetMVpnTable;
 class McastForwarder;
 class McastManagerPartition;
+class McastSGEntry;
 class McastTreeManager;
 struct UpdateInfo;
 
@@ -66,7 +67,7 @@ typedef std::vector<McastForwarder *> McastForwarderList;
 //
 class McastForwarder : public DBState {
 public:
-    McastForwarder(InetMVpnRoute *route);
+    McastForwarder(McastSGEntry *sg_entry, InetMVpnRoute *route);
     ~McastForwarder();
 
     bool Update(InetMVpnRoute *route);
@@ -81,6 +82,8 @@ public:
     void AllocateLabel();
     void ReleaseLabel();
 
+    void AddTreeRoute();
+    void DeleteTreeRoute();
     UpdateInfo *GetUpdateInfo(InetMVpnTable *table);
 
     uint8_t level() const { return level_; }
@@ -97,7 +100,9 @@ private:
     friend class BgpMulticastTest;
     friend class ShowMulticastManagerDetailHandler;
 
+    McastSGEntry *sg_entry_;
     InetMVpnRoute *route_;
+    InetMVpnRoute *tree_route_;
     uint8_t level_;
     LabelBlockPtr label_block_;
     uint32_t label_;
@@ -166,6 +171,7 @@ public:
     void AddForwarder(McastForwarder *forwarder);
     void DeleteForwarder(McastForwarder *forwarder);
 
+    RouteDistinguisher GetSourceRd();
     void AddCMcastRoute();
     void DeleteCMcastRoute();
     void UpdateCMcastRoute();
@@ -173,6 +179,8 @@ public:
 
     Ip4Address group() const { return group_; }
     Ip4Address source() const { return source_; }
+    McastManagerPartition *partition() { return partition_; }
+    const BgpServer *server() const;
 
     bool on_work_queue() { return on_work_queue_; }
     void set_on_work_queue() { on_work_queue_ = true; }

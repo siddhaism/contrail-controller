@@ -44,9 +44,9 @@ private:
 // from the nexthop. The RD also ought to contain the same information.
 // The LabelBlockPtr from the InetMVpnRoute is copied for convenience.
 //
-McastForwarder::McastForwarder(InetMVpnRoute *route)
-    : route_(route), label_(0), address_(0),
-      rd_(route->GetPrefix().route_distinguisher()),
+McastForwarder::McastForwarder(McastSGEntry *sg_entry, InetMVpnRoute *route)
+    : sg_entry_(sg_entry), route_(route), tree_route_(NULL),
+      label_(0), address_(0), rd_(route->GetPrefix().route_distinguisher()),
       router_id_(route->GetPrefix().router_id()) {
     const BgpPath *path = route->BestPath();
     const BgpAttr *attr = path->GetAttr();
@@ -83,7 +83,8 @@ McastForwarder::~McastForwarder() {
 // Return true if something changed.
 //
 bool McastForwarder::Update(InetMVpnRoute *route) {
-    McastForwarder forwarder(route);
+    McastForwarder forwarder(sg_entry_, route);
+
     bool changed = false;
     if (label_block_ != forwarder.label_block_) {
         ReleaseLabel();
@@ -173,6 +174,60 @@ void McastForwarder::ReleaseLabel() {
     }
 }
 
+void McastForwarder::AddTreeRoute() {
+    assert(!tree_route_);
+    if (label_ == 0)
+        return;
+
+    BgpTable *table = static_cast<BgpTable *>(route_->get_table());
+    BgpServer *server = table->routing_instance()->server();
+    InetMVpnPrefix prefix(InetMVpnPrefix::TreeRoute,
+        RouteDistinguisher::null_rd, router_id_,
+        sg_entry_->group(), sg_entry_->source());
+    InetMVpnRoute rt_key(prefix);
+
+    McastManagerPartition *partition = sg_entry_->partition();
+    DBTablePartition *tbl_partition =
+        static_cast<DBTablePartition *>(partition->GetTablePartition());
+    InetMVpnRoute *route =
+        static_cast<InetMVpnRoute *>(tbl_partition->Find(&rt_key));
+    if (!route) {
+        route = new InetMVpnRoute(prefix);
+        tbl_partition->Add(route);
+    } else {
+        route->ClearDelete();
+    }
+
+    BgpAttrSpec attr_spec;
+    BgpAttrNextHop nexthop(server->bgp_identifier());
+    attr_spec.push_back(&nexthop);
+    BgpAttrSourceRd source_rd(sg_entry_->GetSourceRd());
+    attr_spec.push_back(&source_rd);
+    BgpAttrPtr attr = server->attr_db()->Locate(attr_spec);
+
+    BgpPath *path = new BgpPath(0, BgpPath::Local, attr);
+    route->InsertPath(path);
+    tbl_partition->Notify(route);
+    tree_route_ = route;
+}
+
+void McastForwarder::DeleteTreeRoute() {
+    if (!tree_route_)
+        return;
+
+    McastManagerPartition *partition = sg_entry_->partition();
+    DBTablePartition *tbl_partition =
+        static_cast<DBTablePartition *>(partition->GetTablePartition());
+    tree_route_->RemovePath(BgpPath::Local);
+
+    if (!tree_route_->BestPath()) {
+        tbl_partition->Delete(tree_route_);
+    } else {
+        tbl_partition->Notify(tree_route_);
+    }
+    tree_route_ = NULL;
+}
+
 //
 // Construct an UpdateInfo with the RibOutAttr that needs to be advertised to
 // the IPeer for the InetMVpnRoute associated with this McastForwarder. This
@@ -253,10 +308,17 @@ void McastSGEntry::AddForwarder(McastForwarder *forwarder) {
 void McastSGEntry::DeleteForwarder(McastForwarder *forwarder) {
     if (forwarder == forest_node_)
         DeleteCMcastRoute();
+    forwarder->DeleteTreeRoute();
     uint8_t level = forwarder->level();
     forwarder_lists_[level].erase(forwarder);
     update_needed_[level] = true;
     partition_->EnqueueSGEntry(this);
+}
+
+RouteDistinguisher McastSGEntry::GetSourceRd() {
+    if (!forest_node_)
+        return RouteDistinguisher::null_rd;
+    return forest_node_->route()->GetPrefix().route_distinguisher();
 }
 
 void McastSGEntry::AddCMcastRoute() {
@@ -290,8 +352,7 @@ void McastSGEntry::AddCMcastRoute() {
     BgpAttrSpec attr_spec;
     BgpAttrNextHop nexthop(server->bgp_identifier());
     attr_spec.push_back(&nexthop);
-    BgpAttrSourceRd source_rd(
-        RouteDistinguisher(forest_node_->route()->GetPrefix().route_distinguisher()));
+    BgpAttrSourceRd source_rd(GetSourceRd());
     attr_spec.push_back(&source_rd);
     EdgeDiscoverySpec edspec;
     EdgeDiscoverySpec::Edge *edge = new EdgeDiscoverySpec::Edge;
@@ -345,6 +406,13 @@ void McastSGEntry::UpdateCMcastRoute() {
 void McastSGEntry::UpdateRoutes(uint8_t level) {
     if (level == McastTreeManager::LevelLocal) {
         UpdateCMcastRoute();
+    } else {
+        ForwarderList *forwarders = &forwarder_lists_[level];
+        for (ForwarderList::iterator it = forwarders->begin();
+             it != forwarders->end(); ++it) {
+            (*it)->DeleteTreeRoute();
+            (*it)->AddTreeRoute();
+        }
     }
 }
 
@@ -424,6 +492,11 @@ bool McastSGEntry::empty() const {
     if (!forwarder_lists_[McastTreeManager::LevelGlobal].empty())
         return false;
     return true;
+}
+
+const BgpServer *McastSGEntry::server() const {
+    BgpTable *table = partition_->GetTreeManager()->table();
+    return table->routing_instance()->server();
 }
 
 //
@@ -599,6 +672,8 @@ void McastTreeManager::RouteListener(
 
     McastManagerPartition *partition = partitions_[tpart->index()];
     InetMVpnRoute *route = dynamic_cast<InetMVpnRoute *>(db_entry);
+    if (route->GetPrefix().type() == InetMVpnPrefix::TreeRoute)
+        return;
 
     DBState *dbstate = route->GetState(table_, listener_id_);
     if (!dbstate) {
@@ -611,7 +686,7 @@ void McastTreeManager::RouteListener(
         // Create a new McastForwarder and associate it with the route.
         McastSGEntry *sg_entry = partition->LocateSGEntry(
             route->GetPrefix().group(), route->GetPrefix().source());
-        McastForwarder *forwarder = new McastForwarder(route);
+        McastForwarder *forwarder = new McastForwarder(sg_entry, route);
         sg_entry->AddForwarder(forwarder);
         route->SetState(table_, listener_id_, forwarder);
 
