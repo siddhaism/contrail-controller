@@ -162,6 +162,23 @@ std::string EdgeDiscoverySpec::ToString() const {
     return "";
 }
 
+int EdgeForwardingSpec::CompareTo(const BgpAttribute &rhs_attr) const {
+    int ret = BgpAttribute::CompareTo(rhs_attr);
+    if (ret != 0) return ret;
+    const EdgeForwardingSpec &rhs =
+        static_cast<const EdgeForwardingSpec &>(rhs_attr);
+    KEY_COMPARE(this, &rhs);
+    return 0;
+}
+
+void EdgeForwardingSpec::ToCanonical(BgpAttr *attr) {
+    attr->set_edge_forwarding(this);
+}
+
+std::string EdgeForwardingSpec::ToString() const {
+    return "";
+}
+
 int BgpAttrOList::CompareTo(const BgpAttribute &rhs_attr) const {
     int ret = BgpAttribute::CompareTo(rhs_attr);
     if (ret != 0) return ret;
@@ -254,6 +271,7 @@ BgpAttr::BgpAttr(const BgpAttr &rhs)
       community_(rhs.community_),
       ext_community_(rhs.ext_community_),
       edge_discovery_(rhs.edge_discovery_),
+      edge_forwarding_(rhs.edge_forwarding_),
       label_block_(rhs.label_block_), olist_(rhs.olist_) {
     refcount_ = 0; 
 }
@@ -292,6 +310,12 @@ void BgpAttr::set_edge_discovery(const EdgeDiscoverySpec *edspec) {
     }
 }
 
+void BgpAttr::set_edge_forwarding(const EdgeForwardingSpec *efspec) {
+    if (efspec) {
+        edge_forwarding_.reset(new EdgeForwarding(*efspec));
+    }
+}
+
 void BgpAttr::set_label_block(LabelBlockPtr label_block) {
     label_block_ = label_block;
 }
@@ -318,6 +342,7 @@ int BgpAttr::CompareTo(const BgpAttr &rhs) const {
     KEY_COMPARE(aggregator_as_num_, rhs.aggregator_as_num_);
     KEY_COMPARE(aggregator_address_, rhs.aggregator_address_);
     KEY_COMPARE(edge_discovery_.get(), rhs.edge_discovery_.get());
+    KEY_COMPARE(edge_forwarding_.get(), rhs.edge_forwarding_.get());
     KEY_COMPARE(source_rd_, rhs.source_rd_);
     KEY_COMPARE(label_block_.get(), rhs.label_block_.get());
     KEY_COMPARE(olist_.get(), rhs.olist_.get());

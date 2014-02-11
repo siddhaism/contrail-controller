@@ -160,10 +160,6 @@ struct EdgeDiscoverySpec : public BgpAttribute {
         STLDeleteValues(&edge_list);
     }
     struct Edge : public ParseObject {
-        int CompareTo(const Edge &rhs) const {
-            return 0;
-        }
-
         Ip4Address GetAddress() const {
             return Ip4Address(get_value(&address[0], 4));
         }
@@ -218,6 +214,79 @@ inline void intrusive_ptr_release(EdgeDiscovery *ediscovery) {
 }
 
 typedef boost::intrusive_ptr<EdgeDiscovery> EdgeDiscoveryPtr;
+
+struct EdgeForwardingSpec : public BgpAttribute {
+    static const int kSize = -1;
+    static const uint8_t kFlags = Optional | Transitive;
+    EdgeForwardingSpec() : BgpAttribute(McastEdgeForwarding, kFlags) { }
+    explicit EdgeForwardingSpec(const BgpAttribute &rhs) : BgpAttribute(rhs) { }
+    explicit EdgeForwardingSpec(const EdgeForwardingSpec &rhs) :
+        BgpAttribute(BgpAttribute::McastEdgeForwarding, kFlags) {
+        for (size_t i = 0; i < rhs.edge_list.size(); i++) {
+            Edge *edge = new Edge;
+            *edge = *rhs.edge_list[i];
+            edge_list.push_back(edge);
+        }
+    }
+    ~EdgeForwardingSpec() {
+        STLDeleteValues(&edge_list);
+    }
+    struct Edge : public ParseObject {
+        Ip4Address GetInboundAddress() const {
+            return Ip4Address(get_value(&inbound_address[0], 4));
+        }
+        Ip4Address GetOutboundAddress() const {
+            return Ip4Address(get_value(&outbound_address[0], 4));
+        }
+        void SetInboundAddress(Ip4Address addr) {
+            inbound_address.resize(4, 0);
+            const Ip4Address::bytes_type &addr_bytes = addr.to_bytes();
+            std::copy(addr_bytes.begin(), addr_bytes.begin() + 4,
+                      inbound_address.begin());
+        }
+        void SetOutboundAddress(Ip4Address addr) {
+            outbound_address.resize(4, 0);
+            const Ip4Address::bytes_type &addr_bytes = addr.to_bytes();
+            std::copy(addr_bytes.begin(), addr_bytes.begin() + 4,
+                      outbound_address.begin());
+        }
+
+        std::vector<uint8_t> inbound_address, outbound_address;
+        uint32_t inbound_label, outbound_label;
+    };
+
+    virtual int CompareTo(const BgpAttribute &rhs_attr) const;
+    virtual void ToCanonical(BgpAttr *attr);
+    virtual std::string ToString() const;
+    std::vector<Edge *> edge_list;
+};
+
+class EdgeForwarding {
+public:
+    explicit EdgeForwarding(const EdgeForwardingSpec &efspec) : efspec_(efspec) {
+        refcount_ = 0;
+    }
+    const EdgeForwardingSpec &edge_forwarding() const { return efspec_; }
+private:
+    friend void intrusive_ptr_add_ref(EdgeForwarding *eforwarding);
+    friend void intrusive_ptr_release(EdgeForwarding *eforwarding);
+
+    tbb::atomic<int> refcount_;
+    EdgeForwardingSpec efspec_;
+};
+
+inline void intrusive_ptr_add_ref(EdgeForwarding *eforwarding) {
+    eforwarding->refcount_.fetch_and_increment();
+}
+
+inline void intrusive_ptr_release(EdgeForwarding *eforwarding) {
+    int prev = eforwarding->refcount_.fetch_and_decrement();
+    if (prev == 1) {
+        delete eforwarding;
+    }
+}
+
+typedef boost::intrusive_ptr<EdgeForwarding> EdgeForwardingPtr;
 
 struct BgpAttrLabelBlock : public BgpAttribute {
     static const int kSize = 0;
@@ -335,6 +404,7 @@ public:
     void set_ext_community(ExtCommunityPtr comm);
     void set_ext_community(const ExtCommunitySpec *extcomm);
     void set_edge_discovery(const EdgeDiscoverySpec *edspec);
+    void set_edge_forwarding(const EdgeForwardingSpec *efspec);
     void set_label_block(LabelBlockPtr label_block);
     void set_olist(BgpOListPtr olist);
     friend std::size_t hash_value(BgpAttr const &attr);
@@ -353,6 +423,7 @@ public:
     const Community *community() const { return community_.get(); }
     const ExtCommunity *ext_community() const { return ext_community_.get(); }
     const EdgeDiscovery *edge_discovery() const { return edge_discovery_.get(); }
+    const EdgeForwarding *edge_forwarding() const { return edge_forwarding_.get(); }
     LabelBlockPtr label_block() const { return label_block_; }
     BgpOListPtr olist() const { return olist_; }
     BgpAttrDB *attr_db() const { return attr_db_; }
@@ -377,6 +448,7 @@ private:
     CommunityPtr community_;
     ExtCommunityPtr ext_community_;
     EdgeDiscoveryPtr edge_discovery_;
+    EdgeForwardingPtr edge_forwarding_;
     LabelBlockPtr label_block_;
     BgpOListPtr olist_;
 };
