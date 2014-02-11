@@ -204,8 +204,8 @@ private:
     McastForwarder *forest_node_;
     InetMVpnRoute *cmcast_route_;
     InetMVpnRoute *tree_route_;
-    ForwarderList forwarder_lists_[2];
-    bool update_needed_[2];
+    std::vector<ForwarderList *> forwarder_lists_;
+    std::vector<bool> update_needed_;
     bool on_work_queue_;
 
     DISALLOW_COPY_AND_ASSIGN(McastSGEntry);

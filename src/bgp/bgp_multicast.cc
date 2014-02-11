@@ -7,6 +7,7 @@
 #include <boost/bind.hpp>
 
 #include "base/task_annotations.h"
+#include "base/util.h"
 #include "bgp/bgp_path.h"
 #include "bgp/bgp_route.h"
 #include "bgp/ipeer.h"
@@ -273,14 +274,19 @@ McastSGEntry::McastSGEntry(McastManagerPartition *partition,
       forest_node_(NULL),
       cmcast_route_(NULL),
       on_work_queue_(false) {
-    update_needed_[0] = false;
-    update_needed_[1] = false;
+    for (int level = McastTreeManager::LevelFirst;
+         level < McastTreeManager::LevelCount; ++level) {
+        ForwarderList *forwarders = new ForwarderList;
+        forwarder_lists_.push_back(forwarders);
+        update_needed_.push_back(false);
+    }
 }
 
 //
 // Destructor for McastSGEntry.
 //
 McastSGEntry::~McastSGEntry() {
+    STLDeleteValues(&forwarder_lists_);
 }
 
 //
@@ -296,7 +302,7 @@ std::string McastSGEntry::ToString() const {
 //
 void McastSGEntry::AddForwarder(McastForwarder *forwarder) {
     uint8_t level = forwarder->level();
-    forwarder_lists_[level].insert(forwarder);
+    forwarder_lists_[level]->insert(forwarder);
     update_needed_[level] = true;
     partition_->EnqueueSGEntry(this);
 }
@@ -310,7 +316,7 @@ void McastSGEntry::DeleteForwarder(McastForwarder *forwarder) {
         DeleteCMcastRoute();
     forwarder->DeleteTreeRoute();
     uint8_t level = forwarder->level();
-    forwarder_lists_[level].erase(forwarder);
+    forwarder_lists_[level]->erase(forwarder);
     update_needed_[level] = true;
     partition_->EnqueueSGEntry(this);
 }
@@ -326,7 +332,7 @@ void McastSGEntry::AddCMcastRoute() {
     assert(!cmcast_route_);
 
     uint8_t level = McastTreeManager::LevelLocal;
-    ForwarderList *forwarders = &forwarder_lists_[level];
+    ForwarderList *forwarders = forwarder_lists_[level];
     if (forwarders->rbegin() == forwarders->rend())
         return;
 
@@ -388,7 +394,7 @@ void McastSGEntry::DeleteCMcastRoute() {
 
 void McastSGEntry::UpdateCMcastRoute() {
     uint8_t level = McastTreeManager::LevelLocal;
-    ForwarderList *forwarders = &forwarder_lists_[level];
+    ForwarderList *forwarders = forwarder_lists_[level];
     McastForwarder *new_forest_node;
     if (forwarders->rbegin() == forwarders->rend()) {
         new_forest_node = NULL;
@@ -407,7 +413,7 @@ void McastSGEntry::UpdateRoutes(uint8_t level) {
     if (level == McastTreeManager::LevelLocal) {
         UpdateCMcastRoute();
     } else {
-        ForwarderList *forwarders = &forwarder_lists_[level];
+        ForwarderList *forwarders = forwarder_lists_[level];
         for (ForwarderList::iterator it = forwarders->begin();
              it != forwarders->end(); ++it) {
             (*it)->DeleteTreeRoute();
@@ -439,7 +445,7 @@ void McastSGEntry::UpdateTree(uint8_t level) {
     } else {
         degree = McastTreeManager::kDegree - 1;
     }
-    ForwarderList *forwarders = &forwarder_lists_[level];
+    ForwarderList *forwarders = forwarder_lists_[level];
 
     // First get rid of the previous distribution tree and enqueue all the
     // associated InetMVpnRoutes for notification.  Note that DBListeners
@@ -495,9 +501,9 @@ void McastSGEntry::NotifyForestNode() {
 bool McastSGEntry::empty() const {
     if (tree_route_)
         return false;
-    if (!forwarder_lists_[McastTreeManager::LevelLocal].empty())
+    if (!forwarder_lists_[McastTreeManager::LevelLocal]->empty())
         return false;
-    if (!forwarder_lists_[McastTreeManager::LevelGlobal].empty())
+    if (!forwarder_lists_[McastTreeManager::LevelGlobal]->empty())
         return false;
     return true;
 }
