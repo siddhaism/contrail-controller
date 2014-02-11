@@ -125,9 +125,9 @@ struct McastForwarderCompare {
             return true;
         if (lhs->route_distinguisher() > rhs->route_distinguisher())
             return false;
-        if (lhs->router_id() < rhs->router_id())
+        if (lhs->router_id().to_ulong() < rhs->router_id().to_ulong())
             return true;
-        if (lhs->router_id() > rhs->router_id())
+        if (lhs->router_id().to_ulong() > rhs->router_id().to_ulong())
             return false;
 
         return false;
