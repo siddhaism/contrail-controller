@@ -251,6 +251,7 @@ struct EdgeForwardingSpec : public BgpAttribute {
                       outbound_address.begin());
         }
 
+        int address_len;
         std::vector<uint8_t> inbound_address, outbound_address;
         uint32_t inbound_label, outbound_label;
     };

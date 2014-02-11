@@ -927,6 +927,128 @@ public:
             BgpPathAttributeDiscoveryEdgeList> Sequence;
 };
 
+class BgpPathAttributeForwardingEdgeLen :
+    public ProtoElement<BgpPathAttributeForwardingEdgeLen> {
+public:
+    static const int kSize = 1;
+    static bool Verifier(const void *obj, const uint8_t *data,
+                         size_t size, ParseContext *context) {
+        uint8_t value = get_value(data, 1);
+        return (value == 4);
+    }
+    struct GetLength {
+        int operator()(EdgeForwardingSpec::Edge *obj,
+                       const uint8_t *data, size_t size) {
+            obj->address_len = get_value(data, 1) * 2 + 8;
+            return obj->address_len;
+        }
+    };
+    typedef GetLength SequenceLength;
+    struct SetLength {
+        static void Callback(EncodeContext *context, uint8_t *data,
+                             int offset, int element_size) {
+            int len = get_value(data, kSize);
+            put_value(data, kSize, (len - 8) / 2);
+        }
+    };
+    typedef SetLength EncodingCallback;
+};
+
+class BgpPathAttributeForwardingEdgeAddressLen :
+    public ProtoElement<BgpPathAttributeForwardingEdgeAddressLen> {
+public:
+    static const int kSize = 0;
+    struct GetLength {
+        int operator()(EdgeForwardingSpec::Edge *obj,
+                       const uint8_t *data, size_t size) {
+            return (obj->address_len - 8) / 2;
+        }
+    };
+    typedef GetLength SequenceLength;
+};
+
+class BgpPathAttributeForwardingEdgeInAddressValue :
+    public ProtoElement<BgpPathAttributeForwardingEdgeInAddressValue> {
+public:
+    static const int kSize = -1;
+    typedef VectorAccessor<EdgeForwardingSpec::Edge, uint8_t,
+            &EdgeForwardingSpec::Edge::inbound_address> Setter;
+};
+
+class BgpPathAttributeForwardingEdgeInAddress :
+    public ProtoSequence<BgpPathAttributeForwardingEdgeInAddress> {
+public:
+    static const int kMinOccurs = 1;
+    static const int kMaxOccurs = 1;
+    typedef mpl::list<BgpPathAttributeForwardingEdgeAddressLen,
+            BgpPathAttributeForwardingEdgeInAddressValue> Sequence;
+};
+
+class BgpPathAttributeForwardingEdgeInLabel :
+    public ProtoElement<BgpPathAttributeForwardingEdgeInLabel> {
+public:
+    static const int kSize = 4;
+    typedef Accessor<EdgeForwardingSpec::Edge, uint32_t,
+            &EdgeForwardingSpec::Edge::inbound_label> Setter;
+};
+
+class BgpPathAttributeForwardingEdgeOutAddressValue :
+    public ProtoElement<BgpPathAttributeForwardingEdgeOutAddressValue> {
+public:
+    static const int kSize = -1;
+    typedef VectorAccessor<EdgeForwardingSpec::Edge, uint8_t,
+            &EdgeForwardingSpec::Edge::outbound_address> Setter;
+};
+
+class BgpPathAttributeForwardingEdgeOutAddress :
+    public ProtoSequence<BgpPathAttributeForwardingEdgeOutAddress> {
+public:
+    static const int kMinOccurs = 1;
+    static const int kMaxOccurs = 1;
+    typedef mpl::list<BgpPathAttributeForwardingEdgeAddressLen,
+            BgpPathAttributeForwardingEdgeOutAddressValue> Sequence;
+};
+
+class BgpPathAttributeForwardingEdgeOutLabel :
+    public ProtoElement<BgpPathAttributeForwardingEdgeOutLabel> {
+public:
+    static const int kSize = 4;
+    typedef Accessor<EdgeForwardingSpec::Edge, uint32_t,
+            &EdgeForwardingSpec::Edge::outbound_label> Setter;
+};
+
+class BgpPathAttributeForwardingEdgeList :
+    public ProtoSequence<BgpPathAttributeForwardingEdgeList> {
+public:
+    static const int kMinOccurs = 1;
+    static const int kMaxOccurs = -1;
+
+    static bool Verifier(const EdgeForwardingSpec *obj, const uint8_t *data,
+                         size_t size, ParseContext *context) {
+        return BgpAttributeVerifier<EdgeForwardingSpec>::Verifier(
+                obj, data, size, context);
+    }
+
+    typedef CollectionAccessor<EdgeForwardingSpec,
+            vector<EdgeForwardingSpec::Edge *>,
+            &EdgeForwardingSpec::edge_list> ContextStorer;
+
+    typedef mpl::list<BgpPathAttributeForwardingEdgeLen,
+            BgpPathAttributeForwardingEdgeInAddress,
+            BgpPathAttributeForwardingEdgeInLabel,
+            BgpPathAttributeForwardingEdgeOutAddress,
+            BgpPathAttributeForwardingEdgeOutLabel> Sequence;
+};
+
+class BgpPathAttributeEdgeForwarding :
+    public ProtoSequence<BgpPathAttributeEdgeForwarding> {
+public:
+    typedef EdgeForwardingSpec ContextType;
+    typedef BgpContextSwap<EdgeForwardingSpec> ContextSwap;
+    typedef mpl::list<BgpPathAttrLength,
+            BgpPathAttributeForwardingEdgeList> Sequence;
+};
+
 class BgpPathAttributeReserved : public ProtoElement<BgpPathAttributeReserved> {
 public:
     const static int kSize = 1;
@@ -1206,6 +1328,8 @@ public:
                     BgpPathAttributeExtendedCommunities>,
           mpl::pair<mpl::int_<BgpAttribute::McastEdgeDiscovery>,
                     BgpPathAttributeEdgeDiscovery>,
+          mpl::pair<mpl::int_<BgpAttribute::McastEdgeForwarding>,
+                    BgpPathAttributeEdgeForwarding>,
           mpl::pair<mpl::int_<-1>, BgpPathAttributeUnknown>
     > Choice;
 };

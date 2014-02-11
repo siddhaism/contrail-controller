@@ -178,6 +178,20 @@ private:
         msg->path_attributes.push_back(edspec);
     }
 
+    static void AddEdgeForwarding(BgpProto::Update *msg) {
+        EdgeForwardingSpec *efspec = new EdgeForwardingSpec;
+        for (int i = rand() % 4; i > 0; i--) {
+            boost::system::error_code ec;
+            EdgeForwardingSpec::Edge *edge = new EdgeForwardingSpec::Edge;
+            edge->SetInboundAddress(Ip4Address::from_string("10.1.1.1", ec));
+            edge->inbound_label = rand() % 10000;
+            edge->SetOutboundAddress(Ip4Address::from_string("10.1.1.2", ec));
+            edge->outbound_label = rand() % 10000;
+            efspec->edge_list.push_back(edge);
+        }
+        msg->path_attributes.push_back(efspec);
+    }
+
     static void AddUnknown(BgpProto::Update *msg) {
         BgpAttrUnknown *unk = new BgpAttrUnknown;
         unk->flags = BgpAttribute::Optional;
@@ -202,6 +216,7 @@ std::vector<BuildUpdateMessage::BuildUpdateParam> BuildUpdateMessage::build_para
             (std::make_pair(&BuildUpdateMessage::AddMpNlri, 5))
             (std::make_pair(&BuildUpdateMessage::AddExtCommunity, 5))
             (std::make_pair(&BuildUpdateMessage::AddEdgeDiscovery, 5))
+            (std::make_pair(&BuildUpdateMessage::AddEdgeForwarding, 5))
             (std::make_pair(&BuildUpdateMessage::AddUnknown, 5));
 
 
