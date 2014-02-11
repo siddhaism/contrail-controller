@@ -176,7 +176,7 @@ void McastForwarder::ReleaseLabel() {
 
 void McastForwarder::AddTreeRoute() {
     assert(!tree_route_);
-    if (label_ == 0)
+    if (label_ == 0 || sg_entry_->GetSourceRd() == RouteDistinguisher::null_rd)
         return;
 
     BgpTable *table = static_cast<BgpTable *>(route_->get_table());
