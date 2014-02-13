@@ -177,7 +177,10 @@ void McastForwarder::ReleaseLabel() {
 
 void McastForwarder::AddTreeRoute() {
     assert(!tree_route_);
-    if (label_ == 0 || sg_entry_->GetSourceRd() == RouteDistinguisher::null_rd)
+
+    if (label_ == 0 || tree_links_.empty())
+        return;
+    if (sg_entry_->GetSourceRd() == RouteDistinguisher::null_rd)
         return;
 
     BgpTable *table = static_cast<BgpTable *>(route_->get_table());
@@ -204,6 +207,17 @@ void McastForwarder::AddTreeRoute() {
     attr_spec.push_back(&nexthop);
     BgpAttrSourceRd source_rd(sg_entry_->GetSourceRd());
     attr_spec.push_back(&source_rd);
+    EdgeForwardingSpec efspec;
+    for (McastForwarderList::const_iterator it = tree_links_.begin();
+         it != tree_links_.end(); ++it) {
+        EdgeForwardingSpec::Edge *edge = new EdgeForwardingSpec::Edge;
+        edge->SetInboundAddress(address_);
+        edge->inbound_label = label_;
+        edge->SetOutboundAddress((*it)->address());
+        edge->outbound_label = (*it)->label();
+        efspec.edge_list.push_back(edge);
+    }
+    attr_spec.push_back(&efspec);
     BgpAttrPtr attr = server->attr_db()->Locate(attr_spec);
 
     BgpPath *path = new BgpPath(0, BgpPath::Local, attr);
@@ -247,7 +261,7 @@ UpdateInfo *McastForwarder::GetUpdateInfo(InetMVpnTable *table) {
 
     BgpOList *olist = new BgpOList;
     for (McastForwarderList::const_iterator it = tree_links_.begin();
-            it != tree_links_.end(); ++it) {
+         it != tree_links_.end(); ++it) {
         BgpOListElem elem((*it)->address(), (*it)->label(), (*it)->encap());
         olist->elements.push_back(elem);
     }

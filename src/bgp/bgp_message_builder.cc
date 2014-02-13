@@ -61,13 +61,11 @@ void BgpMessage::StartReach(const RibOutAttr *roattr, const BgpRoute *route) {
         update.path_attributes.push_back(edspec);
     }
 
-#ifdef TODO
     if (attr->edge_forwarding()) {
         EdgeForwardingSpec *efspec =
-            new EdgeForwardingSpec(attr->edge_forwarding());
+            new EdgeForwardingSpec(attr->edge_forwarding()->edge_forwarding());
         update.path_attributes.push_back(efspec);
     }
-#endif
 
     if (attr->community() && attr->community()->communities().size()) {
         CommunitySpec *comm = new CommunitySpec;
