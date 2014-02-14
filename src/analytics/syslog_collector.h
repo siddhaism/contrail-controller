@@ -28,6 +28,9 @@ class SyslogQueueEntry
         length(l), data(d), ip (ip_), port (port_)
     {
     }
+    virtual ~SyslogQueueEntry()
+    {
+    }
 };
 
 class SyslogTcpSession;
