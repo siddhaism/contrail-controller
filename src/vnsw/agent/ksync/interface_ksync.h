@@ -38,7 +38,16 @@ public:
     InterfaceKSyncEntry(InterfaceKSyncObject *obj, const Interface *intf);
     virtual ~InterfaceKSyncEntry();
 
-    const uint8_t *mac() const {return mac_.ether_addr_octet;}
+    const uint8_t *mac() const { 
+        if (parent_.get() == NULL) {
+            return mac_.ether_addr_octet;
+        } else {
+            const InterfaceKSyncEntry *parent = 
+                static_cast<const InterfaceKSyncEntry *>(parent_.get());
+            return parent->mac();
+        }
+    }
+
     uint32_t interface_id() const {return interface_id_;}
     const string &interface_name() const {return interface_name_;}
     bool has_service_vlan() const {return has_service_vlan_;}
@@ -76,6 +85,7 @@ private:
     bool layer2_forwarding_;
     uint16_t vlan_id_;
     KSyncEntryPtr parent_;
+    KSyncEntryPtr xconnect_;
     DISALLOW_COPY_AND_ASSIGN(InterfaceKSyncEntry);
 };
 

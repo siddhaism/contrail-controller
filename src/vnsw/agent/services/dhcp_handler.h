@@ -86,6 +86,11 @@ struct dhcphdr {
      uint8_t options[DHCP_MAX_OPTION_LEN];
 };
 
+struct vlanhdr {
+    uint16_t tpid;
+    uint16_t tci;
+};
+
 struct ConfigRecord {
     uint32_t ip_addr;
     uint32_t subnet_mask;

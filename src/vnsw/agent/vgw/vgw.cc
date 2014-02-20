@@ -162,7 +162,8 @@ void VirtualGateway::CreateInterfaces() {
     for (it = table.begin(); it != table.end(); it++) {
         InetInterface::CreateReq(agent_->GetInterfaceTable(), it->interface(),
                                  InetInterface::SIMPLE_GATEWAY, it->vrf(),
-                                 Ip4Address(0), 0, Ip4Address(0), "");
+                                 Ip4Address(0), 0, Ip4Address(0),
+                                 Agent::NullString(), "");
     }
 }
 

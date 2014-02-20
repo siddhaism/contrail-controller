@@ -1190,7 +1190,7 @@ TEST_F(CfgTest, Basic_1) {
     InetInterface::CreateReq(Agent::GetInstance()->GetInterfaceTable(),
                              "vhost10", InetInterface::VHOST,
                              Agent::GetInstance()->GetDefaultVrf(),
-                             Ip4Address(0), 0, Ip4Address(0), "");
+                             Ip4Address(0), 0, Ip4Address(0), "vnet0", "");
 
     client->WaitForIdle();
 
