@@ -258,7 +258,7 @@ int InterfaceKSyncEntry::Encode(sandesh_op::type op, char *buf, int buf_len) {
         if (vlan_id_ == VmInterface::kInvalidVlanId) {
             encoder.set_vifr_type(VIF_TYPE_VIRTUAL);
         } else {
-            encoder.set_vifr_type(VIF_TYPE_VLAN);
+            encoder.set_vifr_type(VIF_TYPE_VIRTUAL_VLAN);
             encoder.set_vifr_vlan_id(vlan_id_);
             encoder.set_vifr_parent_vif_idx
                 (static_cast<InterfaceKSyncEntry *>
