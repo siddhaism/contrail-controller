@@ -409,10 +409,12 @@ void McastSGEntry::AddCMcastRoute() {
     BgpAttrSourceRd source_rd(GetSourceRd());
     attr_spec.push_back(&source_rd);
     EdgeDiscoverySpec edspec;
-    EdgeDiscoverySpec::Edge *edge = new EdgeDiscoverySpec::Edge;
-    edge->SetAddress(forest_node_->address());
-    edge->SetLabels(forest_node_->label(), forest_node_->label());
-    edspec.edge_list.push_back(edge);
+    for (int idx = 1; idx <= McastTreeManager::kDegree - 1; ++idx) {
+        EdgeDiscoverySpec::Edge *edge = new EdgeDiscoverySpec::Edge;
+        edge->SetAddress(forest_node_->address());
+        edge->SetLabels(forest_node_->label(), forest_node_->label());
+        edspec.edge_list.push_back(edge);
+    }
     attr_spec.push_back(&edspec);
     BgpAttrPtr attr = server->attr_db()->Locate(attr_spec);
 
