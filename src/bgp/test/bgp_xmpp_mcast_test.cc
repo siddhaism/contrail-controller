@@ -810,7 +810,7 @@ static const char *config_tmpl2 = "\
 </config>\
 ";
 
-class BgpXmppMcastMultiServerTest : public BgpXmppMcastTest {
+class BgpXmppMcast2ServerTest : public BgpXmppMcastTest {
 protected:
     virtual void Configure(const char *config_tmpl) {
         char config[4096];
@@ -898,7 +898,7 @@ protected:
     boost::scoped_ptr<test::NetworkAgentMock> agent_yc_;
 };
 
-TEST_F(BgpXmppMcastMultiServerTest, Testx1) {
+TEST_F(BgpXmppMcast2ServerTest, SingleAgentPerServer) {
     const char *mroute = "225.0.0.1,0.0.0.0";
 
     // Add mcast route for agent xa.
@@ -938,7 +938,7 @@ TEST_F(BgpXmppMcastMultiServerTest, Testx1) {
     TASK_UTIL_EXPECT_EQ(0, agent_ya_->McastRouteCount());
 };
 
-TEST_F(BgpXmppMcastMultiServerTest, Testx2) {
+TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer1) {
     const char *mroute = "225.0.0.1,0.0.0.0";
 
     // Add mcast route for agent xa and ya.
@@ -974,7 +974,7 @@ TEST_F(BgpXmppMcastMultiServerTest, Testx2) {
     task_util::WaitForIdle();
 };
 
-TEST_F(BgpXmppMcastMultiServerTest, Testx3) {
+TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer2) {
     const char *mroute = "225.0.0.1,0.0.0.0";
 
     // Add mcast route for agent xa and xb.
@@ -1010,17 +1010,17 @@ TEST_F(BgpXmppMcastMultiServerTest, Testx3) {
     task_util::WaitForIdle();
 };
 
-TEST_F(BgpXmppMcastMultiServerTest, TestN) {
+TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer3) {
     const char *mroute = "225.0.0.1,0.0.0.0";
 
     // Add mcast route for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-20000");
-    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "40000-60000");
-    agent_xc_->AddMcastRoute("blue", mroute, "10.1.1.3", "60000-80000");
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
+    agent_xc_->AddMcastRoute("blue", mroute, "10.1.1.3", "30000-39999");
     task_util::WaitForIdle();
-    agent_ya_->AddMcastRoute("blue", mroute, "20.1.1.1", "10000-20000");
-    agent_yb_->AddMcastRoute("blue", mroute, "20.1.1.2", "40000-60000");
-    agent_yc_->AddMcastRoute("blue", mroute, "20.1.1.3", "60000-80000");
+    agent_ya_->AddMcastRoute("blue", mroute, "10.1.1.4", "40000-49999");
+    agent_yb_->AddMcastRoute("blue", mroute, "10.1.1.5", "50000-59999");
+    agent_yc_->AddMcastRoute("blue", mroute, "10.1.1.6", "60000-69999");
     task_util::WaitForIdle();
 
     // Verify number of routes on all agents.
@@ -1036,12 +1036,12 @@ TEST_F(BgpXmppMcastMultiServerTest, TestN) {
     VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.3");
     VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1");
     VerifyOListElem(agent_xc_.get(), "blue", mroute, 2, "10.1.1.1");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 2, "20.1.1.3");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 2, "10.1.1.6");
 
-    VerifyOListElem(agent_ya_.get(), "blue", mroute, 2, "20.1.1.2");
-    VerifyOListElem(agent_ya_.get(), "blue", mroute, 2, "20.1.1.3");
-    VerifyOListElem(agent_yb_.get(), "blue", mroute, 1, "20.1.1.1");
-    VerifyOListElem(agent_yc_.get(), "blue", mroute, 2, "20.1.1.1");
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 2, "10.1.1.5");
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 2, "10.1.1.6");
+    VerifyOListElem(agent_yb_.get(), "blue", mroute, 1, "10.1.1.4");
+    VerifyOListElem(agent_yc_.get(), "blue", mroute, 2, "10.1.1.4");
     VerifyOListElem(agent_yc_.get(), "blue", mroute, 2, "10.1.1.3");
 
     // Delete mcast route for all agents.
