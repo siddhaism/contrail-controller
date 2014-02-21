@@ -796,6 +796,232 @@ static const char *config_tmpl2 = "\
 </config>\
 ";
 
+class BgpXmppMcastEncapTest : public BgpXmppMcastMultiAgentTest {
+protected:
+};
+
+TEST_F(BgpXmppMcastEncapTest, ImplicitOnly) {
+    const char *mroute = "255.255.255.255,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
+    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000");
+    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7");
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_xc_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+TEST_F(BgpXmppMcastEncapTest, ExplicitSingle) {
+    const char *mroute = "255.255.255.255,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "gre");
+    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "gre");
+    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "gre");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "gre");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "gre");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_xc_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+TEST_F(BgpXmppMcastEncapTest, ExplicitAll) {
+    const char *mroute = "255.255.255.255,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "all");
+    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "all");
+    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "all");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "all");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "all");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "all");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "all");
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_xc_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+TEST_F(BgpXmppMcastEncapTest, ExplicitMixed1) {
+    const char *mroute = "255.255.255.255,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "all");
+    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "gre");
+    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "udp");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "gre");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "udp");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "all");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "all");
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_xc_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+TEST_F(BgpXmppMcastEncapTest, ExplicitMixed2) {
+    const char *mroute = "255.255.255.255,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "gre");
+    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "all");
+    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "all");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "all");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "all");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_xc_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+TEST_F(BgpXmppMcastEncapTest, ImplicitAndExplicitMixed1) {
+    const char *mroute = "255.255.255.255,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "all");
+    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000");
+    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "all");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "all");
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_xc_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+TEST_F(BgpXmppMcastEncapTest, ImplicitAndExplicitMixed2) {
+    const char *mroute = "255.255.255.255,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
+    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "gre");
+    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "all");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "gre");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "all");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7");
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_xc_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+TEST_F(BgpXmppMcastEncapTest, ImplicitAndExplicitMixed3) {
+    const char *mroute = "255.255.255.255,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "all");
+    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "gre");
+    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "gre");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "all");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "all");
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_xc_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+TEST_F(BgpXmppMcastEncapTest, Change) {
+    const char *mroute = "255.255.255.255,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
+    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000");
+    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7");
+
+    // Update mcast route for all agents - change encaps to all.
+    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "all");
+    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "all");
+    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "all");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "all");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "all");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "all");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "all");
+
+    // Update mcast route for all agents - change encaps to gre.
+    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "gre");
+    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "gre");
+    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "gre");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "gre");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "gre");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_xc_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
 class BgpXmppMcast2ServerTest : public BgpXmppMcastTest {
 protected:
     virtual void Configure(const char *config_tmpl) {
@@ -1037,232 +1263,6 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer3) {
     agent_ya_->DeleteMcastRoute("blue", mroute);
     agent_yb_->DeleteMcastRoute("blue", mroute);
     agent_yc_->DeleteMcastRoute("blue", mroute);
-    task_util::WaitForIdle();
-};
-
-class BgpXmppMcastEncapTest : public BgpXmppMcastMultiAgentTest {
-protected:
-};
-
-TEST_F(BgpXmppMcastEncapTest, ImplicitOnly) {
-    const char *mroute = "255.255.255.255,0.0.0.0";
-
-    // Add mcast route for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000");
-    task_util::WaitForIdle();
-
-    // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7");
-
-    // Delete mcast route for all agents.
-    agent_xa_->DeleteMcastRoute("blue", mroute);
-    agent_xb_->DeleteMcastRoute("blue", mroute);
-    agent_xc_->DeleteMcastRoute("blue", mroute);
-    task_util::WaitForIdle();
-};
-
-TEST_F(BgpXmppMcastEncapTest, ExplicitSingle) {
-    const char *mroute = "255.255.255.255,0.0.0.0";
-
-    // Add mcast route for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "gre");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "gre");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "gre");
-    task_util::WaitForIdle();
-
-    // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "gre");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "gre");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
-
-    // Delete mcast route for all agents.
-    agent_xa_->DeleteMcastRoute("blue", mroute);
-    agent_xb_->DeleteMcastRoute("blue", mroute);
-    agent_xc_->DeleteMcastRoute("blue", mroute);
-    task_util::WaitForIdle();
-};
-
-TEST_F(BgpXmppMcastEncapTest, ExplicitAll) {
-    const char *mroute = "255.255.255.255,0.0.0.0";
-
-    // Add mcast route for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "all");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "all");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "all");
-    task_util::WaitForIdle();
-
-    // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "all");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "all");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "all");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "all");
-
-    // Delete mcast route for all agents.
-    agent_xa_->DeleteMcastRoute("blue", mroute);
-    agent_xb_->DeleteMcastRoute("blue", mroute);
-    agent_xc_->DeleteMcastRoute("blue", mroute);
-    task_util::WaitForIdle();
-};
-
-TEST_F(BgpXmppMcastEncapTest, ExplicitMixed1) {
-    const char *mroute = "255.255.255.255,0.0.0.0";
-
-    // Add mcast route for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "all");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "gre");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "udp");
-    task_util::WaitForIdle();
-
-    // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "gre");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "udp");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "all");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "all");
-
-    // Delete mcast route for all agents.
-    agent_xa_->DeleteMcastRoute("blue", mroute);
-    agent_xb_->DeleteMcastRoute("blue", mroute);
-    agent_xc_->DeleteMcastRoute("blue", mroute);
-    task_util::WaitForIdle();
-};
-
-TEST_F(BgpXmppMcastEncapTest, ExplicitMixed2) {
-    const char *mroute = "255.255.255.255,0.0.0.0";
-
-    // Add mcast route for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "gre");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "all");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "all");
-    task_util::WaitForIdle();
-
-    // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "all");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "all");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
-
-    // Delete mcast route for all agents.
-    agent_xa_->DeleteMcastRoute("blue", mroute);
-    agent_xb_->DeleteMcastRoute("blue", mroute);
-    agent_xc_->DeleteMcastRoute("blue", mroute);
-    task_util::WaitForIdle();
-};
-
-TEST_F(BgpXmppMcastEncapTest, ImplicitAndExplicitMixed1) {
-    const char *mroute = "255.255.255.255,0.0.0.0";
-
-    // Add mcast route for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "all");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000");
-    task_util::WaitForIdle();
-
-    // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "all");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "all");
-
-    // Delete mcast route for all agents.
-    agent_xa_->DeleteMcastRoute("blue", mroute);
-    agent_xb_->DeleteMcastRoute("blue", mroute);
-    agent_xc_->DeleteMcastRoute("blue", mroute);
-    task_util::WaitForIdle();
-};
-
-TEST_F(BgpXmppMcastEncapTest, ImplicitAndExplicitMixed2) {
-    const char *mroute = "255.255.255.255,0.0.0.0";
-
-    // Add mcast route for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "gre");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "all");
-    task_util::WaitForIdle();
-
-    // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "gre");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "all");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7");
-
-    // Delete mcast route for all agents.
-    agent_xa_->DeleteMcastRoute("blue", mroute);
-    agent_xb_->DeleteMcastRoute("blue", mroute);
-    agent_xc_->DeleteMcastRoute("blue", mroute);
-    task_util::WaitForIdle();
-};
-
-TEST_F(BgpXmppMcastEncapTest, ImplicitAndExplicitMixed3) {
-    const char *mroute = "255.255.255.255,0.0.0.0";
-
-    // Add mcast route for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "all");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "gre");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000");
-    task_util::WaitForIdle();
-
-    // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "gre");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "all");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "all");
-
-    // Delete mcast route for all agents.
-    agent_xa_->DeleteMcastRoute("blue", mroute);
-    agent_xb_->DeleteMcastRoute("blue", mroute);
-    agent_xc_->DeleteMcastRoute("blue", mroute);
-    task_util::WaitForIdle();
-};
-
-TEST_F(BgpXmppMcastEncapTest, Change) {
-    const char *mroute = "255.255.255.255,0.0.0.0";
-
-    // Add mcast route for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000");
-    task_util::WaitForIdle();
-
-    // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7");
-
-    // Update mcast route for all agents - change encaps to all.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "all");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "all");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "all");
-    task_util::WaitForIdle();
-
-    // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "all");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "all");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "all");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "all");
-
-    // Update mcast route for all agents - change encaps to gre.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000", "gre");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000", "gre");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000", "gre");
-    task_util::WaitForIdle();
-
-    // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8", "gre");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9", "gre");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7", "gre");
-
-    // Delete mcast route for all agents.
-    agent_xa_->DeleteMcastRoute("blue", mroute);
-    agent_xb_->DeleteMcastRoute("blue", mroute);
-    agent_xc_->DeleteMcastRoute("blue", mroute);
     task_util::WaitForIdle();
 };
 
