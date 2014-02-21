@@ -765,37 +765,6 @@ TEST_F(BgpXmppMcastMultiAgentTest, MultipleNetworks) {
     task_util::WaitForIdle();
 };
 
-static const char *config_tmpl2 = "\
-<config>\
-    <bgp-router name=\'X\'>\
-        <identifier>192.168.0.1</identifier>\
-        <address>127.0.0.1</address>\
-        <port>%d</port>\
-        <session to=\'Y\'>\
-            <address-families>\
-                <family>inet-mvpn</family>\
-            </address-families>\
-        </session>\
-    </bgp-router>\
-    <bgp-router name=\'Y\'>\
-        <identifier>192.168.0.4</identifier>\
-        <address>127.0.0.4</address>\
-        <port>%d</port>\
-        <session to=\'X\'>\
-            <address-families>\
-                <family>inet-mvpn</family>\
-            </address-families>\
-        </session>\
-    </bgp-router>\
-    <routing-instance name='blue'>\
-        <vrf-target>target:1:1</vrf-target>\
-    </routing-instance>\
-    <routing-instance name='pink'>\
-        <vrf-target>target:1:2</vrf-target>\
-    </routing-instance>\
-</config>\
-";
-
 class BgpXmppMcastEncapTest : public BgpXmppMcastMultiAgentTest {
 protected:
 };
@@ -1022,7 +991,38 @@ TEST_F(BgpXmppMcastEncapTest, Change) {
     task_util::WaitForIdle();
 };
 
-class BgpXmppMcast2ServerTest : public BgpXmppMcastTest {
+static const char *config_tmpl2 = "\
+<config>\
+    <bgp-router name=\'X\'>\
+        <identifier>192.168.0.1</identifier>\
+        <address>127.0.0.1</address>\
+        <port>%d</port>\
+        <session to=\'Y\'>\
+            <address-families>\
+                <family>inet-mvpn</family>\
+            </address-families>\
+        </session>\
+    </bgp-router>\
+    <bgp-router name=\'Y\'>\
+        <identifier>192.168.0.4</identifier>\
+        <address>127.0.0.4</address>\
+        <port>%d</port>\
+        <session to=\'X\'>\
+            <address-families>\
+                <family>inet-mvpn</family>\
+            </address-families>\
+        </session>\
+    </bgp-router>\
+    <routing-instance name='blue'>\
+        <vrf-target>target:1:1</vrf-target>\
+    </routing-instance>\
+    <routing-instance name='pink'>\
+        <vrf-target>target:1:2</vrf-target>\
+    </routing-instance>\
+</config>\
+";
+
+class BgpXmppMcast2ServerTestBase : public BgpXmppMcastTest {
 protected:
     virtual void Configure(const char *config_tmpl) {
         char config[4096];
@@ -1041,17 +1041,9 @@ protected:
         bcm_y_.reset(new BgpXmppChannelManagerMock(xs_y_, bs_y_.get()));
 
         BgpXmppMcastTest::SetUp();
-
-        Configure(config_tmpl2);
-        task_util::WaitForIdle();
-
-        SessionUp();
-        Subscribe("blue", 1);
     }
 
     virtual void TearDown() {
-        SessionDown();
-
         xs_y_->Shutdown();
         task_util::WaitForIdle();
         bs_y_->Shutdown();
@@ -1105,6 +1097,24 @@ protected:
     boost::scoped_ptr<test::NetworkAgentMock> agent_ya_;
     boost::scoped_ptr<test::NetworkAgentMock> agent_yb_;
     boost::scoped_ptr<test::NetworkAgentMock> agent_yc_;
+};
+
+class BgpXmppMcast2ServerTest : public BgpXmppMcast2ServerTestBase {
+protected:
+    virtual void SetUp() {
+        BgpXmppMcast2ServerTestBase::SetUp();
+
+        Configure(config_tmpl2);
+        task_util::WaitForIdle();
+
+        BgpXmppMcast2ServerTestBase::SessionUp();
+        BgpXmppMcast2ServerTestBase::Subscribe("blue", 1);
+    }
+
+    virtual void TearDown() {
+        BgpXmppMcast2ServerTestBase::SessionDown();
+        BgpXmppMcast2ServerTestBase::TearDown();
+    }
 };
 
 TEST_F(BgpXmppMcast2ServerTest, SingleAgentPerServer) {
