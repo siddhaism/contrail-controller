@@ -57,13 +57,9 @@ McastForwarder::McastForwarder(McastSGEntry *sg_entry, InetMVpnRoute *route)
         label_block_ = attr->label_block();
     } else {
         level_ = McastTreeManager::LevelGlobal;
-        const EdgeDiscoverySpec &edspec =
-            attr->edge_discovery()->edge_discovery();
-        const EdgeDiscoverySpec::Edge *edge = edspec.edge_list[0];
-        address_ = edge->GetAddress();
-        uint32_t first_label, last_label;
-        edge->GetLabels(first_label, last_label);
-        label_block_ = new LabelBlock(first_label, last_label);
+        const EdgeDiscovery::Edge *edge = attr->edge_discovery()->edge_list[0];
+        address_ = edge->address;
+        label_block_ = edge->label_block;
     }
 
     if (path->GetAttr()->ext_community())
@@ -98,6 +94,10 @@ bool McastForwarder::Update(InetMVpnRoute *route) {
     }
     if (encap_ != forwarder.encap_) {
         encap_ = forwarder.encap_;
+        changed = true;
+    }
+    if (router_id_ != forwarder.router_id_) {
+        router_id_ = forwarder.router_id_;
         changed = true;
     }
 
@@ -255,16 +255,37 @@ void McastForwarder::DeleteTreeRoute() {
 UpdateInfo *McastForwarder::GetUpdateInfo(InetMVpnTable *table) {
     CHECK_CONCURRENCY("db::DBTable");
 
-    // Bail if the tree has not been
-    if (tree_links_.empty() || label_ == 0)
+    // Bail if the tree has not been built.
+    if (label_ == 0)
         return NULL;
 
-    BgpOList *olist = new BgpOList;
+    BgpOListPtr olist(new BgpOList);
     for (McastForwarderList::const_iterator it = tree_links_.begin();
          it != tree_links_.end(); ++it) {
         BgpOListElem elem((*it)->address(), (*it)->label(), (*it)->encap());
         olist->elements.push_back(elem);
     }
+
+    const InetMVpnRoute *tree_route = sg_entry_->tree_route();
+    const BgpPath *tree_path = tree_route ? tree_route->BestPath() : NULL;
+    if (tree_path) {
+        const BgpAttr *tree_attr = tree_path->GetAttr();
+        const EdgeForwardingSpec &efspec =
+            tree_attr->edge_forwarding()->edge_forwarding();
+        for (EdgeForwardingSpec::EdgeList::const_iterator it =
+             efspec.edge_list.begin(); it != efspec.edge_list.end(); ++it) {
+            const EdgeForwardingSpec::Edge *edge = *it;
+            if (edge->GetInboundAddress() == address_) {
+                BgpOListElem elem(edge->GetOutboundAddress(),
+                    edge->outbound_label);
+                olist->elements.push_back(elem);
+            }
+        }
+    }
+
+    // Bail if there are links.
+    if (olist->elements.empty())
+        return NULL;
 
     BgpAttrOList olist_attr = BgpAttrOList(olist);
     BgpAttrSpec attr_spec;
@@ -287,6 +308,7 @@ McastSGEntry::McastSGEntry(McastManagerPartition *partition,
       source_(source),
       forest_node_(NULL),
       cmcast_route_(NULL),
+      tree_route_(NULL),
       on_work_queue_(false) {
     for (int level = McastTreeManager::LevelFirst;
          level < McastTreeManager::LevelCount; ++level) {
@@ -321,6 +343,12 @@ void McastSGEntry::AddForwarder(McastForwarder *forwarder) {
     partition_->EnqueueSGEntry(this);
 }
 
+void McastSGEntry::ChangeForwarder(McastForwarder *forwarder) {
+    uint8_t level = forwarder->level();
+    update_needed_[level] = true;
+    partition_->EnqueueSGEntry(this);
+}
+
 //
 // Delete the given McastForwarder from this McastSGEntry and trigger update
 // of the distribution tree.
@@ -351,8 +379,7 @@ void McastSGEntry::AddCMcastRoute() {
         return;
 
     forest_node_ = *forwarders->rbegin();
-    BgpTable *table = partition_->GetTreeManager()->table();
-    BgpServer *server = table->routing_instance()->server();
+    BgpServer *server = partition_->server();
     Ip4Address router_id(server->bgp_identifier());
     InetMVpnPrefix prefix(InetMVpnPrefix::CMcastRoute,
         RouteDistinguisher::null_rd, router_id, group_, source_);
@@ -407,18 +434,6 @@ void McastSGEntry::DeleteCMcastRoute() {
 }
 
 void McastSGEntry::UpdateCMcastRoute() {
-    uint8_t level = McastTreeManager::LevelLocal;
-    ForwarderList *forwarders = forwarder_lists_[level];
-    McastForwarder *new_forest_node;
-    if (forwarders->rbegin() == forwarders->rend()) {
-        new_forest_node = NULL;
-    } else {
-        new_forest_node = *forwarders->rbegin();
-    }
-
-    if (new_forest_node == forest_node_)
-        return;
-
     DeleteCMcastRoute();
     AddCMcastRoute();
 }
@@ -434,6 +449,22 @@ void McastSGEntry::UpdateRoutes(uint8_t level) {
             (*it)->AddTreeRoute();
         }
     }
+}
+
+bool McastSGEntry::IsTreeBuilder(uint8_t level) {
+    if (level == McastTreeManager::LevelLocal)
+        return true;
+
+    ForwarderList *forwarders = forwarder_lists_[level];
+    ForwarderList::iterator it = forwarders->begin();
+    if (it == forwarders->end())
+        return false;
+
+    Ip4Address router_id(partition_->server()->bgp_identifier());
+    if ((*it)->router_id() != router_id)
+        return false;
+
+    return true;
 }
 
 //
@@ -459,16 +490,21 @@ void McastSGEntry::UpdateTree(uint8_t level) {
     } else {
         degree = McastTreeManager::kDegree - 1;
     }
-    ForwarderList *forwarders = forwarder_lists_[level];
 
     // First get rid of the previous distribution tree and enqueue all the
     // associated InetMVpnRoutes for notification.  Note that DBListeners
     // will not get invoked until after this routine is done.
+    ForwarderList *forwarders = forwarder_lists_[level];
     for (ForwarderList::iterator it = forwarders->begin();
          it != forwarders->end(); ++it) {
        (*it)->FlushLinks();
        (*it)->ReleaseLabel();
        partition_->GetTablePartition()->Notify((*it)->route());
+    }
+
+    if (!IsTreeBuilder(level)) {
+        UpdateRoutes(level);
+        return;
     }
 
     // Create a vector of pointers to the McastForwarders in sorted order. We
@@ -513,7 +549,7 @@ void McastSGEntry::NotifyForestNode() {
 }
 
 bool McastSGEntry::empty() const {
-    if (tree_route_)
+    if (cmcast_route_ || tree_route_)
         return false;
     if (!forwarder_lists_[McastTreeManager::LevelLocal]->empty())
         return false;
@@ -602,6 +638,10 @@ bool McastManagerPartition::ProcessSGEntry(McastSGEntry *sg_entry) {
 //
 DBTablePartBase *McastManagerPartition::GetTablePartition() {
     return tree_manager_->GetTablePartition(part_id_);
+}
+
+BgpServer *McastManagerPartition::server() {
+    return tree_manager_->table()->server();
 }
 
 //
@@ -726,7 +766,7 @@ void McastTreeManager::TreeNodeListener(McastManagerPartition *partition,
         } else if (forwarder->Update(route)) {
 
             // Trigger update of the distribution tree.
-            partition->EnqueueSGEntry(sg_entry);
+            sg_entry->ChangeForwarder(forwarder);
         }
 
     }

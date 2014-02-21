@@ -169,6 +169,7 @@ public:
     std::string ToString() const;
 
     void AddForwarder(McastForwarder *forwarder);
+    void ChangeForwarder(McastForwarder *forwarder);
     void DeleteForwarder(McastForwarder *forwarder);
 
     RouteDistinguisher GetSourceRd();
@@ -181,6 +182,7 @@ public:
     Ip4Address group() const { return group_; }
     Ip4Address source() const { return source_; }
     McastManagerPartition *partition() { return partition_; }
+    const InetMVpnRoute *tree_route() const { return tree_route_; }
     void set_tree_route(InetMVpnRoute *route) { tree_route_ = route; }
     void clear_tree_route() { tree_route_ = NULL; }
 
@@ -196,6 +198,7 @@ private:
 
     typedef std::set<McastForwarder *, McastForwarderCompare> ForwarderList;
 
+    bool IsTreeBuilder(uint8_t level);
     void UpdateTree(uint8_t level);
     void UpdateRoutes(uint8_t level);
 
@@ -264,7 +267,8 @@ public:
     void EnqueueSGEntry(McastSGEntry *sg_entry);
 
     DBTablePartBase *GetTablePartition();
-    McastTreeManager *GetTreeManager() const { return tree_manager_; }
+    McastTreeManager *tree_manager() const { return tree_manager_; }
+    BgpServer *server();
 
     bool empty() { return sg_list_.empty(); }
     size_t size() { return sg_list_.size(); }

@@ -181,19 +181,29 @@ struct EdgeDiscoverySpec : public BgpAttribute {
         std::vector<uint8_t> address;
         std::vector<uint32_t> labels;
     };
+    typedef std::vector<Edge *> EdgeList;
 
     virtual int CompareTo(const BgpAttribute &rhs_attr) const;
     virtual void ToCanonical(BgpAttr *attr);
     virtual std::string ToString() const;
-    std::vector<Edge *> edge_list;
+    EdgeList edge_list;
 };
 
 class EdgeDiscovery {
 public:
-    explicit EdgeDiscovery(const EdgeDiscoverySpec &edspec) : edspec_(edspec) {
-        refcount_ = 0;
-    }
+    explicit EdgeDiscovery(const EdgeDiscoverySpec &edspec);
+    ~EdgeDiscovery();
     const EdgeDiscoverySpec &edge_discovery() const { return edspec_; }
+
+    struct Edge {
+        Edge(const EdgeDiscoverySpec::Edge *edge_spec);
+        Ip4Address address;
+        LabelBlockPtr label_block;
+    };
+    typedef std::vector<Edge *> EdgeList;
+
+    EdgeList edge_list;
+
 private:
     friend void intrusive_ptr_add_ref(EdgeDiscovery *ediscovery);
     friend void intrusive_ptr_release(EdgeDiscovery *ediscovery);
@@ -255,11 +265,12 @@ struct EdgeForwardingSpec : public BgpAttribute {
         std::vector<uint8_t> inbound_address, outbound_address;
         uint32_t inbound_label, outbound_label;
     };
+    typedef std::vector<Edge *> EdgeList;
 
     virtual int CompareTo(const BgpAttribute &rhs_attr) const;
     virtual void ToCanonical(BgpAttr *attr);
     virtual std::string ToString() const;
-    std::vector<Edge *> edge_list;
+    EdgeList edge_list;
 };
 
 class EdgeForwarding {
@@ -305,7 +316,7 @@ struct BgpAttrLabelBlock : public BgpAttribute {
 class BgpOListElem {
 public:
     BgpOListElem(Ip4Address address, uint32_t label,
-        std::vector<std::string> encap)
+        std::vector<std::string> encap = std::vector<std::string>())
         : address(address), label(label), encap(encap) {
     }
 
@@ -352,6 +363,8 @@ struct BgpAttrOList : public BgpAttribute {
     BgpAttrOList() : BgpAttribute(0, BgpAttribute::OList, 0) {}
     BgpAttrOList(const BgpAttribute &rhs) : BgpAttribute(rhs) {}
     BgpAttrOList(BgpOList *olist) :
+        BgpAttribute(0, BgpAttribute::OList, 0), olist(olist) {}
+    BgpAttrOList(BgpOListPtr olist) :
         BgpAttribute(0, BgpAttribute::OList, 0), olist(olist) {}
     BgpOListPtr olist;
     virtual int CompareTo(const BgpAttribute &rhs_attr) const;

@@ -162,6 +162,27 @@ std::string EdgeDiscoverySpec::ToString() const {
     return "";
 }
 
+EdgeDiscovery::Edge::Edge(const EdgeDiscoverySpec::Edge *spec_edge) {
+    address = spec_edge->GetAddress();
+    uint32_t first_label, last_label;
+    spec_edge->GetLabels(first_label, last_label);
+    label_block  = new LabelBlock(first_label, last_label);
+}
+
+EdgeDiscovery::EdgeDiscovery(const EdgeDiscoverySpec &edspec)
+    : edspec_(edspec) {
+    refcount_ = 0;
+    for (EdgeDiscoverySpec::EdgeList::const_iterator it =
+         edspec_.edge_list.begin(); it != edspec_.edge_list.end(); ++it) {
+        Edge *edge = new Edge(*it);
+        edge_list.push_back(edge);
+    }
+}
+
+EdgeDiscovery::~EdgeDiscovery() {
+    STLDeleteValues(&edge_list);
+}
+
 int EdgeForwardingSpec::CompareTo(const BgpAttribute &rhs_attr) const {
     int ret = BgpAttribute::CompareTo(rhs_attr);
     if (ret != 0) return ret;
