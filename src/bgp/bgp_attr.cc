@@ -142,7 +142,51 @@ int BgpMpNlri::CompareTo(const BgpAttribute &rhs_attr) const {
     }
     return 0;
 }
+
 void BgpMpNlri::ToCanonical(BgpAttr *attr) {
+}
+
+EdgeDiscoverySpec::EdgeDiscoverySpec()
+    : BgpAttribute(McastEdgeDiscovery, kFlags) {
+}
+
+EdgeDiscoverySpec::EdgeDiscoverySpec(const BgpAttribute &rhs)
+    : BgpAttribute(rhs) {
+}
+
+EdgeDiscoverySpec::EdgeDiscoverySpec(const EdgeDiscoverySpec &rhs)
+    : BgpAttribute(BgpAttribute::McastEdgeDiscovery, kFlags) {
+    for (size_t i = 0; i < rhs.edge_list.size(); i++) {
+        Edge *edge = new Edge;
+        *edge = *rhs.edge_list[i];
+        edge_list.push_back(edge);
+    }
+}
+
+EdgeDiscoverySpec::~EdgeDiscoverySpec() {
+    STLDeleteValues(&edge_list);
+}
+
+Ip4Address EdgeDiscoverySpec::Edge::GetAddress() const {
+    return Ip4Address(get_value(&address[0], 4));
+}
+
+void EdgeDiscoverySpec::Edge::SetAddress(Ip4Address addr) {
+    address.resize(4, 0);
+    const Ip4Address::bytes_type &addr_bytes = addr.to_bytes();
+    std::copy(addr_bytes.begin(), addr_bytes.begin() + 4, address.begin());
+}
+
+void EdgeDiscoverySpec::Edge::GetLabels(
+    uint32_t &first_label, uint32_t &last_label) const {
+    first_label = labels[0];
+    last_label = labels[1];
+}
+
+void EdgeDiscoverySpec::Edge::SetLabels(
+    uint32_t first_label, uint32_t last_label) {
+    labels.push_back(first_label);
+    labels.push_back(last_label);
 }
 
 int EdgeDiscoverySpec::CompareTo(const BgpAttribute &rhs_attr) const {
@@ -181,6 +225,49 @@ EdgeDiscovery::EdgeDiscovery(const EdgeDiscoverySpec &edspec)
 
 EdgeDiscovery::~EdgeDiscovery() {
     STLDeleteValues(&edge_list);
+}
+
+EdgeForwardingSpec::EdgeForwardingSpec()
+    : BgpAttribute(McastEdgeForwarding, kFlags) {
+}
+
+EdgeForwardingSpec::EdgeForwardingSpec(const BgpAttribute &rhs)
+    : BgpAttribute(rhs) {
+}
+
+EdgeForwardingSpec::EdgeForwardingSpec(const EdgeForwardingSpec &rhs)
+    : BgpAttribute(BgpAttribute::McastEdgeForwarding, kFlags) {
+    for (size_t i = 0; i < rhs.edge_list.size(); i++) {
+        Edge *edge = new Edge;
+        *edge = *rhs.edge_list[i];
+        edge_list.push_back(edge);
+    }
+}
+
+EdgeForwardingSpec:: ~EdgeForwardingSpec() {
+    STLDeleteValues(&edge_list);
+}
+
+Ip4Address EdgeForwardingSpec::Edge::GetInboundAddress() const {
+    return Ip4Address(get_value(&inbound_address[0], 4));
+}
+
+Ip4Address EdgeForwardingSpec::Edge::GetOutboundAddress() const {
+    return Ip4Address(get_value(&outbound_address[0], 4));
+}
+
+void EdgeForwardingSpec::Edge::SetInboundAddress(Ip4Address addr) {
+    inbound_address.resize(4, 0);
+    const Ip4Address::bytes_type &addr_bytes = addr.to_bytes();
+    std::copy(addr_bytes.begin(), addr_bytes.begin() + 4,
+        inbound_address.begin());
+}
+
+void EdgeForwardingSpec::Edge::SetOutboundAddress(Ip4Address addr) {
+    outbound_address.resize(4, 0);
+    const Ip4Address::bytes_type &addr_bytes = addr.to_bytes();
+    std::copy(addr_bytes.begin(), addr_bytes.begin() + 4,
+        outbound_address.begin());
 }
 
 int EdgeForwardingSpec::CompareTo(const BgpAttribute &rhs_attr) const {

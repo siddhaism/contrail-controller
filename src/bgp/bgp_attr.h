@@ -146,46 +146,25 @@ struct BgpMpNlri : public BgpAttribute {
 struct EdgeDiscoverySpec : public BgpAttribute {
     static const int kSize = -1;
     static const uint8_t kFlags = Optional | Transitive;
-    EdgeDiscoverySpec() : BgpAttribute(McastEdgeDiscovery, kFlags) { }
-    explicit EdgeDiscoverySpec(const BgpAttribute &rhs) : BgpAttribute(rhs) { }
-    explicit EdgeDiscoverySpec(const EdgeDiscoverySpec &rhs) :
-        BgpAttribute(BgpAttribute::McastEdgeDiscovery, kFlags) {
-        for (size_t i = 0; i < rhs.edge_list.size(); i++) {
-            Edge *edge = new Edge;
-            *edge = *rhs.edge_list[i];
-            edge_list.push_back(edge);
-        }
-    }
-    ~EdgeDiscoverySpec() {
-        STLDeleteValues(&edge_list);
-    }
+    EdgeDiscoverySpec();
+    explicit EdgeDiscoverySpec(const BgpAttribute &rhs);
+    explicit EdgeDiscoverySpec(const EdgeDiscoverySpec &rhs);
+    ~EdgeDiscoverySpec();
+
+    virtual int CompareTo(const BgpAttribute &rhs_attr) const;
+    virtual void ToCanonical(BgpAttr *attr);
+    virtual std::string ToString() const;
+
     struct Edge : public ParseObject {
-        Ip4Address GetAddress() const {
-            return Ip4Address(get_value(&address[0], 4));
-        }
-        void SetAddress(Ip4Address addr) {
-            address.resize(4, 0);
-            const Ip4Address::bytes_type &addr_bytes = addr.to_bytes();
-            std::copy(addr_bytes.begin(), addr_bytes.begin() + 4,
-                      address.begin());
-        }
-        void GetLabels(uint32_t &first_label, uint32_t &last_label) const {
-            first_label = labels[0];
-            last_label = labels[1];
-        }
-        void SetLabels(uint32_t first_label, uint32_t last_label) {
-            labels.push_back(first_label);
-            labels.push_back(last_label);
-        }
+        Ip4Address GetAddress() const;
+        void SetAddress(Ip4Address addr);
+        void GetLabels(uint32_t &first_label, uint32_t &last_label) const;
+        void SetLabels(uint32_t first_label, uint32_t last_label);
 
         std::vector<uint8_t> address;
         std::vector<uint32_t> labels;
     };
     typedef std::vector<Edge *> EdgeList;
-
-    virtual int CompareTo(const BgpAttribute &rhs_attr) const;
-    virtual void ToCanonical(BgpAttr *attr);
-    virtual std::string ToString() const;
     EdgeList edge_list;
 };
 
@@ -228,38 +207,20 @@ typedef boost::intrusive_ptr<EdgeDiscovery> EdgeDiscoveryPtr;
 struct EdgeForwardingSpec : public BgpAttribute {
     static const int kSize = -1;
     static const uint8_t kFlags = Optional | Transitive;
-    EdgeForwardingSpec() : BgpAttribute(McastEdgeForwarding, kFlags) { }
-    explicit EdgeForwardingSpec(const BgpAttribute &rhs) : BgpAttribute(rhs) { }
-    explicit EdgeForwardingSpec(const EdgeForwardingSpec &rhs) :
-        BgpAttribute(BgpAttribute::McastEdgeForwarding, kFlags) {
-        for (size_t i = 0; i < rhs.edge_list.size(); i++) {
-            Edge *edge = new Edge;
-            *edge = *rhs.edge_list[i];
-            edge_list.push_back(edge);
-        }
-    }
-    ~EdgeForwardingSpec() {
-        STLDeleteValues(&edge_list);
-    }
+    EdgeForwardingSpec();
+    explicit EdgeForwardingSpec(const BgpAttribute &rhs);
+    explicit EdgeForwardingSpec(const EdgeForwardingSpec &rhs);
+    ~EdgeForwardingSpec();
+
+    virtual int CompareTo(const BgpAttribute &rhs_attr) const;
+    virtual void ToCanonical(BgpAttr *attr);
+    virtual std::string ToString() const;
+
     struct Edge : public ParseObject {
-        Ip4Address GetInboundAddress() const {
-            return Ip4Address(get_value(&inbound_address[0], 4));
-        }
-        Ip4Address GetOutboundAddress() const {
-            return Ip4Address(get_value(&outbound_address[0], 4));
-        }
-        void SetInboundAddress(Ip4Address addr) {
-            inbound_address.resize(4, 0);
-            const Ip4Address::bytes_type &addr_bytes = addr.to_bytes();
-            std::copy(addr_bytes.begin(), addr_bytes.begin() + 4,
-                      inbound_address.begin());
-        }
-        void SetOutboundAddress(Ip4Address addr) {
-            outbound_address.resize(4, 0);
-            const Ip4Address::bytes_type &addr_bytes = addr.to_bytes();
-            std::copy(addr_bytes.begin(), addr_bytes.begin() + 4,
-                      outbound_address.begin());
-        }
+        Ip4Address GetInboundAddress() const;
+        Ip4Address GetOutboundAddress() const;
+        void SetInboundAddress(Ip4Address addr);
+        void SetOutboundAddress(Ip4Address addr);
 
         int address_len;
         std::vector<uint8_t> inbound_address, outbound_address;
@@ -267,9 +228,6 @@ struct EdgeForwardingSpec : public BgpAttribute {
     };
     typedef std::vector<Edge *> EdgeList;
 
-    virtual int CompareTo(const BgpAttribute &rhs_attr) const;
-    virtual void ToCanonical(BgpAttr *attr);
-    virtual std::string ToString() const;
     EdgeList edge_list;
 };
 
@@ -287,6 +245,7 @@ public:
     typedef std::vector<Edge *> EdgeList;
 
     EdgeList edge_list;
+
 private:
     friend void intrusive_ptr_add_ref(EdgeForwarding *eforwarding);
     friend void intrusive_ptr_release(EdgeForwarding *eforwarding);
