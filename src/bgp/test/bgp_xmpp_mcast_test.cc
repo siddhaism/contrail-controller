@@ -1002,7 +1002,9 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer2) {
 
     // Verify all OList elements on all agents.
     VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.4");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 0, "0.0.0.0");
     VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.1");
+    VerifyOListElem(agent_yb_.get(), "blue", mroute, 0, "0.0.0.0");
 
     // Delete mcast route for agents ya and yb.
     agent_xa_->DeleteMcastRoute("blue", mroute);
