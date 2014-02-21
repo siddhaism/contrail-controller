@@ -75,8 +75,6 @@ public:
 
 class BgpXmppMcastTest : public ::testing::Test {
 protected:
-    static const char *config_tmpl;
-
     static void ValidateShowRouteResponse(Sandesh *sandesh,
         vector<size_t> &result) {
         ShowRouteResp *resp = dynamic_cast<ShowRouteResp *>(sandesh);
@@ -86,13 +84,13 @@ protected:
 
         cout << "*******************************************************"<<endl;
         for (size_t i = 0; i < resp->get_tables().size(); i++) {
-            TASK_UTIL_EXPECT_EQ(result[i], resp->get_tables()[i].routes.size());
             cout << resp->get_tables()[i].routing_instance << " "
                  << resp->get_tables()[i].routing_table_name << endl;
             for (size_t j = 0; j < resp->get_tables()[i].routes.size(); j++) {
                 cout << resp->get_tables()[i].routes[j].prefix << " "
                         << resp->get_tables()[i].routes[j].paths.size() << endl;
             }
+            TASK_UTIL_EXPECT_EQ(result[i], resp->get_tables()[i].routes.size());
         }
         cout << "*******************************************************"<<endl;
         validate_done_ = 1;
@@ -106,12 +104,6 @@ protected:
         bs_x_->session_manager()->Initialize(0);
         xs_x_->Initialize(0, false);
         bcm_x_.reset(new BgpXmppChannelManagerMock(xs_x_, bs_x_.get()));
-
-        bs_y_.reset(new BgpServerTest(&evm_, "Y"));
-        xs_y_ = new XmppServer(&evm_, test::XmppDocumentMock::kControlNodeJID);
-        bs_y_->session_manager()->Initialize(0);
-        xs_y_->Initialize(0, false);
-        bcm_y_.reset(new BgpXmppChannelManagerMock(xs_y_, bs_y_.get()));
 
         thread_.Start();
     }
@@ -129,30 +121,16 @@ protected:
         if (agent_xb_) { agent_xb_->Delete(); }
         if (agent_xc_) { agent_xc_->Delete(); }
 
-        xs_y_->Shutdown();
-        task_util::WaitForIdle();
-        bs_y_->Shutdown();
-        task_util::WaitForIdle();
-        bcm_y_.reset();
-        TcpServerManager::DeleteServer(xs_y_);
-        xs_y_ = NULL;
-
-        if (agent_ya_) { agent_ya_->Delete(); }
-        if (agent_yb_) { agent_yb_->Delete(); }
-        if (agent_yc_) { agent_yc_->Delete(); }
-
         evm_.Shutdown();
         thread_.Join();
         task_util::WaitForIdle();
     }
 
-    void Configure() {
+    virtual void Configure(const char *config_tmpl) {
         char config[4096];
         snprintf(config, sizeof(config), config_tmpl,
-                 bs_x_->session_manager()->GetPort(),
-                 bs_y_->session_manager()->GetPort());
+                 bs_x_->session_manager()->GetPort());
         bs_x_->Configure(config);
-        bs_y_->Configure(config);
     }
 
     bool CheckOListElem(const test::NetworkAgentMock *agent,
@@ -200,42 +178,24 @@ protected:
 
     EventManager evm_;
     ServerThread thread_;
-    boost::scoped_ptr<BgpServerTest> bs_x_, bs_y_;
-    XmppServer *xs_x_, *xs_y_;
-    boost::scoped_ptr<BgpXmppChannelManagerMock> bcm_x_, bcm_y_;
+    boost::scoped_ptr<BgpServerTest> bs_x_;
+    XmppServer *xs_x_;
+    boost::scoped_ptr<BgpXmppChannelManagerMock> bcm_x_;
     boost::scoped_ptr<test::NetworkAgentMock> agent_xa_;
     boost::scoped_ptr<test::NetworkAgentMock> agent_xb_;
     boost::scoped_ptr<test::NetworkAgentMock> agent_xc_;
-    boost::scoped_ptr<test::NetworkAgentMock> agent_ya_;
-    boost::scoped_ptr<test::NetworkAgentMock> agent_yb_;
-    boost::scoped_ptr<test::NetworkAgentMock> agent_yc_;
 
     static int validate_done_;
 };
 
 int BgpXmppMcastTest::validate_done_;
 
-const char *BgpXmppMcastTest::config_tmpl = "\
+static const char *config_tmpl1 = "\
 <config>\
     <bgp-router name=\'X\'>\
         <identifier>192.168.0.1</identifier>\
         <address>127.0.0.1</address>\
         <port>%d</port>\
-        <session to=\'Y\'>\
-            <address-families>\
-                <family>inet-mvpn</family>\
-            </address-families>\
-        </session>\
-    </bgp-router>\
-    <bgp-router name=\'Y\'>\
-        <identifier>192.168.0.4</identifier>\
-        <address>127.0.0.4</address>\
-        <port>%d</port>\
-        <session to=\'X\'>\
-            <address-families>\
-                <family>inet-mvpn</family>\
-            </address-families>\
-        </session>\
     </bgp-router>\
     <routing-instance name='blue'>\
         <vrf-target>target:1:1</vrf-target>\
@@ -251,7 +211,7 @@ protected:
     virtual void SetUp() {
         BgpXmppMcastTest::SetUp();
 
-        Configure();
+        Configure(config_tmpl1);
         task_util::WaitForIdle();
 
         // Create agent a and register to multicast table.
@@ -316,7 +276,7 @@ protected:
     virtual void SetUp() {
         BgpXmppMcastTest::SetUp();
 
-        Configure();
+        Configure(config_tmpl1);
         task_util::WaitForIdle();
 
         // Create agents and wait for the sessions to be Established.
@@ -443,7 +403,7 @@ protected:
     virtual void SetUp() {
         BgpXmppMcastTest::SetUp();
 
-        Configure();
+        Configure(config_tmpl1);
         task_util::WaitForIdle();
 
         // Create agents and register to multicast table.
@@ -667,8 +627,8 @@ TEST_F(BgpXmppMcastMultiAgentTest, Introspect) {
     sandesh_context.xmpp_peer_manager = bcm_x_.get();
     Sandesh::set_client_context(&sandesh_context);
 
-    // First get all tables.
-    std::vector<size_t> result = list_of(3);
+    // First get all tables - blue.inetmvpn.0 and bgp.inetmvpn.0.
+    std::vector<size_t> result = list_of(4)(1);
     Sandesh::set_response_callback(boost::bind(ValidateShowRouteResponse, _1,
                                    result));
     ShowRouteReq *show_req = new ShowRouteReq;
@@ -679,11 +639,23 @@ TEST_F(BgpXmppMcastMultiAgentTest, Introspect) {
     TASK_UTIL_EXPECT_EQ(1, validate_done_);
 
     // Now get blue.inetmvpn.0.
-    result = list_of(3);
+    result = list_of(4);
     Sandesh::set_response_callback(boost::bind(ValidateShowRouteResponse, _1,
                                    result));
     show_req = new ShowRouteReq;
     show_req->set_routing_table("blue.inetmvpn.0");
+    validate_done_ = 0;
+    show_req->HandleRequest();
+    show_req->Release();
+    task_util::WaitForIdle();
+    TASK_UTIL_EXPECT_EQ(1, validate_done_);
+
+    // Now get bgp.inetmvpn.0.
+    result = list_of(1);
+    Sandesh::set_response_callback(boost::bind(ValidateShowRouteResponse, _1,
+                                   result));
+    show_req = new ShowRouteReq;
+    show_req->set_routing_table("bgp.inetmvpn.0");
     validate_done_ = 0;
     show_req->HandleRequest();
     show_req->Release();
@@ -807,12 +779,58 @@ TEST_F(BgpXmppMcastMultiAgentTest, MultipleNetworks) {
     task_util::WaitForIdle();
 };
 
+static const char *config_tmpl2 = "\
+<config>\
+    <bgp-router name=\'X\'>\
+        <identifier>192.168.0.1</identifier>\
+        <address>127.0.0.1</address>\
+        <port>%d</port>\
+        <session to=\'Y\'>\
+            <address-families>\
+                <family>inet-mvpn</family>\
+            </address-families>\
+        </session>\
+    </bgp-router>\
+    <bgp-router name=\'Y\'>\
+        <identifier>192.168.0.4</identifier>\
+        <address>127.0.0.4</address>\
+        <port>%d</port>\
+        <session to=\'X\'>\
+            <address-families>\
+                <family>inet-mvpn</family>\
+            </address-families>\
+        </session>\
+    </bgp-router>\
+    <routing-instance name='blue'>\
+        <vrf-target>target:1:1</vrf-target>\
+    </routing-instance>\
+    <routing-instance name='pink'>\
+        <vrf-target>target:1:2</vrf-target>\
+    </routing-instance>\
+</config>\
+";
+
 class BgpXmppMcastMultiServerTest : public BgpXmppMcastTest {
 protected:
+    virtual void Configure(const char *config_tmpl) {
+        char config[4096];
+        snprintf(config, sizeof(config), config_tmpl,
+                 bs_x_->session_manager()->GetPort(),
+                 bs_y_->session_manager()->GetPort());
+        bs_x_->Configure(config);
+        bs_y_->Configure(config);
+    }
+
     virtual void SetUp() {
+        bs_y_.reset(new BgpServerTest(&evm_, "Y"));
+        xs_y_ = new XmppServer(&evm_, test::XmppDocumentMock::kControlNodeJID);
+        bs_y_->session_manager()->Initialize(0);
+        xs_y_->Initialize(0, false);
+        bcm_y_.reset(new BgpXmppChannelManagerMock(xs_y_, bs_y_.get()));
+
         BgpXmppMcastTest::SetUp();
 
-        Configure();
+        Configure(config_tmpl2);
         task_util::WaitForIdle();
 
         // Create agents and register to multicast table.
@@ -857,8 +875,27 @@ protected:
         agent_yc_->SessionDown();
         task_util::WaitForIdle();
 
+        xs_y_->Shutdown();
+        task_util::WaitForIdle();
+        bs_y_->Shutdown();
+        task_util::WaitForIdle();
+        bcm_y_.reset();
+        TcpServerManager::DeleteServer(xs_y_);
+        xs_y_ = NULL;
+
+        if (agent_ya_) { agent_ya_->Delete(); }
+        if (agent_yb_) { agent_yb_->Delete(); }
+        if (agent_yc_) { agent_yc_->Delete(); }
+
         BgpXmppMcastTest::TearDown();
     }
+
+    boost::scoped_ptr<BgpServerTest> bs_y_;
+    XmppServer *xs_y_;
+    boost::scoped_ptr<BgpXmppChannelManagerMock> bcm_y_;
+    boost::scoped_ptr<test::NetworkAgentMock> agent_ya_;
+    boost::scoped_ptr<test::NetworkAgentMock> agent_yb_;
+    boost::scoped_ptr<test::NetworkAgentMock> agent_yc_;
 };
 
 TEST_F(BgpXmppMcastMultiServerTest, Testx1) {
