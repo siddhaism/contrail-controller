@@ -33,6 +33,8 @@ public:
                     uint32_t path_id = 0);
     bool RemovePath(const IPeer *peer);
 
+    virtual bool IsValid() const;
+
     // Check if there's a better path with the same forwarding information.
     bool DuplicateForwardingPath(const BgpPath *in_path) const;
 

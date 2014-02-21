@@ -229,6 +229,30 @@ string InetMVpnRoute::ToXmppIdString() const {
     return prefix_.ToXmppIdString();
 }
 
+bool InetMVpnRoute::IsValid() const {
+    if (!BgpRoute::IsValid())
+        return false;
+
+    const BgpAttr *attr = BestPath()->GetAttr();
+    switch (prefix_.type()) {
+    case InetMVpnPrefix::NativeRoute:
+        return attr->label_block();
+        break;
+    case InetMVpnPrefix::CMcastRoute:
+        return attr->edge_discovery();
+        break;
+    case InetMVpnPrefix::TreeRoute:
+        return attr->edge_forwarding();
+        break;
+    default:
+        assert(false);
+        break;
+    }
+
+    assert(false);
+    return false;
+}
+
 void InetMVpnRoute::SetKey(const DBRequestKey *reqkey) {
     const InetMVpnTable::RequestKey *key =
         static_cast<const InetMVpnTable::RequestKey *>(reqkey);

@@ -63,6 +63,7 @@ public:
 
     virtual std::string ToString() const;
     virtual std::string ToXmppIdString() const;
+    virtual bool IsValid() const;
 
     const InetMVpnPrefix &GetPrefix() const { return prefix_; }
 

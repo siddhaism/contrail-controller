@@ -750,8 +750,8 @@ void McastTreeManager::TreeNodeListener(McastManagerPartition *partition,
     if (!dbstate) {
 
         // We have no previous DBState for this route.
-        // Bail if the route is deleted or has no best path.
-        if (route->IsDeleted() || !route->BestPath())
+        // Bail if the route is not valid.
+        if (!route->IsValid())
             return;
 
         // Create a new McastForwarder and associate it with the route.
@@ -769,7 +769,7 @@ void McastTreeManager::TreeNodeListener(McastManagerPartition *partition,
         McastForwarder *forwarder = dynamic_cast<McastForwarder *>(dbstate);
         assert(forwarder);
 
-        if (route->IsDeleted()) {
+        if (!route->IsValid()) {
 
             // Delete the McastForwarder associated with the route.
             route->ClearState(table_, listener_id_);
@@ -797,8 +797,8 @@ void McastTreeManager::TreeResultListener(McastManagerPartition *partition,
     if (!dbstate) {
 
         // We have no previous DBState for this route.
-        // Bail if the route is deleted or has no best path.
-        if (route->IsDeleted() || !route->BestPath())
+        // Bail if the route is not valid.
+        if (!route->IsValid())
             return;
 
         McastSGEntry *sg_entry = partition->LocateSGEntry(
@@ -812,7 +812,7 @@ void McastTreeManager::TreeResultListener(McastManagerPartition *partition,
         McastSGEntry *sg_entry = dynamic_cast<McastSGEntry *>(dbstate);
         assert(sg_entry);
 
-        if (route->IsDeleted() || !route->BestPath()) {
+        if (!route->IsValid()) {
             sg_entry->clear_tree_route();
             route->ClearState(table_, listener_id_);
             partition->EnqueueSGEntry(sg_entry);
