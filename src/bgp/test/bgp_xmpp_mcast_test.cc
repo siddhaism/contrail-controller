@@ -861,7 +861,7 @@ protected:
     }
 };
 
-TEST_F(BgpXmppMcastMultiServerTest, Test1) {
+TEST_F(BgpXmppMcastMultiServerTest, Testx1) {
     const char *mroute = "225.0.0.1,0.0.0.0";
 
     // Add mcast route for agent xa.
@@ -899,6 +899,78 @@ TEST_F(BgpXmppMcastMultiServerTest, Test1) {
     // Verify number of routes on all agents.
     TASK_UTIL_EXPECT_EQ(0, agent_xa_->McastRouteCount());
     TASK_UTIL_EXPECT_EQ(0, agent_ya_->McastRouteCount());
+};
+
+TEST_F(BgpXmppMcastMultiServerTest, Testx2) {
+    const char *mroute = "225.0.0.1,0.0.0.0";
+
+    // Add mcast route for agent xa and ya.
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+    task_util::WaitForIdle();
+    agent_ya_->AddMcastRoute("blue", mroute, "10.1.1.4", "40000-49999");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.4");
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.1");
+
+    // Add mcast route for agent xb and yb.
+    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
+    task_util::WaitForIdle();
+    agent_yb_->AddMcastRoute("blue", mroute, "10.1.1.5", "50000-59999");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 2, "10.1.1.1");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 2, "10.1.1.5");
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.5");
+    VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.4");
+    VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+    agent_ya_->DeleteMcastRoute("blue", mroute);
+    agent_yb_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+TEST_F(BgpXmppMcastMultiServerTest, Testx3) {
+    const char *mroute = "225.0.0.1,0.0.0.0";
+
+    // Add mcast route for agent xa and xb.
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
+    task_util::WaitForIdle();
+
+    // Add mcast route for agent ya and yb.
+    agent_ya_->AddMcastRoute("blue", mroute, "10.1.1.4", "40000-49999");
+    agent_yb_->AddMcastRoute("blue", mroute, "10.1.1.5", "50000-59999");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 2, "10.1.1.1");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 2, "10.1.1.5");
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.5");
+    VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.4");
+    VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+    // Delete mcast route for agents xb and yb.
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_yb_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+
+    // Verify all OList elements on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.4");
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.1");
+
+    // Delete mcast route for agents ya and yb.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_ya_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
 };
 
 TEST_F(BgpXmppMcastMultiServerTest, TestN) {

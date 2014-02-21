@@ -200,6 +200,27 @@ std::string EdgeForwardingSpec::ToString() const {
     return "";
 }
 
+EdgeForwarding::Edge::Edge(const EdgeForwardingSpec::Edge *spec_edge) {
+    inbound_address = spec_edge->GetInboundAddress();
+    outbound_address = spec_edge->GetOutboundAddress();
+    inbound_label = spec_edge->inbound_label;
+    outbound_label = spec_edge->outbound_label;
+}
+
+EdgeForwarding::EdgeForwarding(const EdgeForwardingSpec &efspec)
+    : efspec_(efspec) {
+    refcount_ = 0;
+    for (EdgeForwardingSpec::EdgeList::const_iterator it =
+         efspec_.edge_list.begin(); it != efspec_.edge_list.end(); ++it) {
+        Edge *edge = new Edge(*it);
+        edge_list.push_back(edge);
+    }
+}
+
+EdgeForwarding::~EdgeForwarding() {
+    STLDeleteValues(&edge_list);
+}
+
 int BgpAttrOList::CompareTo(const BgpAttribute &rhs_attr) const {
     int ret = BgpAttribute::CompareTo(rhs_attr);
     if (ret != 0) return ret;

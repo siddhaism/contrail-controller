@@ -275,10 +275,18 @@ struct EdgeForwardingSpec : public BgpAttribute {
 
 class EdgeForwarding {
 public:
-    explicit EdgeForwarding(const EdgeForwardingSpec &efspec) : efspec_(efspec) {
-        refcount_ = 0;
-    }
+    explicit EdgeForwarding(const EdgeForwardingSpec &efspec);
+    ~EdgeForwarding();
     const EdgeForwardingSpec &edge_forwarding() const { return efspec_; }
+
+    struct Edge {
+        Edge(const EdgeForwardingSpec::Edge *edge_spec);
+        Ip4Address inbound_address, outbound_address;
+        uint32_t inbound_label, outbound_label;
+    };
+    typedef std::vector<Edge *> EdgeList;
+
+    EdgeList edge_list;
 private:
     friend void intrusive_ptr_add_ref(EdgeForwarding *eforwarding);
     friend void intrusive_ptr_release(EdgeForwarding *eforwarding);

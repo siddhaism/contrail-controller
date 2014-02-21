@@ -243,6 +243,38 @@ void McastForwarder::DeleteTreeRoute() {
     tree_route_ = NULL;
 }
 
+void McastForwarder::AddLocalOListElems(BgpOListPtr olist) {
+    for (McastForwarderList::const_iterator it = tree_links_.begin();
+         it != tree_links_.end(); ++it) {
+        BgpOListElem elem((*it)->address(), (*it)->label(), (*it)->encap());
+        olist->elements.push_back(elem);
+    }
+}
+
+void McastForwarder::AddGlobalOListElems(BgpOListPtr olist) {
+    if (!sg_entry_->IsForestNode(this))
+        return;
+
+    const InetMVpnRoute *route = sg_entry_->tree_route();
+    if (!route)
+        return;
+
+    const BgpPath *path = route->BestPath();
+    if (!path)
+        return;
+
+    const EdgeForwarding *eforwarding = path->GetAttr()->edge_forwarding();
+    for (EdgeForwarding::EdgeList::const_iterator it =
+         eforwarding->edge_list.begin(); it != eforwarding->edge_list.end();
+         ++it) {
+        const EdgeForwarding::Edge *edge = *it;
+        if (edge->inbound_address == address_) {
+            BgpOListElem elem(edge->outbound_address, edge->outbound_label);
+            olist->elements.push_back(elem);
+        }
+    }
+}
+
 //
 // Construct an UpdateInfo with the RibOutAttr that needs to be advertised to
 // the IPeer for the InetMVpnRoute associated with this McastForwarder. This
@@ -255,44 +287,19 @@ void McastForwarder::DeleteTreeRoute() {
 UpdateInfo *McastForwarder::GetUpdateInfo(InetMVpnTable *table) {
     CHECK_CONCURRENCY("db::DBTable");
 
-    // Bail if the tree has not been built.
-    if (label_ == 0)
-        return NULL;
-
     BgpOListPtr olist(new BgpOList);
-    for (McastForwarderList::const_iterator it = tree_links_.begin();
-         it != tree_links_.end(); ++it) {
-        BgpOListElem elem((*it)->address(), (*it)->label(), (*it)->encap());
-        olist->elements.push_back(elem);
-    }
+    AddLocalOListElems(olist);
+    AddGlobalOListElems(olist);
 
-    const InetMVpnRoute *tree_route = sg_entry_->tree_route();
-    const BgpPath *tree_path = tree_route ? tree_route->BestPath() : NULL;
-    if (tree_path) {
-        const BgpAttr *tree_attr = tree_path->GetAttr();
-        const EdgeForwardingSpec &efspec =
-            tree_attr->edge_forwarding()->edge_forwarding();
-        for (EdgeForwardingSpec::EdgeList::const_iterator it =
-             efspec.edge_list.begin(); it != efspec.edge_list.end(); ++it) {
-            const EdgeForwardingSpec::Edge *edge = *it;
-            if (edge->GetInboundAddress() == address_) {
-                BgpOListElem elem(edge->GetOutboundAddress(),
-                    edge->outbound_label);
-                olist->elements.push_back(elem);
-            }
-        }
-    }
-
-    // Bail if there are links.
-    if (olist->elements.empty())
+    // Bail if the tree has not been built or there are no links.
+    if (label_ == 0 || olist->elements.empty())
         return NULL;
 
     BgpAttrOList olist_attr = BgpAttrOList(olist);
     BgpAttrSpec attr_spec;
     attr_spec.push_back(&olist_attr);
+    BgpAttrPtr attr = table->server()->attr_db()->Locate(attr_spec);
 
-    BgpServer *server = table->routing_instance()->server();
-    BgpAttrPtr attr = server->attr_db()->Locate(attr_spec);
     UpdateInfo *uinfo = new UpdateInfo;
     uinfo->roattr = RibOutAttr(attr.get(), label_);
     return uinfo;
@@ -419,12 +426,14 @@ void McastSGEntry::DeleteCMcastRoute() {
     if (!cmcast_route_)
         return;
 
-    assert(forest_node_);
-    forest_node_ = NULL;
     DBTablePartition *tbl_partition =
         static_cast<DBTablePartition *>(partition_->GetTablePartition());
-    cmcast_route_->RemovePath(BgpPath::Local);
 
+    assert(forest_node_);
+    tbl_partition->Notify(forest_node_->route());
+    forest_node_ = NULL;
+
+    cmcast_route_->RemovePath(BgpPath::Local);
     if (!cmcast_route_->BestPath()) {
         tbl_partition->Delete(cmcast_route_);
     } else {
@@ -546,6 +555,10 @@ void McastSGEntry::NotifyForestNode() {
     if (!forest_node_)
         return;
     partition_->GetTablePartition()->Notify(forest_node_->route());
+}
+
+bool McastSGEntry::IsForestNode(McastForwarder *forwarder) {
+    return (forwarder == forest_node_);
 }
 
 bool McastSGEntry::empty() const {

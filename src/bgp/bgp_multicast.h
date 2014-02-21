@@ -100,6 +100,9 @@ private:
     friend class BgpMulticastTest;
     friend class ShowMulticastManagerDetailHandler;
 
+    void AddLocalOListElems(BgpOListPtr olist);
+    void AddGlobalOListElems(BgpOListPtr olist);
+
     McastSGEntry *sg_entry_;
     InetMVpnRoute *route_;
     InetMVpnRoute *tree_route_;
@@ -178,6 +181,7 @@ public:
     void UpdateCMcastRoute();
     void UpdateTree();
     void NotifyForestNode();
+    bool IsForestNode(McastForwarder *forwarder);
 
     Ip4Address group() const { return group_; }
     Ip4Address source() const { return source_; }
