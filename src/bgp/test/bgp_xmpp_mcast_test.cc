@@ -117,12 +117,38 @@ protected:
         TcpServerManager::DeleteServer(xs_x_);
         xs_x_ = NULL;
 
-        if (agent_xa_) { agent_xa_->Delete(); }
-        if (agent_xb_) { agent_xb_->Delete(); }
-        if (agent_xc_) { agent_xc_->Delete(); }
+        agent_xa_->Delete();
+        agent_xb_->Delete();
+        agent_xc_->Delete();
 
         evm_.Shutdown();
         thread_.Join();
+        task_util::WaitForIdle();
+    }
+
+    virtual void SessionUp() {
+        agent_xa_.reset(new test::NetworkAgentMock(
+                &evm_, "agent-a", xs_x_->GetPort(), "127.0.0.1"));
+        TASK_UTIL_EXPECT_TRUE(agent_xa_->IsEstablished());
+        agent_xb_.reset(new test::NetworkAgentMock(
+                &evm_, "agent-b", xs_x_->GetPort(), "127.0.0.2"));
+        TASK_UTIL_EXPECT_TRUE(agent_xb_->IsEstablished());
+        agent_xc_.reset(new test::NetworkAgentMock(
+                &evm_, "agent-c", xs_x_->GetPort(), "127.0.0.3"));
+        TASK_UTIL_EXPECT_TRUE(agent_xc_->IsEstablished());
+    }
+
+    virtual void SessionDown() {
+        agent_xa_->SessionDown();
+        agent_xb_->SessionDown();
+        agent_xc_->SessionDown();
+        task_util::WaitForIdle();
+    }
+
+    virtual void Subscribe(const string net, int id) {
+        agent_xa_->McastSubscribe(net, id);
+        agent_xb_->McastSubscribe(net, id);
+        agent_xc_->McastSubscribe(net, id);
         task_util::WaitForIdle();
     }
 
@@ -214,25 +240,19 @@ protected:
         Configure(config_tmpl1);
         task_util::WaitForIdle();
 
-        // Create agent a and register to multicast table.
-        agent_xa_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-a", xs_x_->GetPort(), "127.0.0.1"));
-        TASK_UTIL_EXPECT_TRUE(agent_xa_->IsEstablished());
-        agent_xa_->McastSubscribe("blue", 1);
+        BgpXmppMcastTest::SessionUp();
+        BgpXmppMcastTest::Subscribe("blue", 1);
         task_util::WaitForIdle();
     }
 
     virtual void TearDown() {
-        // Trigger TCP close on server and wait for channel to be deleted.
-        agent_xa_->SessionDown();
-        task_util::WaitForIdle();
-
+        BgpXmppMcastTest::SessionDown();
         BgpXmppMcastTest::TearDown();
     }
 };
 
 TEST_F(BgpXmppMcastErrorTest, BadGroupAddress) {
-    agent_xa_->AddMcastRoute("blue", "225.0.0,10.1.1.1", "7.7.7.7", "1000-2000");
+    agent_xa_->AddMcastRoute("blue", "225.0.0,10.1.1.1", "7.7.7.7", "10-20");
     task_util::WaitForIdle();
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
         bs_x_->database()->FindTable("blue.inetmvpn.0"));
@@ -240,7 +260,7 @@ TEST_F(BgpXmppMcastErrorTest, BadGroupAddress) {
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadSourceAddress) {
-    agent_xa_->AddMcastRoute("blue", "225.0.0.1,10.1.1", "7.7.7.7", "1000-2000");
+    agent_xa_->AddMcastRoute("blue", "225.0.0.1,10.1.1", "7.7.7.7", "10-20");
     task_util::WaitForIdle();
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
         bs_x_->database()->FindTable("blue.inetmvpn.0"));
@@ -248,7 +268,7 @@ TEST_F(BgpXmppMcastErrorTest, BadSourceAddress) {
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadNexthopAddress) {
-    agent_xa_->AddMcastRoute("blue", "225.0.0.1,10.1.1.1", "7.7", "1000-2000");
+    agent_xa_->AddMcastRoute("blue", "225.0.0.1,10.1.1.1", "7.7", "10-20");
     task_util::WaitForIdle();
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
         bs_x_->database()->FindTable("blue.inetmvpn.0"));
@@ -256,7 +276,7 @@ TEST_F(BgpXmppMcastErrorTest, BadNexthopAddress) {
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadLabelBlock1) {
-    agent_xa_->AddMcastRoute("blue", "225.0.0.1,10.1.1.1", "7.7.7.7", "100,200");
+    agent_xa_->AddMcastRoute("blue", "225.0.0.1,10.1.1.1", "7.7.7.7", "10,20");
     task_util::WaitForIdle();
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
         bs_x_->database()->FindTable("blue.inetmvpn.0"));
@@ -278,24 +298,11 @@ protected:
 
         Configure(config_tmpl1);
         task_util::WaitForIdle();
-
-        // Create agents and wait for the sessions to be Established.
-        // Do not register agents to the multicast table.
-        agent_xa_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-a", xs_x_->GetPort(), "127.0.0.1"));
-        TASK_UTIL_EXPECT_TRUE(agent_xa_->IsEstablished());
-
-        agent_xb_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-b", xs_x_->GetPort(), "127.0.0.2"));
-        TASK_UTIL_EXPECT_TRUE(agent_xb_->IsEstablished());
+        BgpXmppMcastTest::SessionUp();
     }
 
     virtual void TearDown() {
-        // Trigger TCP close on server and wait for channel to be deleted.
-        agent_xa_->SessionDown();
-        agent_xb_->SessionDown();
-        task_util::WaitForIdle();
-
+        BgpXmppMcastTest::SessionDown();
         BgpXmppMcastTest::TearDown();
     }
 };
@@ -406,30 +413,12 @@ protected:
         Configure(config_tmpl1);
         task_util::WaitForIdle();
 
-        // Create agents and register to multicast table.
-        agent_xa_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-a", xs_x_->GetPort(), "127.0.0.1"));
-        TASK_UTIL_EXPECT_TRUE(agent_xa_->IsEstablished());
-        agent_xa_->McastSubscribe("blue", 1);
-
-        agent_xb_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-b", xs_x_->GetPort(), "127.0.0.2"));
-        TASK_UTIL_EXPECT_TRUE(agent_xb_->IsEstablished());
-        agent_xb_->McastSubscribe("blue", 1);
-
-        agent_xc_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-c", xs_x_->GetPort(), "127.0.0.3"));
-        TASK_UTIL_EXPECT_TRUE(agent_xc_->IsEstablished());
-        agent_xc_->McastSubscribe("blue", 1);
+        BgpXmppMcastTest::SessionUp();
+        BgpXmppMcastTest::Subscribe("blue", 1);
     }
 
     virtual void TearDown() {
-        // Trigger TCP close on server and wait for channel to be deleted.
-        agent_xa_->SessionDown();
-        agent_xb_->SessionDown();
-        agent_xc_->SessionDown();
-        task_util::WaitForIdle();
-
+        BgpXmppMcastTest::SessionDown();
         BgpXmppMcastTest::TearDown();
     }
 };
@@ -731,11 +720,8 @@ TEST_F(BgpXmppMcastMultiAgentTest, ChangeNexthop) {
 TEST_F(BgpXmppMcastMultiAgentTest, MultipleNetworks) {
     const char *mroute = "225.0.0.1,10.1.1.1";
 
-    // Subscribe to another network.
-    agent_xa_->McastSubscribe("pink", 2);
-    agent_xb_->McastSubscribe("pink", 2);
-    agent_xc_->McastSubscribe("pink", 2);
-    task_util::WaitForIdle();
+    // Subscribe all agents to another network.
+    Subscribe("pink", 2);
 
     // Add mcast routes in blue and pink for all agents.
     agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
@@ -833,47 +819,12 @@ protected:
         Configure(config_tmpl2);
         task_util::WaitForIdle();
 
-        // Create agents and register to multicast table.
-        agent_xa_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-xa", xs_x_->GetPort(), "127.0.0.1", "127.0.0.1"));
-        TASK_UTIL_EXPECT_TRUE(agent_xa_->IsEstablished());
-        agent_xa_->McastSubscribe("blue", 1);
-
-        agent_xb_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-xb", xs_x_->GetPort(), "127.0.0.2", "127.0.0.1"));
-        TASK_UTIL_EXPECT_TRUE(agent_xb_->IsEstablished());
-        agent_xb_->McastSubscribe("blue", 1);
-
-        agent_xc_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-xc", xs_x_->GetPort(), "127.0.0.3", "127.0.0.1"));
-        TASK_UTIL_EXPECT_TRUE(agent_xc_->IsEstablished());
-        agent_xc_->McastSubscribe("blue", 1);
-
-        agent_ya_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-ya", xs_y_->GetPort(), "127.0.0.4", "127.0.0.4"));
-        TASK_UTIL_EXPECT_TRUE(agent_ya_->IsEstablished());
-        agent_ya_->McastSubscribe("blue", 1);
-
-        agent_yb_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-yb", xs_y_->GetPort(), "127.0.0.5", "127.0.0.4"));
-        TASK_UTIL_EXPECT_TRUE(agent_yb_->IsEstablished());
-        agent_yb_->McastSubscribe("blue", 1);
-
-        agent_yc_.reset(new test::NetworkAgentMock(
-                &evm_, "agent-yc", xs_y_->GetPort(), "127.0.0.6", "127.0.0.4"));
-        TASK_UTIL_EXPECT_TRUE(agent_yc_->IsEstablished());
-        agent_yc_->McastSubscribe("blue", 1);
+        SessionUp();
+        Subscribe("blue", 1);
     }
 
     virtual void TearDown() {
-        // Trigger TCP close on server and wait for channel to be deleted.
-        agent_xa_->SessionDown();
-        agent_xb_->SessionDown();
-        agent_xc_->SessionDown();
-        agent_ya_->SessionDown();
-        agent_yb_->SessionDown();
-        agent_yc_->SessionDown();
-        task_util::WaitForIdle();
+        SessionDown();
 
         xs_y_->Shutdown();
         task_util::WaitForIdle();
@@ -883,11 +834,43 @@ protected:
         TcpServerManager::DeleteServer(xs_y_);
         xs_y_ = NULL;
 
-        if (agent_ya_) { agent_ya_->Delete(); }
-        if (agent_yb_) { agent_yb_->Delete(); }
-        if (agent_yc_) { agent_yc_->Delete(); }
+        agent_ya_->Delete();
+        agent_yb_->Delete();
+        agent_yc_->Delete();
 
         BgpXmppMcastTest::TearDown();
+    }
+
+    virtual void SessionUp() {
+        BgpXmppMcastTest::SessionUp();
+
+        agent_ya_.reset(new test::NetworkAgentMock(
+                &evm_, "agent-ya", xs_y_->GetPort(), "127.0.0.4", "127.0.0.4"));
+        TASK_UTIL_EXPECT_TRUE(agent_ya_->IsEstablished());
+        agent_yb_.reset(new test::NetworkAgentMock(
+                &evm_, "agent-yb", xs_y_->GetPort(), "127.0.0.5", "127.0.0.4"));
+        TASK_UTIL_EXPECT_TRUE(agent_yb_->IsEstablished());
+        agent_yc_.reset(new test::NetworkAgentMock(
+                &evm_, "agent-yc", xs_y_->GetPort(), "127.0.0.6", "127.0.0.4"));
+        TASK_UTIL_EXPECT_TRUE(agent_yc_->IsEstablished());
+    }
+
+    virtual void SessionDown() {
+        BgpXmppMcastTest::SessionDown();
+
+        agent_ya_->SessionDown();
+        agent_yb_->SessionDown();
+        agent_yc_->SessionDown();
+        task_util::WaitForIdle();
+    }
+
+    virtual void Subscribe(const string net, int id) {
+        BgpXmppMcastTest::Subscribe(net, id);
+
+        agent_ya_->McastSubscribe(net, id);
+        agent_yb_->McastSubscribe(net, id);
+        agent_yc_->McastSubscribe(net, id);
+        task_util::WaitForIdle();
     }
 
     boost::scoped_ptr<BgpServerTest> bs_y_;
