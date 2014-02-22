@@ -475,7 +475,7 @@ TEST_F(BgpXmppMcastMultiAgentTest, SourceAndGroup) {
     VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.2", label_xb);
     VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.3", label_xc);
     VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
 
     // Delete mcast route for all agents.
     agent_xa_->DeleteMcastRoute("blue", mroute);
@@ -486,6 +486,7 @@ TEST_F(BgpXmppMcastMultiAgentTest, SourceAndGroup) {
 
 TEST_F(BgpXmppMcastMultiAgentTest, GroupOnly) {
     const char *mroute = "225.0.0.1,0.0.0.0";
+    int label_xa, label_xb, label_xc;
 
     // Add mcast route for all agents.
     agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
@@ -504,6 +505,17 @@ TEST_F(BgpXmppMcastMultiAgentTest, GroupOnly) {
     VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1");
     VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "10.1.1.1");
 
+    // Get the labels used by all agents.
+    label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
+    label_xb = GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999);
+    label_xc = GetLabel(agent_xc_.get(), "blue", mroute, 30000, 39999);
+
+    // Verify all OList elements on all agents, including outbound labels.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.2", label_xb);
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.3", label_xc);
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
+
     // Delete mcast route for all agents.
     agent_xa_->DeleteMcastRoute("blue", mroute);
     agent_xb_->DeleteMcastRoute("blue", mroute);
@@ -512,16 +524,17 @@ TEST_F(BgpXmppMcastMultiAgentTest, GroupOnly) {
 };
 
 TEST_F(BgpXmppMcastMultiAgentTest, MultipleRoutes) {
-    const char *mroute1 = "225.0.0.1,10.1.1.1";
-    const char *mroute2 = "225.0.0.1,10.1.1.2";
+    const char *mroute1 = "225.0.0.1,90.1.1.1";
+    const char *mroute2 = "225.0.0.1,90.1.1.2";
+    int label_xa, label_xb, label_xc;
 
     // Add mcast routes for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute1, "7.7.7.7", "10000-20000");
-    agent_xb_->AddMcastRoute("blue", mroute1, "8.8.8.8", "40000-60000");
-    agent_xc_->AddMcastRoute("blue", mroute1, "9.9.9.9", "60000-80000");
-    agent_xa_->AddMcastRoute("blue", mroute2, "7.7.7.7", "10000-20000");
-    agent_xb_->AddMcastRoute("blue", mroute2, "8.8.8.8", "40000-60000");
-    agent_xc_->AddMcastRoute("blue", mroute2, "9.9.9.9", "60000-80000");
+    agent_xa_->AddMcastRoute("blue", mroute1, "10.1.1.1", "10000-19999");
+    agent_xb_->AddMcastRoute("blue", mroute1, "10.1.1.2", "20000-29999");
+    agent_xc_->AddMcastRoute("blue", mroute1, "10.1.1.3", "30000-39999");
+    agent_xa_->AddMcastRoute("blue", mroute2, "10.1.1.1", "10000-19999");
+    agent_xb_->AddMcastRoute("blue", mroute2, "10.1.1.2", "20000-29999");
+    agent_xc_->AddMcastRoute("blue", mroute2, "10.1.1.3", "30000-39999");
     task_util::WaitForIdle();
 
     // Verify that all agents have both routes.
@@ -530,16 +543,38 @@ TEST_F(BgpXmppMcastMultiAgentTest, MultipleRoutes) {
     TASK_UTIL_EXPECT_EQ(2, agent_xc_->McastRouteCount());
 
     // Verify all OList elements for the route 1 on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute1, 2, "8.8.8.8");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute1, 2, "9.9.9.9");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute1, 1, "7.7.7.7");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute1, 1, "7.7.7.7");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute1, 2, "10.1.1.2");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute1, 2, "10.1.1.3");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute1, 1, "10.1.1.1");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute1, 1, "10.1.1.1");
+
+    // Get the labels used for route 1 by all agents.
+    label_xa = GetLabel(agent_xa_.get(), "blue", mroute1, 10000, 19999);
+    label_xb = GetLabel(agent_xb_.get(), "blue", mroute1, 20000, 29999);
+    label_xc = GetLabel(agent_xc_.get(), "blue", mroute1, 30000, 39999);
+
+    // Verify all OList elements on all agents, including outbound labels.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute1, 2, "10.1.1.2", label_xb);
+    VerifyOListElem(agent_xa_.get(), "blue", mroute1, 2, "10.1.1.3", label_xc);
+    VerifyOListElem(agent_xb_.get(), "blue", mroute1, 1, "10.1.1.1", label_xa);
+    VerifyOListElem(agent_xc_.get(), "blue", mroute1, 1, "10.1.1.1", label_xa);
 
     // Verify all OList elements for the route 2 on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute2, 2, "8.8.8.8");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute2, 2, "9.9.9.9");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute2, 1, "7.7.7.7");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute2, 1, "7.7.7.7");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute2, 2, "10.1.1.2");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute2, 2, "10.1.1.3");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute2, 1, "10.1.1.1");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute2, 1, "10.1.1.1");
+
+    // Get the labels used for route 1 by all agents.
+    label_xa = GetLabel(agent_xa_.get(), "blue", mroute2, 10000, 19999);
+    label_xb = GetLabel(agent_xb_.get(), "blue", mroute2, 20000, 29999);
+    label_xc = GetLabel(agent_xc_.get(), "blue", mroute2, 30000, 39999);
+
+    // Verify all OList elements on all agents, including outbound labels.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute2, 2, "10.1.1.2", label_xb);
+    VerifyOListElem(agent_xa_.get(), "blue", mroute2, 2, "10.1.1.3", label_xc);
+    VerifyOListElem(agent_xb_.get(), "blue", mroute2, 1, "10.1.1.1", label_xa);
+    VerifyOListElem(agent_xc_.get(), "blue", mroute2, 1, "10.1.1.1", label_xa);
 
     // Delete mcast route for all agents.
     agent_xa_->DeleteMcastRoute("blue", mroute1);
