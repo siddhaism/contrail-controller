@@ -1359,6 +1359,8 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer2) {
 
 TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer3) {
     const char *mroute = "225.0.0.1,0.0.0.0";
+    int label_xa, label_xb, label_xc;
+    int label_ya, label_yb, label_yc;
 
     // Add mcast route for all agents.
     agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
@@ -1390,6 +1392,27 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer3) {
     VerifyOListElem(agent_yb_.get(), "blue", mroute, 1, "10.1.1.4");
     VerifyOListElem(agent_yc_.get(), "blue", mroute, 2, "10.1.1.4");
     VerifyOListElem(agent_yc_.get(), "blue", mroute, 2, "10.1.1.3");
+
+    // Get the labels used by agent xa/xb/xc and ya/yb/yc.
+    label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
+    label_xb = GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999);
+    label_xc = GetLabel(agent_xc_.get(), "blue", mroute, 30000, 39999);
+    label_ya = GetLabel(agent_ya_.get(), "blue", mroute, 40000, 49999);
+    label_yb = GetLabel(agent_yb_.get(), "blue", mroute, 50000, 59999);
+    label_yc = GetLabel(agent_yc_.get(), "blue", mroute, 60000, 69999);
+
+    // Verify all OList elements on all agents, including labels.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.2", label_xb);
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.3", label_xc);
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 2, "10.1.1.1", label_xa);
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 2, "10.1.1.6", label_yc);
+
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 2, "10.1.1.5", label_yb);
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 2, "10.1.1.6", label_yc);
+    VerifyOListElem(agent_yb_.get(), "blue", mroute, 1, "10.1.1.4", label_ya);
+    VerifyOListElem(agent_yc_.get(), "blue", mroute, 2, "10.1.1.4", label_ya);
+    VerifyOListElem(agent_yc_.get(), "blue", mroute, 2, "10.1.1.3", label_xc);
 
     // Delete mcast route for all agents.
     agent_xa_->DeleteMcastRoute("blue", mroute);
