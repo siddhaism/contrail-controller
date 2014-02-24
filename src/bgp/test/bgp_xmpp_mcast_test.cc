@@ -274,7 +274,7 @@ protected:
 };
 
 TEST_F(BgpXmppMcastErrorTest, BadGroupAddress) {
-    agent_xa_->AddMcastRoute("blue", "225.0.0,10.1.1.1", "7.7.7.7", "10-20");
+    agent_xa_->AddMcastRoute("blue", "225.0.0,90.1.1.1", "10.1.1.1", "10-20");
     task_util::WaitForIdle();
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
         bs_x_->database()->FindTable("blue.inetmvpn.0"));
@@ -282,7 +282,7 @@ TEST_F(BgpXmppMcastErrorTest, BadGroupAddress) {
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadSourceAddress) {
-    agent_xa_->AddMcastRoute("blue", "225.0.0.1,10.1.1", "7.7.7.7", "10-20");
+    agent_xa_->AddMcastRoute("blue", "225.0.0.1,90.1.1", "10.1.1.1", "10-20");
     task_util::WaitForIdle();
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
         bs_x_->database()->FindTable("blue.inetmvpn.0"));
@@ -290,7 +290,7 @@ TEST_F(BgpXmppMcastErrorTest, BadSourceAddress) {
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadNexthopAddress) {
-    agent_xa_->AddMcastRoute("blue", "225.0.0.1,10.1.1.1", "7.7", "10-20");
+    agent_xa_->AddMcastRoute("blue", "225.0.0.1,90.1.1.1", "10.1", "10-20");
     task_util::WaitForIdle();
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
         bs_x_->database()->FindTable("blue.inetmvpn.0"));
@@ -298,7 +298,7 @@ TEST_F(BgpXmppMcastErrorTest, BadNexthopAddress) {
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadLabelBlock1) {
-    agent_xa_->AddMcastRoute("blue", "225.0.0.1,10.1.1.1", "7.7.7.7", "10,20");
+    agent_xa_->AddMcastRoute("blue", "225.0.0.1,90.1.1.1", "10.1.1.1", "10,20");
     task_util::WaitForIdle();
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
         bs_x_->database()->FindTable("blue.inetmvpn.0"));
@@ -306,7 +306,7 @@ TEST_F(BgpXmppMcastErrorTest, BadLabelBlock1) {
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadLabelBlock2) {
-    agent_xa_->AddMcastRoute("blue", "225.0.0.1,10.1.1.1", "7.7.7.7", "1-2-3");
+    agent_xa_->AddMcastRoute("blue", "225.0.0.1,90.1.1.1", "10.1.1.1", "1-2-3");
     task_util::WaitForIdle();
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
         bs_x_->database()->FindTable("blue.inetmvpn.0"));
@@ -605,7 +605,7 @@ TEST_F(BgpXmppMcastMultiAgentTest, MultipleRoutes) {
 };
 
 TEST_F(BgpXmppMcastMultiAgentTest, Join) {
-    const char *mroute = "225.0.0.1,10.1.1.1";
+    const char *mroute = "225.0.0.1,90.1.1.1";
 
     // Add mcast route for agents a and b.
     agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
@@ -645,7 +645,7 @@ TEST_F(BgpXmppMcastMultiAgentTest, Join) {
 };
 
 TEST_F(BgpXmppMcastMultiAgentTest, Leave) {
-    const char *mroute = "225.0.0.1,10.1.1.1";
+    const char *mroute = "225.0.0.1,90.1.1.1";
 
     // Add mcast route for all agents.
     agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
@@ -684,7 +684,7 @@ TEST_F(BgpXmppMcastMultiAgentTest, Leave) {
 };
 
 TEST_F(BgpXmppMcastMultiAgentTest, Introspect) {
-    const char *mroute = "225.0.0.1,10.1.1.1";
+    const char *mroute = "225.0.0.1,90.1.1.1";
 
     // Add mcast route for all agents.
     agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
@@ -805,18 +805,18 @@ TEST_F(BgpXmppMcastMultiAgentTest, ChangeNexthop) {
 };
 
 TEST_F(BgpXmppMcastMultiAgentTest, MultipleNetworks) {
-    const char *mroute = "225.0.0.1,10.1.1.1";
+    const char *mroute = "225.0.0.1,90.1.1.1";
 
     // Subscribe all agents to another network.
     Subscribe("pink", 2);
 
     // Add mcast routes in blue and pink for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000");
-    agent_xc_->AddMcastRoute("blue", mroute, "9.9.9.9", "60000-80000");
-    agent_xa_->AddMcastRoute("pink", mroute, "7.7.7.7", "10000-20000");
-    agent_xb_->AddMcastRoute("pink", mroute, "8.8.8.8", "40000-60000");
-    agent_xc_->AddMcastRoute("pink", mroute, "9.9.9.9", "60000-80000");
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
+    agent_xc_->AddMcastRoute("blue", mroute, "10.1.1.3", "30000-39999");
+    agent_xa_->AddMcastRoute("pink", mroute, "10.1.1.1", "10000-19999");
+    agent_xb_->AddMcastRoute("pink", mroute, "10.1.1.2", "20000-29999");
+    agent_xc_->AddMcastRoute("pink", mroute, "10.1.1.3", "30000-39999");
     task_util::WaitForIdle();
 
     // Verify that all agents have both routes.
@@ -831,16 +831,16 @@ TEST_F(BgpXmppMcastMultiAgentTest, MultipleNetworks) {
     TASK_UTIL_EXPECT_EQ(1, agent_xc_->McastRouteCount("pink"));
 
     // Verify all OList elements for the route in blue on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "8.8.8.8");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "9.9.9.9");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "7.7.7.7");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.2");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.3");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "10.1.1.1");
 
     // Verify all OList elements for the route in pink on all agents.
-    VerifyOListElem(agent_xa_.get(), "pink", mroute, 2, "8.8.8.8");
-    VerifyOListElem(agent_xa_.get(), "pink", mroute, 2, "9.9.9.9");
-    VerifyOListElem(agent_xb_.get(), "pink", mroute, 1, "7.7.7.7");
-    VerifyOListElem(agent_xc_.get(), "pink", mroute, 1, "7.7.7.7");
+    VerifyOListElem(agent_xa_.get(), "pink", mroute, 2, "10.1.1.2");
+    VerifyOListElem(agent_xa_.get(), "pink", mroute, 2, "10.1.1.3");
+    VerifyOListElem(agent_xb_.get(), "pink", mroute, 1, "10.1.1.1");
+    VerifyOListElem(agent_xc_.get(), "pink", mroute, 1, "10.1.1.1");
 
     // Delete mcast route for all agents.
     agent_xa_->DeleteMcastRoute("blue", mroute);
