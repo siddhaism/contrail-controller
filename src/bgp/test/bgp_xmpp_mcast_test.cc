@@ -1188,6 +1188,7 @@ protected:
 
 TEST_F(BgpXmppMcast2ServerTest, SingleAgentPerServer) {
     const char *mroute = "225.0.0.1,0.0.0.0";
+    int label_xa, label_ya;
 
     // Add mcast route for agent xa.
     agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
@@ -1209,6 +1210,14 @@ TEST_F(BgpXmppMcast2ServerTest, SingleAgentPerServer) {
     VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.4");
     VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.1");
 
+    // Get the labels used by agent xa and ya.
+    label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
+    label_ya = GetLabel(agent_ya_.get(), "blue", mroute, 40000, 49999);
+
+    // Verify all OList elements on all agents, including outbound labels.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.4", label_ya);
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
+
     // Delete mcast route for agent ya.
     agent_ya_->DeleteMcastRoute("blue", mroute);
     task_util::WaitForIdle();
@@ -1228,6 +1237,8 @@ TEST_F(BgpXmppMcast2ServerTest, SingleAgentPerServer) {
 
 TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer1) {
     const char *mroute = "225.0.0.1,0.0.0.0";
+    int label_xa, label_xb;
+    int label_ya, label_yb;
 
     // Add mcast route for agent xa and ya.
     agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
@@ -1238,6 +1249,14 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer1) {
     // Verify all OList elements on all agents.
     VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.4");
     VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.1");
+
+    // Get the labels used by agent xa and ya.
+    label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
+    label_ya = GetLabel(agent_ya_.get(), "blue", mroute, 40000, 49999);
+
+    // Verify all OList elements on all agents, including outbound labels.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.4", label_ya);
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
 
     // Add mcast route for agent xb and yb.
     agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
@@ -1252,6 +1271,20 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer1) {
     VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.5");
     VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.4");
     VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+    // Get the labels used by agent xa/xb and ya/yb.
+    label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
+    label_xb = GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999);
+    label_ya = GetLabel(agent_ya_.get(), "blue", mroute, 40000, 49999);
+    label_yb = GetLabel(agent_yb_.get(), "blue", mroute, 50000, 59999);
+
+    // Verify all OList elements on all agents, including labels.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2", label_xb);
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 2, "10.1.1.1", label_xa);
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 2, "10.1.1.5", label_yb);
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.5", label_yb);
+    VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.4", label_ya);
+    VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2", label_xb);
 
     // Delete mcast route for all agents.
     agent_xa_->DeleteMcastRoute("blue", mroute);
