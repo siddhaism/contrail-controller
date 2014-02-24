@@ -331,6 +331,7 @@ protected:
 
 TEST_F(BgpXmppMcastSubscriptionTest, PendingSubscribe) {
     const char *mroute = "225.0.0.1,0.0.0.0";
+    int label_xa, label_xb;
 
     // Register agent b to the multicast table and add a mcast route
     // after waiting for the subscription to be processed.
@@ -351,6 +352,14 @@ TEST_F(BgpXmppMcastSubscriptionTest, PendingSubscribe) {
     // Verify all OList elements on all agents.
     VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
     VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1");
+
+    // Get the labels used by all agents.
+    label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
+    label_xb = GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999);
+
+    // Verify all OList elements on all agents, including labels.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2", label_xb);
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
 
     // Delete mcast route for all agents.
     agent_xa_->DeleteMcastRoute("blue", mroute);
@@ -386,6 +395,7 @@ TEST_F(BgpXmppMcastSubscriptionTest, PendingUnsubscribe) {
 
 TEST_F(BgpXmppMcastSubscriptionTest, SubsequentSubscribeUnsubscribe) {
     const char *mroute = "225.0.0.1,0.0.0.0";
+    int label_xa, label_xb;
 
     // Register agent b to the multicast table and add a mcast route
     // after waiting for the subscription to be processed.
@@ -411,6 +421,14 @@ TEST_F(BgpXmppMcastSubscriptionTest, SubsequentSubscribeUnsubscribe) {
     // Verify all OList elements on all agents.
     VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
     VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1");
+
+    // Get the labels used by all agents.
+    label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
+    label_xb = GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999);
+
+    // Verify all OList elements on all agents, including labels.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2", label_xb);
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
 
     // Verify that agent a mcast route was added with instance_id = 2.
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
