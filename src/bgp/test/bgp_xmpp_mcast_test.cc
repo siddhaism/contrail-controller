@@ -336,12 +336,12 @@ TEST_F(BgpXmppMcastSubscriptionTest, PendingSubscribe) {
     // after waiting for the subscription to be processed.
     agent_xb_->McastSubscribe("blue", 1);
     task_util::WaitForIdle();
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000");
+    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
 
     // Register agent a to the multicast table and add a mcast route
     // without waiting for the subscription to be processed.
     agent_xa_->McastSubscribe("blue", 1);
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
     task_util::WaitForIdle();
 
     // Verify number of routes on all agents.
@@ -349,8 +349,8 @@ TEST_F(BgpXmppMcastSubscriptionTest, PendingSubscribe) {
     TASK_UTIL_EXPECT_EQ(1, agent_xb_->McastRouteCount());
 
     // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "8.8.8.8");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1");
 
     // Delete mcast route for all agents.
     agent_xa_->DeleteMcastRoute("blue", mroute);
@@ -365,13 +365,13 @@ TEST_F(BgpXmppMcastSubscriptionTest, PendingUnsubscribe) {
     // after waiting for the subscription to be processed.
     agent_xb_->McastSubscribe("blue", 1);
     task_util::WaitForIdle();
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000");
+    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
 
     // Register agent a to the multicast table and add a mcast route
     // without waiting for the subscription to be processed. Then go
     // ahead and unsubscribe right away.
     agent_xa_->McastSubscribe("blue", 1);
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
     agent_xa_->McastUnsubscribe("blue");
     task_util::WaitForIdle();
 
@@ -391,17 +391,17 @@ TEST_F(BgpXmppMcastSubscriptionTest, SubsequentSubscribeUnsubscribe) {
     // after waiting for the subscription to be processed.
     agent_xb_->McastSubscribe("blue", 1);
     task_util::WaitForIdle();
-    agent_xb_->AddMcastRoute("blue", mroute, "8.8.8.8", "40000-60000");
+    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
 
     // Register agent a to the multicast table and add a mcast route
     // without waiting for the subscription to be processed. Then go
     // ahead and unsubscribe right away. Then subscribe again with a
     // different id and add the route again.
     agent_xa_->McastSubscribe("blue", 1);
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
     agent_xa_->McastUnsubscribe("blue");
     agent_xa_->McastSubscribe("blue", 2);
-    agent_xa_->AddMcastRoute("blue", mroute, "7.7.7.7", "10000-20000");
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
     task_util::WaitForIdle();
 
     // Verify number of routes on all agents.
@@ -409,8 +409,8 @@ TEST_F(BgpXmppMcastSubscriptionTest, SubsequentSubscribeUnsubscribe) {
     TASK_UTIL_EXPECT_EQ(1, agent_xb_->McastRouteCount());
 
     // Verify all OList elements on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "8.8.8.8");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "7.7.7.7");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1");
 
     // Verify that agent a mcast route was added with instance_id = 2.
     InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
