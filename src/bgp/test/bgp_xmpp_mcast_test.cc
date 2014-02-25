@@ -547,66 +547,59 @@ TEST_F(BgpXmppMcastMultiAgentTest, GroupOnly) {
 };
 
 TEST_F(BgpXmppMcastMultiAgentTest, MultipleRoutes) {
-    const char *mroute1 = "225.0.0.1,90.1.1.1";
-    const char *mroute2 = "225.0.0.1,90.1.1.2";
+    const char *mroute_list[] = {
+        "225.0.0.1,90.1.1.1",
+        "225.0.0.1,90.1.1.2",
+        "225.0.0.2,90.1.1.1",
+        "225.0.0.2,90.1.1.2"
+    };
     int label_xa, label_xb, label_xc;
 
     // Add mcast routes for all agents.
-    agent_xa_->AddMcastRoute("blue", mroute1, "10.1.1.1", "10000-19999");
-    agent_xb_->AddMcastRoute("blue", mroute1, "10.1.1.2", "20000-29999");
-    agent_xc_->AddMcastRoute("blue", mroute1, "10.1.1.3", "30000-39999");
-    agent_xa_->AddMcastRoute("blue", mroute2, "10.1.1.1", "10000-19999");
-    agent_xb_->AddMcastRoute("blue", mroute2, "10.1.1.2", "20000-29999");
-    agent_xc_->AddMcastRoute("blue", mroute2, "10.1.1.3", "30000-39999");
-    task_util::WaitForIdle();
+    BOOST_FOREACH(const char *mroute, mroute_list) {
+        agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+        agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
+        agent_xc_->AddMcastRoute("blue", mroute, "10.1.1.3", "30000-39999");
+        task_util::WaitForIdle();
+    }
 
-    // Verify that all agents have both routes.
-    TASK_UTIL_EXPECT_EQ(2, agent_xa_->McastRouteCount());
-    TASK_UTIL_EXPECT_EQ(2, agent_xb_->McastRouteCount());
-    TASK_UTIL_EXPECT_EQ(2, agent_xc_->McastRouteCount());
+    // Verify that all agents have all routes.
+    TASK_UTIL_EXPECT_EQ(sizeof(mroute_list) / sizeof(mroute_list[0]),
+        agent_xa_->McastRouteCount());
+    TASK_UTIL_EXPECT_EQ(sizeof(mroute_list) / sizeof(mroute_list[0]),
+        agent_xb_->McastRouteCount());
+    TASK_UTIL_EXPECT_EQ(sizeof(mroute_list) / sizeof(mroute_list[0]),
+        agent_xc_->McastRouteCount());
 
-    // Verify all OList elements for the route 1 on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute1, 2, "10.1.1.2");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute1, 2, "10.1.1.3");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute1, 1, "10.1.1.1");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute1, 1, "10.1.1.1");
+    // Verify all OList elements for all routes on all agents.
+    BOOST_FOREACH(const char *mroute, mroute_list) {
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.2");
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.3");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1");
+        VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "10.1.1.1");
+    }
 
-    // Get the labels used for route 1 by all agents.
-    label_xa = GetLabel(agent_xa_.get(), "blue", mroute1, 10000, 19999);
-    label_xb = GetLabel(agent_xb_.get(), "blue", mroute1, 20000, 29999);
-    label_xc = GetLabel(agent_xc_.get(), "blue", mroute1, 30000, 39999);
+    BOOST_FOREACH(const char *mroute, mroute_list) {
 
-    // Verify all OList elements on all agents, including outbound labels.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute1, 2, "10.1.1.2", label_xb);
-    VerifyOListElem(agent_xa_.get(), "blue", mroute1, 2, "10.1.1.3", label_xc);
-    VerifyOListElem(agent_xb_.get(), "blue", mroute1, 1, "10.1.1.1", label_xa);
-    VerifyOListElem(agent_xc_.get(), "blue", mroute1, 1, "10.1.1.1", label_xa);
+        // Get the labels used for route 1 by all agents.
+        label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
+        label_xb = GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999);
+        label_xc = GetLabel(agent_xc_.get(), "blue", mroute, 30000, 39999);
 
-    // Verify all OList elements for the route 2 on all agents.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute2, 2, "10.1.1.2");
-    VerifyOListElem(agent_xa_.get(), "blue", mroute2, 2, "10.1.1.3");
-    VerifyOListElem(agent_xb_.get(), "blue", mroute2, 1, "10.1.1.1");
-    VerifyOListElem(agent_xc_.get(), "blue", mroute2, 1, "10.1.1.1");
-
-    // Get the labels used for route 1 by all agents.
-    label_xa = GetLabel(agent_xa_.get(), "blue", mroute2, 10000, 19999);
-    label_xb = GetLabel(agent_xb_.get(), "blue", mroute2, 20000, 29999);
-    label_xc = GetLabel(agent_xc_.get(), "blue", mroute2, 30000, 39999);
-
-    // Verify all OList elements on all agents, including outbound labels.
-    VerifyOListElem(agent_xa_.get(), "blue", mroute2, 2, "10.1.1.2", label_xb);
-    VerifyOListElem(agent_xa_.get(), "blue", mroute2, 2, "10.1.1.3", label_xc);
-    VerifyOListElem(agent_xb_.get(), "blue", mroute2, 1, "10.1.1.1", label_xa);
-    VerifyOListElem(agent_xc_.get(), "blue", mroute2, 1, "10.1.1.1", label_xa);
+        // Verify all OList elements on all agents, including outbound labels.
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.2", label_xb);
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.3", label_xc);
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
+        VerifyOListElem(agent_xc_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
+    }
 
     // Delete mcast route for all agents.
-    agent_xa_->DeleteMcastRoute("blue", mroute1);
-    agent_xb_->DeleteMcastRoute("blue", mroute1);
-    agent_xc_->DeleteMcastRoute("blue", mroute1);
-    agent_xa_->DeleteMcastRoute("blue", mroute2);
-    agent_xb_->DeleteMcastRoute("blue", mroute2);
-    agent_xc_->DeleteMcastRoute("blue", mroute2);
-    task_util::WaitForIdle();
+    BOOST_FOREACH(const char *mroute, mroute_list) {
+        agent_xa_->DeleteMcastRoute("blue", mroute);
+        agent_xb_->DeleteMcastRoute("blue", mroute);
+        agent_xc_->DeleteMcastRoute("blue", mroute);
+        task_util::WaitForIdle();
+    }
 };
 
 TEST_F(BgpXmppMcastMultiAgentTest, Join) {
