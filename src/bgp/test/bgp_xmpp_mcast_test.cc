@@ -1443,6 +1443,70 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer3) {
     task_util::WaitForIdle();
 };
 
+TEST_F(BgpXmppMcast2ServerTest, MultipleNetworks) {
+    const char *mroute = "225.0.0.1,90.1.1.1";
+
+    // Subscribe all agents to another network.
+    Subscribe("pink", 2);
+
+    // Add mcast routes in blue and pink for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
+    agent_xc_->AddMcastRoute("blue", mroute, "10.1.1.3", "30000-39999");
+    agent_xa_->AddMcastRoute("pink", mroute, "10.1.1.1", "10000-19999");
+    agent_xb_->AddMcastRoute("pink", mroute, "10.1.1.2", "20000-29999");
+    agent_xc_->AddMcastRoute("pink", mroute, "10.1.1.3", "30000-39999");
+    agent_ya_->AddMcastRoute("blue", mroute, "10.1.1.4", "40000-49999");
+    agent_yb_->AddMcastRoute("blue", mroute, "10.1.1.5", "50000-59999");
+    agent_yc_->AddMcastRoute("blue", mroute, "10.1.1.6", "60000-69999");
+    agent_ya_->AddMcastRoute("pink", mroute, "10.1.1.4", "40000-49999");
+    agent_yb_->AddMcastRoute("pink", mroute, "10.1.1.5", "50000-59999");
+    agent_yc_->AddMcastRoute("pink", mroute, "10.1.1.6", "60000-69999");
+    task_util::WaitForIdle();
+
+    // Verify all OList elements for the route in blue on all agents.
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.2");
+    VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.3");
+    VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 2, "10.1.1.1");
+    VerifyOListElem(agent_xc_.get(), "blue", mroute, 2, "10.1.1.6");
+
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 2, "10.1.1.5");
+    VerifyOListElem(agent_ya_.get(), "blue", mroute, 2, "10.1.1.6");
+    VerifyOListElem(agent_yb_.get(), "blue", mroute, 1, "10.1.1.4");
+    VerifyOListElem(agent_yc_.get(), "blue", mroute, 2, "10.1.1.4");
+    VerifyOListElem(agent_yc_.get(), "blue", mroute, 2, "10.1.1.3");
+
+    // Verify all OList elements for the route in pink on all agents.
+    VerifyOListElem(agent_xa_.get(), "pink", mroute, 2, "10.1.1.2");
+    VerifyOListElem(agent_xa_.get(), "pink", mroute, 2, "10.1.1.3");
+    VerifyOListElem(agent_xb_.get(), "pink", mroute, 1, "10.1.1.1");
+    VerifyOListElem(agent_xc_.get(), "pink", mroute, 2, "10.1.1.1");
+    VerifyOListElem(agent_xc_.get(), "pink", mroute, 2, "10.1.1.6");
+
+    VerifyOListElem(agent_ya_.get(), "pink", mroute, 2, "10.1.1.5");
+    VerifyOListElem(agent_ya_.get(), "pink", mroute, 2, "10.1.1.6");
+    VerifyOListElem(agent_yb_.get(), "pink", mroute, 1, "10.1.1.4");
+    VerifyOListElem(agent_yc_.get(), "pink", mroute, 2, "10.1.1.4");
+    VerifyOListElem(agent_yc_.get(), "pink", mroute, 2, "10.1.1.3");
+
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_xc_->DeleteMcastRoute("blue", mroute);
+    agent_xa_->DeleteMcastRoute("pink", mroute);
+    agent_xb_->DeleteMcastRoute("pink", mroute);
+    agent_xc_->DeleteMcastRoute("pink", mroute);
+    agent_ya_->DeleteMcastRoute("blue", mroute);
+    agent_yb_->DeleteMcastRoute("blue", mroute);
+    agent_yc_->DeleteMcastRoute("blue", mroute);
+    agent_ya_->DeleteMcastRoute("pink", mroute);
+    agent_yb_->DeleteMcastRoute("pink", mroute);
+    agent_yc_->DeleteMcastRoute("pink", mroute);
+    task_util::WaitForIdle();
+};
+
 static const char *config_tmpl3 = "\
 <config>\
     <bgp-router name=\'X\'>\
