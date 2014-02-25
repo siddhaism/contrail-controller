@@ -1249,7 +1249,7 @@ protected:
     }
 };
 
-TEST_F(BgpXmppMcast2ServerTest, SingleAgentPerServer) {
+TEST_F(BgpXmppMcast2ServerTest, SingleAgent) {
     const char *mroute = "225.0.0.1,0.0.0.0";
     int label_xa, label_ya;
 
@@ -1298,7 +1298,7 @@ TEST_F(BgpXmppMcast2ServerTest, SingleAgentPerServer) {
     TASK_UTIL_EXPECT_EQ(0, agent_ya_->McastRouteCount());
 };
 
-TEST_F(BgpXmppMcast2ServerTest, MultipleRoutes) {
+TEST_F(BgpXmppMcast2ServerTest, SingleAgentMultipleRoutes) {
     const char *mroute_list[] = {
         "225.0.0.1,90.1.1.1",
         "225.0.0.1,90.1.1.2",
@@ -1345,7 +1345,7 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleRoutes) {
     }
 };
 
-TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer1) {
+TEST_F(BgpXmppMcast2ServerTest, MultipleAgent1) {
     const char *mroute = "225.0.0.1,0.0.0.0";
     int label_xa, label_xb;
     int label_ya, label_yb;
@@ -1405,7 +1405,7 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer1) {
     task_util::WaitForIdle();
 };
 
-TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer2) {
+TEST_F(BgpXmppMcast2ServerTest, MultipleAgent2) {
     const char *mroute = "225.0.0.1,0.0.0.0";
     int label_xa, label_xb;
     int label_ya, label_yb;
@@ -1467,7 +1467,7 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer2) {
     task_util::WaitForIdle();
 };
 
-TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer3) {
+TEST_F(BgpXmppMcast2ServerTest, MultipleAgent3) {
     const char *mroute = "225.0.0.1,0.0.0.0";
     int label_xa, label_xb, label_xc;
     int label_ya, label_yb, label_yc;
@@ -1535,7 +1535,7 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer3) {
     task_util::WaitForIdle();
 };
 
-TEST_F(BgpXmppMcast2ServerTest, MultipleRoutes2) {
+TEST_F(BgpXmppMcast2ServerTest, MultipleAgentMultipleRoutes) {
     const char *mroute_list[] = {
         "225.0.0.1,90.1.1.1",
         "225.0.0.1,90.1.1.2",
@@ -1581,7 +1581,7 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleRoutes2) {
     }
 };
 
-TEST_F(BgpXmppMcast2ServerTest, MultipleNetworks) {
+TEST_F(BgpXmppMcast2ServerTest, MultipleAgentMultipleNetworks) {
     const char *mroute = "225.0.0.1,90.1.1.1";
     const char *networks[] = { "blue", "pink" };
 
