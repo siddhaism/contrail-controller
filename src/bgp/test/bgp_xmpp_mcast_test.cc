@@ -1298,6 +1298,53 @@ TEST_F(BgpXmppMcast2ServerTest, SingleAgentPerServer) {
     TASK_UTIL_EXPECT_EQ(0, agent_ya_->McastRouteCount());
 };
 
+TEST_F(BgpXmppMcast2ServerTest, MultipleRoutes) {
+    const char *mroute_list[] = {
+        "225.0.0.1,90.1.1.1",
+        "225.0.0.1,90.1.1.2",
+        "225.0.0.2,90.1.1.1",
+        "225.0.0.2,90.1.1.2"
+    };
+    int label_xa, label_ya;
+
+    // Add mcast routes for all agents.
+    BOOST_FOREACH(const char *mroute, mroute_list) {
+        agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+        agent_ya_->AddMcastRoute("blue", mroute, "10.1.1.4", "40000-49999");
+        task_util::WaitForIdle();
+    }
+
+    // Verify that all agents have all routes.
+    TASK_UTIL_EXPECT_EQ(sizeof(mroute_list) / sizeof(mroute_list[0]),
+        agent_xa_->McastRouteCount());
+    TASK_UTIL_EXPECT_EQ(sizeof(mroute_list) / sizeof(mroute_list[0]),
+        agent_ya_->McastRouteCount());
+
+    // Verify all OList elements for all routes on all agents.
+    BOOST_FOREACH(const char *mroute, mroute_list) {
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.4");
+        VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.1");
+    }
+
+    BOOST_FOREACH(const char *mroute, mroute_list) {
+
+        // Get the labels used for route by all agents.
+        label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
+        label_ya = GetLabel(agent_ya_.get(), "blue", mroute, 40000, 49999);
+
+        // Verify all OList elements on all agents, including outbound labels.
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.4", label_ya);
+        VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
+    }
+
+    // Delete mcast route for all agents.
+    BOOST_FOREACH(const char *mroute, mroute_list) {
+        agent_xa_->DeleteMcastRoute("blue", mroute);
+        agent_ya_->DeleteMcastRoute("blue", mroute);
+        task_util::WaitForIdle();
+    }
+};
+
 TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer1) {
     const char *mroute = "225.0.0.1,0.0.0.0";
     int label_xa, label_xb;
@@ -1486,6 +1533,52 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgentPerServer3) {
     agent_yb_->DeleteMcastRoute("blue", mroute);
     agent_yc_->DeleteMcastRoute("blue", mroute);
     task_util::WaitForIdle();
+};
+
+TEST_F(BgpXmppMcast2ServerTest, MultipleRoutes2) {
+    const char *mroute_list[] = {
+        "225.0.0.1,90.1.1.1",
+        "225.0.0.1,90.1.1.2",
+        "225.0.0.2,90.1.1.1",
+        "225.0.0.2,90.1.1.2"
+    };
+
+    // Add mcast routes for all agents.
+    BOOST_FOREACH(const char *mroute, mroute_list) {
+        agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+        agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
+        agent_xc_->AddMcastRoute("blue", mroute, "10.1.1.3", "30000-39999");
+        agent_ya_->AddMcastRoute("blue", mroute, "10.1.1.4", "40000-49999");
+        agent_yb_->AddMcastRoute("blue", mroute, "10.1.1.5", "50000-59999");
+        agent_yc_->AddMcastRoute("blue", mroute, "10.1.1.6", "60000-69999");
+        task_util::WaitForIdle();
+    }
+
+    // Verify all OList elements for all routes on all agents.
+    BOOST_FOREACH(const char *mroute, mroute_list) {
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.2");
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 2, "10.1.1.3");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1");
+        VerifyOListElem(agent_xc_.get(), "blue", mroute, 2, "10.1.1.1");
+        VerifyOListElem(agent_xc_.get(), "blue", mroute, 2, "10.1.1.6");
+
+        VerifyOListElem(agent_ya_.get(), "blue", mroute, 2, "10.1.1.5");
+        VerifyOListElem(agent_ya_.get(), "blue", mroute, 2, "10.1.1.6");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 1, "10.1.1.4");
+        VerifyOListElem(agent_yc_.get(), "blue", mroute, 2, "10.1.1.4");
+        VerifyOListElem(agent_yc_.get(), "blue", mroute, 2, "10.1.1.3");
+    }
+
+    // Delete mcast route for all agents.
+    BOOST_FOREACH(const char *mroute, mroute_list) {
+        agent_xa_->DeleteMcastRoute("blue", mroute);
+        agent_xb_->DeleteMcastRoute("blue", mroute);
+        agent_xc_->DeleteMcastRoute("blue", mroute);
+        agent_ya_->DeleteMcastRoute("blue", mroute);
+        agent_yb_->DeleteMcastRoute("blue", mroute);
+        agent_yc_->DeleteMcastRoute("blue", mroute);
+        task_util::WaitForIdle();
+    }
 };
 
 TEST_F(BgpXmppMcast2ServerTest, MultipleNetworks) {
