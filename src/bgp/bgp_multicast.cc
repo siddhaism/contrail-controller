@@ -362,7 +362,7 @@ void McastSGEntry::ChangeForwarder(McastForwarder *forwarder) {
 //
 void McastSGEntry::DeleteForwarder(McastForwarder *forwarder) {
     if (forwarder == forest_node_)
-        DeleteCMcastRoute();
+        forest_node_ = NULL;
     forwarder->DeleteTreeRoute();
     uint8_t level = forwarder->level();
     forwarder_lists_[level]->erase(forwarder);
@@ -428,13 +428,9 @@ void McastSGEntry::DeleteCMcastRoute() {
     if (!cmcast_route_)
         return;
 
+    forest_node_ = NULL;
     DBTablePartition *tbl_partition =
         static_cast<DBTablePartition *>(partition_->GetTablePartition());
-
-    assert(forest_node_);
-    tbl_partition->Notify(forest_node_->route());
-    forest_node_ = NULL;
-
     cmcast_route_->RemovePath(BgpPath::Local);
     if (!cmcast_route_->BestPath()) {
         tbl_partition->Delete(cmcast_route_);
