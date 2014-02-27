@@ -160,18 +160,19 @@ protected:
         bs_x_->Configure(config);
     }
 
+    int ExtractLabel(const test::NetworkAgentMock *agent,
+        const string &net, const string &prefix) {
+        const NetworkAgentMock::McastRouteEntry *rt =
+            agent->McastRouteLookup(net, prefix);
+        return (rt ? rt->entry.nlri.source_label : 0);
+    }
+
     int GetLabel(const test::NetworkAgentMock *agent,
             const string &net, const string &prefix,
             int first_label, int last_label) {
-        const NetworkAgentMock::McastRouteEntry *rt =
-                agent->McastRouteLookup(net, prefix);
-        int label = 0;
-        if (rt) {
-            label = rt->entry.nlri.source_label;
-            TASK_UTIL_EXPECT_TRUE(label >= first_label);
-            TASK_UTIL_EXPECT_TRUE(label <= last_label);
-        }
-        return label;
+        TASK_UTIL_EXPECT_TRUE(ExtractLabel(agent, net, prefix) >= first_label);
+        TASK_UTIL_EXPECT_TRUE(ExtractLabel(agent, net, prefix) <= last_label);
+        return ExtractLabel(agent, net, prefix);
     }
 
     bool CheckOListElem(const test::NetworkAgentMock *agent,
@@ -2422,6 +2423,7 @@ TEST_F(BgpXmppMcast3ServerTest, MultipleAgentLabelBlockChange1) {
     task_util::WaitForIdle();
 
     for (int idx = 0; idx < 8; ++idx) {
+
         // Verify all OList elements on all agents.
         VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
         VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.1");
@@ -2435,6 +2437,14 @@ TEST_F(BgpXmppMcast3ServerTest, MultipleAgentLabelBlockChange1) {
         VerifyOListElem(agent_za_.get(), "blue", mroute, 1, "10.1.1.8");
         VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.7");
         VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        // Verify label used by agent xb.
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2",
+            GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999));
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2",
+            GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999));
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.2",
+            GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999));
 
         // Change mcast route for agent xb.
         agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "120000-129999");
@@ -2454,8 +2464,226 @@ TEST_F(BgpXmppMcast3ServerTest, MultipleAgentLabelBlockChange1) {
         VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.7");
         VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.2");
 
+        // Verify label used by agent xb.
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2",
+            GetLabel(agent_xb_.get(), "blue", mroute, 120000, 129999));
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2",
+            GetLabel(agent_xb_.get(), "blue", mroute, 120000, 129999));
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.2",
+            GetLabel(agent_xb_.get(), "blue", mroute, 120000, 129999));
+
         // Change mcast route for agent xb.
-        agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "120000-129999");
+        agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
+        task_util::WaitForIdle();
+    }
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_ya_->DeleteMcastRoute("blue", mroute);
+    agent_yb_->DeleteMcastRoute("blue", mroute);
+    agent_za_->DeleteMcastRoute("blue", mroute);
+    agent_zb_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+//
+// Non-forest node on tree builder changes label block.
+//
+TEST_F(BgpXmppMcast3ServerTest, MultipleAgentLabelBlockChange2) {
+    const char *mroute = "225.0.0.1,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
+    agent_ya_->AddMcastRoute("blue", mroute, "10.1.1.4", "40000-49999");
+    agent_yb_->AddMcastRoute("blue", mroute, "10.1.1.5", "50000-59999");
+    agent_za_->AddMcastRoute("blue", mroute, "10.1.1.7", "70000-79999");
+    agent_zb_->AddMcastRoute("blue", mroute, "10.1.1.8", "80000-89999");
+    task_util::WaitForIdle();
+
+    for (int idx = 0; idx < 8; ++idx) {
+
+        // Verify all OList elements on all agents.
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.1");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.5");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.8");
+
+        VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.5");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.4");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        VerifyOListElem(agent_za_.get(), "blue", mroute, 1, "10.1.1.8");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.7");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        // Verify label used by agent xa.
+        GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
+
+        // Change mcast route for agent xb.
+        agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "110000-119999");
+        task_util::WaitForIdle();
+
+        // Verify all OList elements on all agents.
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.1");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.5");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.8");
+
+        VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.5");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.4");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        VerifyOListElem(agent_za_.get(), "blue", mroute, 1, "10.1.1.8");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.7");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        // Verify label used by agent xa.
+        GetLabel(agent_xa_.get(), "blue", mroute, 110000, 119999);
+
+        // Change mcast route for agent xb.
+        agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+        task_util::WaitForIdle();
+    }
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_ya_->DeleteMcastRoute("blue", mroute);
+    agent_yb_->DeleteMcastRoute("blue", mroute);
+    agent_za_->DeleteMcastRoute("blue", mroute);
+    agent_zb_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+//
+// Forest node on non tree builder changes label block.
+//
+TEST_F(BgpXmppMcast3ServerTest, MultipleAgentLabelBlockChange3) {
+    const char *mroute = "225.0.0.1,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
+    agent_ya_->AddMcastRoute("blue", mroute, "10.1.1.4", "40000-49999");
+    agent_yb_->AddMcastRoute("blue", mroute, "10.1.1.5", "50000-59999");
+    agent_za_->AddMcastRoute("blue", mroute, "10.1.1.7", "70000-79999");
+    agent_zb_->AddMcastRoute("blue", mroute, "10.1.1.8", "80000-89999");
+    task_util::WaitForIdle();
+
+    for (int idx = 0; idx < 8; ++idx) {
+
+        // Verify all OList elements on all agents.
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.1");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.5");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.8");
+
+        VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.5");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.4");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        VerifyOListElem(agent_za_.get(), "blue", mroute, 1, "10.1.1.8");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.7");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        // Verify label used by agent yb.
+        GetLabel(agent_yb_.get(), "blue", mroute, 50000, 59999);
+
+        // Change mcast route for agent yb.
+        agent_yb_->AddMcastRoute("blue", mroute, "10.1.1.5", "150000-159999");
+        task_util::WaitForIdle();
+
+        // Verify all OList elements on all agents.
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.1");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.5");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.8");
+
+        VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.5");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.4");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        VerifyOListElem(agent_za_.get(), "blue", mroute, 1, "10.1.1.8");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.7");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        // Verify label used by agent yb.
+        GetLabel(agent_yb_.get(), "blue", mroute, 150000, 159999);
+
+        // Change mcast route for agent yb.
+        agent_yb_->AddMcastRoute("blue", mroute, "10.1.1.5", "50000-59999");
+        task_util::WaitForIdle();
+    }
+
+    // Delete mcast route for all agents.
+    agent_xa_->DeleteMcastRoute("blue", mroute);
+    agent_xb_->DeleteMcastRoute("blue", mroute);
+    agent_ya_->DeleteMcastRoute("blue", mroute);
+    agent_yb_->DeleteMcastRoute("blue", mroute);
+    agent_za_->DeleteMcastRoute("blue", mroute);
+    agent_zb_->DeleteMcastRoute("blue", mroute);
+    task_util::WaitForIdle();
+};
+
+//
+// Non-forest node on non tree builder changes label block.
+//
+TEST_F(BgpXmppMcast3ServerTest, MultipleAgentLabelBlockChange4) {
+    const char *mroute = "225.0.0.1,0.0.0.0";
+
+    // Add mcast route for all agents.
+    agent_xa_->AddMcastRoute("blue", mroute, "10.1.1.1", "10000-19999");
+    agent_xb_->AddMcastRoute("blue", mroute, "10.1.1.2", "20000-29999");
+    agent_ya_->AddMcastRoute("blue", mroute, "10.1.1.4", "40000-49999");
+    agent_yb_->AddMcastRoute("blue", mroute, "10.1.1.5", "50000-59999");
+    agent_za_->AddMcastRoute("blue", mroute, "10.1.1.7", "70000-79999");
+    agent_zb_->AddMcastRoute("blue", mroute, "10.1.1.8", "80000-89999");
+    task_util::WaitForIdle();
+
+    for (int idx = 0; idx < 8; ++idx) {
+
+        // Verify all OList elements on all agents.
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.1");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.5");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.8");
+
+        VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.5");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.4");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        VerifyOListElem(agent_za_.get(), "blue", mroute, 1, "10.1.1.8");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.7");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        // Verify label used by agent ya.
+        GetLabel(agent_ya_.get(), "blue", mroute, 40000, 49999);
+
+        // Change mcast route for agent ya.
+        agent_ya_->AddMcastRoute("blue", mroute, "10.1.1.4", "140000-149999");
+        task_util::WaitForIdle();
+
+        // Verify all OList elements on all agents.
+        VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.1");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.5");
+        VerifyOListElem(agent_xb_.get(), "blue", mroute, 3, "10.1.1.8");
+
+        VerifyOListElem(agent_ya_.get(), "blue", mroute, 1, "10.1.1.5");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.4");
+        VerifyOListElem(agent_yb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        VerifyOListElem(agent_za_.get(), "blue", mroute, 1, "10.1.1.8");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.7");
+        VerifyOListElem(agent_zb_.get(), "blue", mroute, 2, "10.1.1.2");
+
+        // Verify label used by agent ya.
+        GetLabel(agent_ya_.get(), "blue", mroute, 140000, 149999);
+
+        // Change mcast route for agent ya.
+        agent_ya_->AddMcastRoute("blue", mroute, "10.1.1.4", "40000-49999");
         task_util::WaitForIdle();
     }
 
