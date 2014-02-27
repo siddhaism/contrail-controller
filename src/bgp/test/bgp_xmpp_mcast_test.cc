@@ -169,7 +169,7 @@ protected:
 
     int GetLabel(const test::NetworkAgentMock *agent,
             const string &net, const string &prefix,
-            int first_label, int last_label) {
+            int first_label = 0, int last_label = 0) {
         TASK_UTIL_EXPECT_TRUE(ExtractLabel(agent, net, prefix) >= first_label);
         TASK_UTIL_EXPECT_TRUE(ExtractLabel(agent, net, prefix) <= last_label);
         return ExtractLabel(agent, net, prefix);
@@ -626,7 +626,7 @@ TEST_F(BgpXmppMcastMultiAgentTest, Join) {
     // Get the labels used for route by all agents.
     label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
     label_xb = GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999);
-    label_xc = GetLabel(agent_xc_.get(), "blue", mroute, 30000, 39999);
+    label_xc = GetLabel(agent_xc_.get(), "blue", mroute);
 
     // Verify all OList elements on all agents, including labels.
     VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2", label_xb);
@@ -725,12 +725,12 @@ TEST_F(BgpXmppMcastMultiAgentTest, Leave) {
     TASK_UTIL_EXPECT_NE(label_xb,
         GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999));
     TASK_UTIL_EXPECT_NE(label_xc,
-        GetLabel(agent_xc_.get(), "blue", mroute, 30000, 39999));
+        GetLabel(agent_xc_.get(), "blue", mroute));
 
     // Get the labels used for route by all agents.
     label_xa_new = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
     label_xb_new = GetLabel(agent_xb_.get(), "blue", mroute, 20000, 29999);
-    label_xc_new = GetLabel(agent_xc_.get(), "blue", mroute, 30000, 39999);
+    label_xc_new = GetLabel(agent_xc_.get(), "blue", mroute);
 
     // Verify all OList elements on all agents, including labels.
     VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.2", label_xb_new);
@@ -1456,7 +1456,9 @@ TEST_F(BgpXmppMcast2ServerTest, MultipleAgent2) {
 
     // Get the labels used by agent xa and ya.
     label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
+    label_xb = GetLabel(agent_xb_.get(), "blue", mroute);
     label_ya = GetLabel(agent_ya_.get(), "blue", mroute, 40000, 49999);
+    label_yb = GetLabel(agent_yb_.get(), "blue", mroute);
 
     // Verify all OList elements on all agents, including outbound labels.
     VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.4", label_ya);
@@ -1825,6 +1827,7 @@ TEST_F(BgpXmppMcast3ServerTest, SingleAgentRouteFlapping1) {
         VerifyOListElem(agent_za_.get(), "blue", mroute, 1, "10.1.1.4");
 
         // Get the labels used by agent ya and za.
+        label_xa = GetLabel(agent_xa_.get(), "blue", mroute);
         label_ya = GetLabel(agent_ya_.get(), "blue", mroute, 40000, 49999);
         label_za = GetLabel(agent_za_.get(), "blue", mroute, 70000, 79999);
 
@@ -1889,6 +1892,7 @@ TEST_F(BgpXmppMcast3ServerTest, SingleAgentRouteFlapping2) {
         // Get the labels used by agent xa and ya.
         label_xa = GetLabel(agent_xa_.get(), "blue", mroute, 10000, 19999);
         label_ya = GetLabel(agent_ya_.get(), "blue", mroute, 40000, 49999);
+        label_za = GetLabel(agent_za_.get(), "blue", mroute);
 
         // Verify all OList elements on all agents, including outbound labels.
         VerifyOListElem(agent_xa_.get(), "blue", mroute, 1, "10.1.1.4", label_ya);
