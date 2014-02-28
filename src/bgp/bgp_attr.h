@@ -158,7 +158,7 @@ struct EdgeDiscoverySpec : public BgpAttribute {
     struct Edge : public ParseObject {
         Ip4Address GetAddress() const;
         void SetAddress(Ip4Address addr);
-        void GetLabels(uint32_t &first_label, uint32_t &last_label) const;
+        void GetLabels(uint32_t *first_label, uint32_t *last_label) const;
         void SetLabels(uint32_t first_label, uint32_t last_label);
 
         std::vector<uint8_t> address;

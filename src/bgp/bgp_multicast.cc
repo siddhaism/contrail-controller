@@ -168,6 +168,7 @@ void McastForwarder::AllocateLabel() {
 //
 // Release the label, if any, for this McastForwarder. This is required when
 // updating the distribution tree for the McastSGEntry to which we belong.
+//
 void McastForwarder::ReleaseLabel() {
     if (label_ != 0) {
         label_block_->ReleaseLabel(label_);

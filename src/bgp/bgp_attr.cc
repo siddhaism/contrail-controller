@@ -178,9 +178,9 @@ void EdgeDiscoverySpec::Edge::SetAddress(Ip4Address addr) {
 }
 
 void EdgeDiscoverySpec::Edge::GetLabels(
-    uint32_t &first_label, uint32_t &last_label) const {
-    first_label = labels[0];
-    last_label = labels[1];
+    uint32_t *first_label, uint32_t *last_label) const {
+    *first_label = labels[0];
+    *last_label = labels[1];
 }
 
 void EdgeDiscoverySpec::Edge::SetLabels(
@@ -203,13 +203,26 @@ void EdgeDiscoverySpec::ToCanonical(BgpAttr *attr) {
 }
 
 std::string EdgeDiscoverySpec::ToString() const {
-    return "";
+    std::ostringstream oss;
+    oss << "EdgeDiscovery <code: " << int(code);
+    oss << ", flags: 0x" << std::hex << int(flags) << std::dec << ">";
+    int idx = 0;
+    for (EdgeList::const_iterator it = edge_list.begin();
+         it != edge_list.end(); ++it, ++idx) {
+        const Edge *edge = *it;
+        uint32_t first_label, last_label;
+        edge->GetLabels(&first_label, &last_label);
+        oss << " Edge[" << idx << "] = (" << edge->GetAddress() << ", ";
+        oss << first_label << "-" << last_label << ")";
+    }
+
+    return oss.str();
 }
 
 EdgeDiscovery::Edge::Edge(const EdgeDiscoverySpec::Edge *spec_edge) {
     address = spec_edge->GetAddress();
     uint32_t first_label, last_label;
-    spec_edge->GetLabels(first_label, last_label);
+    spec_edge->GetLabels(&first_label, &last_label);
     label_block  = new LabelBlock(first_label, last_label);
 }
 
@@ -284,7 +297,21 @@ void EdgeForwardingSpec::ToCanonical(BgpAttr *attr) {
 }
 
 std::string EdgeForwardingSpec::ToString() const {
-    return "";
+    std::ostringstream oss;
+    oss << "EdgeForwarding <code: " << int(code);
+    oss << ", flags: 0x" << std::hex << int(flags) << std::dec << ">";
+    int idx = 0;
+    for (EdgeList::const_iterator it = edge_list.begin();
+         it != edge_list.end(); ++it, ++idx) {
+        const Edge *edge = *it;
+        oss << " Edge[" << idx << "] = (";
+        oss << "InAddress=" << edge->GetInboundAddress() << ", ";
+        oss << "InLabel=" << edge->inbound_label << ", ";
+        oss << "OutAddress=" << edge->GetOutboundAddress() << ", ";
+        oss << "OutLabel=" << edge->outbound_label << ")";
+    }
+
+    return oss.str();
 }
 
 EdgeForwarding::Edge::Edge(const EdgeForwardingSpec::Edge *spec_edge) {
