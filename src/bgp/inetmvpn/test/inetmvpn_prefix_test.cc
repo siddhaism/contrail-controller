@@ -92,6 +92,87 @@ TEST_F(InetMVpnPrefixTest, ParseTreePrefix) {
     EXPECT_EQ("192.168.1.1", prefix.source().to_string());
 }
 
+// No "-" to delineate the prefix type.
+TEST_F(InetMVpnPrefixTest, Error1) {
+    boost::system::error_code ec;
+    string prefix_str("2:10.1.1.1:65535:9.8.7.6,224.1.2.3,192.168.1.1");
+    InetMVpnPrefix prefix = InetMVpnPrefix::FromString(prefix_str, &ec);
+    EXPECT_NE(0, ec.value());
+    EXPECT_EQ(InetMVpnPrefix::Invalid, prefix.type());
+}
+
+// Invalid prefix type.
+TEST_F(InetMVpnPrefixTest, Error2) {
+    boost::system::error_code ec;
+    string prefix_str("9-10.1.1.1:65535-9.8.7.6,224.1.2.3,192.168.1.1");
+    InetMVpnPrefix prefix = InetMVpnPrefix::FromString(prefix_str, &ec);
+    EXPECT_NE(0, ec.value());
+    EXPECT_EQ(InetMVpnPrefix::Invalid, prefix.type());
+}
+
+// No "-" to delineate the rd.
+TEST_F(InetMVpnPrefixTest, Error3) {
+    boost::system::error_code ec;
+    string prefix_str("2-10.1.1.1:65535:9.8.7.6,224.1.2.3,192.168.1.1");
+    InetMVpnPrefix prefix = InetMVpnPrefix::FromString(prefix_str, &ec);
+    EXPECT_NE(0, ec.value());
+    EXPECT_EQ(InetMVpnPrefix::Invalid, prefix.type());
+}
+
+// Bad rd.
+TEST_F(InetMVpnPrefixTest, Error4) {
+    boost::system::error_code ec;
+    string prefix_str("2-10.1.1.1:65536-9.8.7.6,224.1.2.3,192.168.1.1");
+    InetMVpnPrefix prefix = InetMVpnPrefix::FromString(prefix_str, &ec);
+    EXPECT_NE(0, ec.value());
+    EXPECT_EQ(InetMVpnPrefix::Invalid, prefix.type());
+}
+
+// No "," to delineate the router-id.
+TEST_F(InetMVpnPrefixTest, Error5) {
+    boost::system::error_code ec;
+    string prefix_str("2-10.1.1.1:65535-9.8.7.6:224.1.2.3,192.168.1.1");
+    InetMVpnPrefix prefix = InetMVpnPrefix::FromString(prefix_str, &ec);
+    EXPECT_NE(0, ec.value());
+    EXPECT_EQ(InetMVpnPrefix::Invalid, prefix.type());
+}
+
+// Bad router-id.
+TEST_F(InetMVpnPrefixTest, Error6) {
+    boost::system::error_code ec;
+    string prefix_str("2-10.1.1.1:65535-9.8.7,224.1.2.3,192.168.1.1");
+    InetMVpnPrefix prefix = InetMVpnPrefix::FromString(prefix_str, &ec);
+    EXPECT_NE(0, ec.value());
+    EXPECT_EQ(InetMVpnPrefix::Invalid, prefix.type());
+}
+
+// No "," to delineate the group.
+TEST_F(InetMVpnPrefixTest, Error7) {
+    boost::system::error_code ec;
+    string prefix_str("2-10.1.1.1:65535-9.8.7.6,224.1.2.3:192.168.1.1");
+    InetMVpnPrefix prefix = InetMVpnPrefix::FromString(prefix_str, &ec);
+    EXPECT_NE(0, ec.value());
+    EXPECT_EQ(InetMVpnPrefix::Invalid, prefix.type());
+}
+
+// Bad group address.
+TEST_F(InetMVpnPrefixTest, Error8) {
+    boost::system::error_code ec;
+    string prefix_str("2-10.1.1.1:65535-9.8.7.6,224.1.2,192.168.1.1");
+    InetMVpnPrefix prefix = InetMVpnPrefix::FromString(prefix_str, &ec);
+    EXPECT_NE(0, ec.value());
+    EXPECT_EQ(InetMVpnPrefix::Invalid, prefix.type());
+}
+
+// Bad source address.
+TEST_F(InetMVpnPrefixTest, Error9) {
+    boost::system::error_code ec;
+    string prefix_str("2-10.1.1.1:65535-9.8.7.6,224.1.2.3,192.168.1");
+    InetMVpnPrefix prefix = InetMVpnPrefix::FromString(prefix_str, &ec);
+    EXPECT_NE(0, ec.value());
+    EXPECT_EQ(InetMVpnPrefix::Invalid, prefix.type());
+}
+
 int main(int argc, char **argv) {
     bgp_log_test::init();
     ::testing::InitGoogleTest(&argc, argv);

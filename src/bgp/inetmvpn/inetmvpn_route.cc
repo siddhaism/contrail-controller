@@ -8,7 +8,7 @@
 
 using namespace std;
 
-InetMVpnPrefix::InetMVpnPrefix() : type_(0) {
+InetMVpnPrefix::InetMVpnPrefix() : type_(InetMVpnPrefix::Invalid) {
 }
 
 InetMVpnPrefix::InetMVpnPrefix(uint8_t type, const RouteDistinguisher &rd,
@@ -94,7 +94,7 @@ void InetMVpnPrefix::BuildProtoPrefix(BgpProtoPrefix *prefix) const {
 
 InetMVpnPrefix InetMVpnPrefix::FromString(const string &str,
     boost::system::error_code *errorp) {
-    InetMVpnPrefix prefix;
+    InetMVpnPrefix prefix, null_prefix;
     string temp_str;
 
     // Look for Type.
@@ -103,7 +103,7 @@ InetMVpnPrefix InetMVpnPrefix::FromString(const string &str,
         if (errorp != NULL) {
             *errorp = make_error_code(boost::system::errc::invalid_argument);
         }
-        return prefix;
+        return null_prefix;
     }
     temp_str = str.substr(0, pos1);
     stringToInteger(temp_str, prefix.type_);
@@ -111,7 +111,7 @@ InetMVpnPrefix InetMVpnPrefix::FromString(const string &str,
         if (errorp != NULL) {
             *errorp = make_error_code(boost::system::errc::invalid_argument);
         }
-        return prefix;
+        return null_prefix;
     }
 
     // Look for RD.
@@ -120,7 +120,7 @@ InetMVpnPrefix InetMVpnPrefix::FromString(const string &str,
         if (errorp != NULL) {
             *errorp = make_error_code(boost::system::errc::invalid_argument);
         }
-        return prefix;
+        return null_prefix;
     }
     temp_str = str.substr(pos1 + 1, pos2 - pos1 - 1);
     boost::system::error_code rd_err;
@@ -129,7 +129,7 @@ InetMVpnPrefix InetMVpnPrefix::FromString(const string &str,
         if (errorp != NULL) {
             *errorp = rd_err;
         }
-        return prefix;
+        return null_prefix;
     }
 
     // Look for router-id.
@@ -138,7 +138,7 @@ InetMVpnPrefix InetMVpnPrefix::FromString(const string &str,
         if (errorp != NULL) {
             *errorp = make_error_code(boost::system::errc::invalid_argument);
         }
-        return prefix;
+        return null_prefix;
     }
     temp_str = str.substr(pos2 + 1, pos3 - pos2 - 1);
     boost::system::error_code rtid_err;
@@ -147,7 +147,7 @@ InetMVpnPrefix InetMVpnPrefix::FromString(const string &str,
         if (errorp != NULL) {
             *errorp = rtid_err;
         }
-        return prefix;
+        return null_prefix;
     }
 
     // Look for group.
@@ -156,7 +156,7 @@ InetMVpnPrefix InetMVpnPrefix::FromString(const string &str,
         if (errorp != NULL) {
             *errorp = make_error_code(boost::system::errc::invalid_argument);
         }
-        return prefix;
+        return null_prefix;
     }
     temp_str = str.substr(pos3 + 1, pos4 - pos3 - 1);
     boost::system::error_code group_err;
@@ -165,7 +165,7 @@ InetMVpnPrefix InetMVpnPrefix::FromString(const string &str,
         if (errorp != NULL) {
             *errorp = group_err;
         }
-        return prefix;
+        return null_prefix;
     }
 
     // Rest is source.
@@ -176,7 +176,7 @@ InetMVpnPrefix InetMVpnPrefix::FromString(const string &str,
         if (errorp != NULL) {
             *errorp = source_err;
         }
-        return prefix;
+        return null_prefix;
     }
 
     return prefix;

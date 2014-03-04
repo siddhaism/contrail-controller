@@ -23,6 +23,7 @@ public:
         NativeRoute = 0,
         CMcastRoute = 1,
         TreeRoute = 2,
+        Invalid = 255,
     };
 
     InetMVpnPrefix();
