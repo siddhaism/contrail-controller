@@ -304,15 +304,15 @@ protected:
              tm->partitions_.begin(); it != tm->partitions_.end(); ++it) {
             McastSGEntry *sg_entry = (*it)->FindSGEntry(group, source);
             if (sg_entry) {
-                McastSGEntry::ForwarderList *forwarders =
-                    sg_entry->forwarder_lists_[McastTreeManager::LevelLocal];
+                McastSGEntry::ForwarderSet *forwarders =
+                    sg_entry->forwarder_sets_[McastTreeManager::LevelLocal];
                 TASK_UTIL_EXPECT_EQ(count, forwarders->size());
                 if (forwarders->size() > 1) {
 
                     BGP_DEBUG_UT("  McastSGEntry " << sg_entry->ToString() <<
                                  "  partition " << (*it)->part_id_);
                 }
-                for (McastSGEntry::ForwarderList::iterator it =
+                for (McastSGEntry::ForwarderSet::iterator it =
                      forwarders->begin(); it != forwarders->end(); ++it) {
                     if (forwarders->size() > 1) {
                         VerifyForwarderProperties(tm->table_, *it);

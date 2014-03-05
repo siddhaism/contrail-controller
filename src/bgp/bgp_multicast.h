@@ -200,7 +200,7 @@ private:
     friend class BgpMulticastTest;
     friend class ShowMulticastManagerDetailHandler;
 
-    typedef std::set<McastForwarder *, McastForwarderCompare> ForwarderList;
+    typedef std::set<McastForwarder *, McastForwarderCompare> ForwarderSet;
 
     bool IsTreeBuilder(uint8_t level);
     void UpdateTree(uint8_t level);
@@ -211,7 +211,7 @@ private:
     McastForwarder *forest_node_;
     ErmVpnRoute *cmcast_route_;
     ErmVpnRoute *tree_route_;
-    std::vector<ForwarderList *> forwarder_lists_;
+    std::vector<ForwarderSet *> forwarder_sets_;
     std::vector<bool> update_needed_;
     bool on_work_queue_;
 

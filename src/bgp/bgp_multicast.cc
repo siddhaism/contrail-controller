@@ -320,8 +320,8 @@ McastSGEntry::McastSGEntry(McastManagerPartition *partition,
       on_work_queue_(false) {
     for (int level = McastTreeManager::LevelFirst;
          level < McastTreeManager::LevelCount; ++level) {
-        ForwarderList *forwarders = new ForwarderList;
-        forwarder_lists_.push_back(forwarders);
+        ForwarderSet *forwarders = new ForwarderSet;
+        forwarder_sets_.push_back(forwarders);
         update_needed_.push_back(false);
     }
 }
@@ -330,7 +330,7 @@ McastSGEntry::McastSGEntry(McastManagerPartition *partition,
 // Destructor for McastSGEntry.
 //
 McastSGEntry::~McastSGEntry() {
-    STLDeleteValues(&forwarder_lists_);
+    STLDeleteValues(&forwarder_sets_);
 }
 
 //
@@ -346,7 +346,7 @@ std::string McastSGEntry::ToString() const {
 //
 void McastSGEntry::AddForwarder(McastForwarder *forwarder) {
     uint8_t level = forwarder->level();
-    forwarder_lists_[level]->insert(forwarder);
+    forwarder_sets_[level]->insert(forwarder);
     update_needed_[level] = true;
     partition_->EnqueueSGEntry(this);
 }
@@ -366,7 +366,7 @@ void McastSGEntry::DeleteForwarder(McastForwarder *forwarder) {
         forest_node_ = NULL;
     forwarder->DeleteTreeRoute();
     uint8_t level = forwarder->level();
-    forwarder_lists_[level]->erase(forwarder);
+    forwarder_sets_[level]->erase(forwarder);
     update_needed_[level] = true;
     partition_->EnqueueSGEntry(this);
 }
@@ -382,7 +382,7 @@ void McastSGEntry::AddCMcastRoute() {
     assert(!cmcast_route_);
 
     uint8_t level = McastTreeManager::LevelLocal;
-    ForwarderList *forwarders = forwarder_lists_[level];
+    ForwarderSet *forwarders = forwarder_sets_[level];
     if (forwarders->rbegin() == forwarders->rend())
         return;
 
@@ -450,8 +450,8 @@ void McastSGEntry::UpdateRoutes(uint8_t level) {
     if (level == McastTreeManager::LevelLocal) {
         UpdateCMcastRoute();
     } else {
-        ForwarderList *forwarders = forwarder_lists_[level];
-        for (ForwarderList::iterator it = forwarders->begin();
+        ForwarderSet *forwarders = forwarder_sets_[level];
+        for (ForwarderSet::iterator it = forwarders->begin();
              it != forwarders->end(); ++it) {
             (*it)->DeleteTreeRoute();
             (*it)->AddTreeRoute();
@@ -463,8 +463,8 @@ bool McastSGEntry::IsTreeBuilder(uint8_t level) {
     if (level == McastTreeManager::LevelLocal)
         return true;
 
-    ForwarderList *forwarders = forwarder_lists_[level];
-    ForwarderList::iterator it = forwarders->begin();
+    ForwarderSet *forwarders = forwarder_sets_[level];
+    ForwarderSet::iterator it = forwarders->begin();
     if (it == forwarders->end())
         return false;
 
@@ -502,8 +502,8 @@ void McastSGEntry::UpdateTree(uint8_t level) {
     // First get rid of the previous distribution tree and enqueue all the
     // associated ErmVpnRoutes for notification.  Note that DBListeners
     // will not get invoked until after this routine is done.
-    ForwarderList *forwarders = forwarder_lists_[level];
-    for (ForwarderList::iterator it = forwarders->begin();
+    ForwarderSet *forwarders = forwarder_sets_[level];
+    for (ForwarderSet::iterator it = forwarders->begin();
          it != forwarders->end(); ++it) {
        (*it)->FlushLinks();
        (*it)->ReleaseLabel();
@@ -519,7 +519,7 @@ void McastSGEntry::UpdateTree(uint8_t level) {
     // resort to this because std::set doesn't support random access iterators.
     McastForwarderList vec;
     vec.reserve(forwarders->size());
-    for (ForwarderList::iterator it = forwarders->begin();
+    for (ForwarderSet::iterator it = forwarders->begin();
          it != forwarders->end(); ++it) {
         vec.push_back(*it);
     }
@@ -563,9 +563,9 @@ bool McastSGEntry::IsForestNode(McastForwarder *forwarder) {
 bool McastSGEntry::empty() const {
     if (cmcast_route_ || tree_route_)
         return false;
-    if (!forwarder_lists_[McastTreeManager::LevelLocal]->empty())
+    if (!forwarder_sets_[McastTreeManager::LevelLocal]->empty())
         return false;
-    if (!forwarder_lists_[McastTreeManager::LevelGlobal]->empty())
+    if (!forwarder_sets_[McastTreeManager::LevelGlobal]->empty())
         return false;
     return true;
 }
