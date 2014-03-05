@@ -48,7 +48,7 @@ public:
 
         DBRequest req;
         req.oper = DBRequest::DB_ENTRY_ADD_CHANGE;
-        ErmVpnPrefix prefix(rd, group, source);
+        ErmVpnPrefix prefix(ErmVpnPrefix::NativeRoute, rd, group, source);
         req.key.reset(new ErmVpnTable::RequestKey(prefix, this));
         req.data.reset(new ErmVpnTable::RequestData(attr, 0, 0));
         table->Enqueue(&req);
@@ -66,7 +66,7 @@ public:
 
         DBRequest req;
         req.oper = DBRequest::DB_ENTRY_DELETE;
-        ErmVpnPrefix prefix(rd, group, source);
+        ErmVpnPrefix prefix(ErmVpnPrefix::NativeRoute, rd, group, source);
         req.key.reset(new ErmVpnTable::RequestKey(prefix, this));
         table->Enqueue(&req);
     }
@@ -301,20 +301,20 @@ protected:
 
         BGP_DEBUG_UT("Table " << tm->table_->name());
         for (McastTreeManager::PartitionList::iterator it =
-                tm->partitions_.begin();
-                it != tm->partitions_.end(); ++it) {
+             tm->partitions_.begin(); it != tm->partitions_.end(); ++it) {
             McastSGEntry *sg_entry = (*it)->FindSGEntry(group, source);
             if (sg_entry) {
-                TASK_UTIL_EXPECT_EQ(count, sg_entry->forwarders_.size());
-                if (sg_entry->forwarders_.size() > 1) {
+                McastSGEntry::ForwarderList *forwarders =
+                    sg_entry->forwarder_lists_[McastTreeManager::LevelLocal];
+                TASK_UTIL_EXPECT_EQ(count, forwarders->size());
+                if (forwarders->size() > 1) {
 
                     BGP_DEBUG_UT("  McastSGEntry " << sg_entry->ToString() <<
                                  "  partition " << (*it)->part_id_);
                 }
-                for (McastSGEntry::ForwarderSet::iterator it =
-                     sg_entry->forwarders_.begin();
-                     it != sg_entry->forwarders_.end(); ++it) {
-                    if (sg_entry->forwarders_.size() > 1) {
+                for (McastSGEntry::ForwarderList::iterator it =
+                     forwarders->begin(); it != forwarders->end(); ++it) {
+                    if (forwarders->size() > 1) {
                         VerifyForwarderProperties(tm->table_, *it);
                         VerifyForwarderLinks(*it);
                     } else {
