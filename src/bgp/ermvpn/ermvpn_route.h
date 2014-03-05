@@ -82,7 +82,7 @@ public:
     }
 
     virtual u_int16_t Afi() const { return BgpAf::IPv4; }
-    virtual u_int8_t Safi() const { return BgpAf::McastVpn; }
+    virtual u_int8_t Safi() const { return BgpAf::ErmVpn; }
     virtual u_int8_t XmppSafi() const { return BgpAf::Mcast; }
 
 private:

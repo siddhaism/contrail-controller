@@ -13,8 +13,8 @@
 #include "bgp/bgp_route.h"
 #include "bgp/routing-instance/routing_instance.h"
 #include "bgp/bgp_table.h"
-#include "bgp/inetmvpn/inetmvpn_route.h"
 #include "bgp/enet/enet_route.h"
+#include "bgp/ermvpn/ermvpn_route.h"
 #include "bgp/origin-vn/origin_vn.h"
 #include "bgp/security_group/security_group.h"
 #include "net/bgp_af.h"
@@ -108,7 +108,7 @@ void BgpXmppMessage::Start(const RibOutAttr *roattr, const BgpRoute *route) {
     ss << route->Afi() << "/" << int(route->XmppSafi()) << "/" <<
           table_->routing_instance()->name();
     std::string node(ss.str());
-    if (table_->family() == Address::INETMVPN) {
+    if (table_->family() == Address::ERMVPN) {
         xitems_.append_attribute("node") = node.c_str();
         AddMcastRoute(route, roattr);
     } else if (table_->family() == Address::ENET) {
@@ -121,7 +121,7 @@ void BgpXmppMessage::Start(const RibOutAttr *roattr, const BgpRoute *route) {
 }
 
 bool BgpXmppMessage::AddRoute(const BgpRoute *route, const RibOutAttr *roattr) {
-    if (table_->family() == Address::INETMVPN) {
+    if (table_->family() == Address::ERMVPN) {
         return AddMcastRoute(route, roattr);
     } else if (table_->family() == Address::ENET) {
         return AddEnetRoute(route, roattr);
@@ -255,10 +255,10 @@ void BgpXmppMessage::AddMcastReach(const BgpRoute *route, const RibOutAttr *roat
     item.entry.nlri.af = route->Afi();
     item.entry.nlri.safi = route->XmppSafi();
 
-    InetMVpnRoute *mvpn_route =
-        static_cast<InetMVpnRoute *>(const_cast<BgpRoute *>(route));
-    item.entry.nlri.group = mvpn_route->GetPrefix().group().to_string();
-    item.entry.nlri.source =  mvpn_route->GetPrefix().source().to_string();
+    ErmVpnRoute *ermvpn_route =
+        static_cast<ErmVpnRoute *>(const_cast<BgpRoute *>(route));
+    item.entry.nlri.group = ermvpn_route->GetPrefix().group().to_string();
+    item.entry.nlri.source =  ermvpn_route->GetPrefix().source().to_string();
     item.entry.nlri.source_label = roattr->label();
 
     BgpOList *olist = roattr->attr()->olist().get();

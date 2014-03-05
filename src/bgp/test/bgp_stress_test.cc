@@ -841,7 +841,7 @@ string BgpStressTest::GetRouterConfig(int router_id, int peer_id,
         out << "<family>inet</family>";
         out << "<family>inet-vpn</family>";
         out << "<family>e-vpn</family>";
-        out << "<family>inet-mvpn</family>";
+        out << "<family>erm-vpn</family>";
         out << "</address-families>";
         out << "</session>";
     }

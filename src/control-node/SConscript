@@ -154,8 +154,8 @@ libs = MapBuildDir(['base',
                     'bgp/inet',
                     'bgp/inetmcast',
                     'bgp/enet',
+                    'bgp/ermvpn',
                     'bgp/evpn',
-                    'bgp/inetmvpn',
                     'bgp/l3vpn',
                     'bgp/origin-vn',
                     'bgp/routing-instance',
@@ -184,8 +184,8 @@ lib_l3vpn = File('../bgp/l3vpn/libbgp_l3vpn.a')
 lib_inet = File('../bgp/inet/libbgp_inet.a')
 lib_inetmcast = File('../bgp/inetmcast/libbgp_inetmcast.a')
 lib_enet = File('../bgp/enet/libbgp_enet.a')
+lib_ermvpn = File('../bgp/ermvpn/libbgp_ermvpn.a')
 lib_evpn = File('../bgp/evpn/libbgp_evpn.a')
-lib_inetmvpn = File('../bgp/inetmvpn/libbgp_inetmvpn.a')
 lib_ifmap_server = File('../ifmap/libifmap_server.a')
 lib_sandesh = File('../sandesh/library/cpp/libsandesh.a')
 lib_cpuinfo = File('../base/libcpuinfo.a')
@@ -194,7 +194,7 @@ if sys.platform != 'darwin':
     env.Prepend(LINKFLAGS =
                      ['-Wl,--whole-archive',
                       '-lbgp_l3vpn', '-lbgp_inet', '-lbgp_inetmcast',
-                      '-lbgp_enet', '-lbgp_evpn', '-lbgp_inetmvpn',
+                      '-lbgp_enet', '-lbgp_ermvpn', '-lbgp_evpn',
                       '-lifmap_server', '-lcpuinfo',
                       '-Wl,--no-whole-archive'])
 else:
@@ -202,8 +202,8 @@ else:
     env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_inet.path])
     env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_inetmcast.path])
     env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_enet.path])
+    env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_ermvpn.path])
     env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_evpn.path])
-    env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_inetmvpn.path])
     env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_ifmap_server.path])
     env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_sandesh.path])
     env.Prepend(LINKFLAGS = ['-Wl,-force_load,' + lib_cpuinfo.path])
@@ -241,8 +241,8 @@ env.Depends(ctrlnode, lib_l3vpn)
 env.Depends(ctrlnode, lib_inet)
 env.Depends(ctrlnode, lib_inetmcast)
 env.Depends(ctrlnode, lib_enet)
+env.Depends(ctrlnode, lib_ermvpn)
 env.Depends(ctrlnode, lib_evpn)
-env.Depends(ctrlnode, lib_inetmvpn)
 env.Depends(ctrlnode, lib_ifmap_server)
 
 env.Alias('control-node', ctrlnode)

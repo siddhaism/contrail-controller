@@ -23,7 +23,7 @@ public:
         Vpn = 128,
         Mcast = 241,
         Enet = 242,
-        McastVpn = 243,
+        ErmVpn = 243,
     };
 
     static std::string ToString(uint8_t afi, uint16_t safi);

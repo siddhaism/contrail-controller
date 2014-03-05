@@ -477,7 +477,7 @@ string BgpPeerCloseTest::GetConfig() {
                 <address-families>\
                 <family>inet-vpn</family>\
                 <family>e-vpn</family>\
-                <family>inet-mvpn</family>\
+                <family>erm-vpn</family>\
                 </address-families>\
             </session>\
     </bgp-router>\

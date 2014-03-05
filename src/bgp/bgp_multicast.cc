@@ -11,7 +11,7 @@
 #include "bgp/bgp_path.h"
 #include "bgp/bgp_route.h"
 #include "bgp/ipeer.h"
-#include "bgp/inetmvpn/inetmvpn_table.h"
+#include "bgp/ermvpn/ermvpn_table.h"
 #include "bgp/routing-instance/routing_instance.h"
 
 class McastTreeManager::DeleteActor : public LifetimeActor {
@@ -43,15 +43,15 @@ private:
 //
 // Constructor for McastForwarder. We get the address of the forwarder
 // from the nexthop. The RD also ought to contain the same information.
-// The LabelBlockPtr from the InetMVpnRoute is copied for convenience.
+// The LabelBlockPtr from the ErmVpnRoute is copied for convenience.
 //
-McastForwarder::McastForwarder(McastSGEntry *sg_entry, InetMVpnRoute *route)
+McastForwarder::McastForwarder(McastSGEntry *sg_entry, ErmVpnRoute *route)
     : sg_entry_(sg_entry), route_(route), tree_route_(NULL),
       label_(0), address_(0), rd_(route->GetPrefix().route_distinguisher()),
       router_id_(route->GetPrefix().router_id()) {
     const BgpPath *path = route->BestPath();
     const BgpAttr *attr = path->GetAttr();
-    if (route_->GetPrefix().type() == InetMVpnPrefix::NativeRoute) {
+    if (route_->GetPrefix().type() == ErmVpnPrefix::NativeRoute) {
         level_ = McastTreeManager::LevelLocal;
         address_ = attr->nexthop().to_v4();
         label_block_ = attr->label_block();
@@ -76,10 +76,10 @@ McastForwarder::~McastForwarder() {
 }
 
 //
-// Update the McastForwarder based on information in the InetMVpnRoute.
+// Update the McastForwarder based on information in the ErmVpnRoute.
 // Return true if something changed.
 //
-bool McastForwarder::Update(InetMVpnRoute *route) {
+bool McastForwarder::Update(ErmVpnRoute *route) {
     McastForwarder forwarder(sg_entry_, route);
 
     bool changed = false;
@@ -186,18 +186,18 @@ void McastForwarder::AddTreeRoute() {
 
     BgpTable *table = static_cast<BgpTable *>(route_->get_table());
     BgpServer *server = table->routing_instance()->server();
-    InetMVpnPrefix prefix(InetMVpnPrefix::TreeRoute,
+    ErmVpnPrefix prefix(ErmVpnPrefix::TreeRoute,
         RouteDistinguisher::null_rd, router_id_,
         sg_entry_->group(), sg_entry_->source());
-    InetMVpnRoute rt_key(prefix);
+    ErmVpnRoute rt_key(prefix);
 
     McastManagerPartition *partition = sg_entry_->partition();
     DBTablePartition *tbl_partition =
         static_cast<DBTablePartition *>(partition->GetTablePartition());
-    InetMVpnRoute *route =
-        static_cast<InetMVpnRoute *>(tbl_partition->Find(&rt_key));
+    ErmVpnRoute *route =
+        static_cast<ErmVpnRoute *>(tbl_partition->Find(&rt_key));
     if (!route) {
-        route = new InetMVpnRoute(prefix);
+        route = new ErmVpnRoute(prefix);
         tbl_partition->Add(route);
     } else {
         route->ClearDelete();
@@ -256,7 +256,7 @@ void McastForwarder::AddGlobalOListElems(BgpOListPtr olist) {
     if (!sg_entry_->IsForestNode(this))
         return;
 
-    const InetMVpnRoute *route = sg_entry_->tree_route();
+    const ErmVpnRoute *route = sg_entry_->tree_route();
     if (!route)
         return;
 
@@ -278,14 +278,14 @@ void McastForwarder::AddGlobalOListElems(BgpOListPtr olist) {
 
 //
 // Construct an UpdateInfo with the RibOutAttr that needs to be advertised to
-// the IPeer for the InetMVpnRoute associated with this McastForwarder. This
-// is used the Export method of the InetMVpnTable.  The target RibPeerSet is
+// the IPeer for the ErmVpnRoute associated with this McastForwarder. This
+// is used the Export method of the ErmVpnTable.  The target RibPeerSet is
 // in the UpdateInfo is assumed to be filled in by the caller.
 //
 // The main functionality here is to transform the McastForwarderList for the
 // distribution tree into a BgpOList.
 //
-UpdateInfo *McastForwarder::GetUpdateInfo(InetMVpnTable *table) {
+UpdateInfo *McastForwarder::GetUpdateInfo(ErmVpnTable *table) {
     CHECK_CONCURRENCY("db::DBTable");
 
     BgpOListPtr olist(new BgpOList);
@@ -389,16 +389,16 @@ void McastSGEntry::AddCMcastRoute() {
     forest_node_ = *forwarders->rbegin();
     BgpServer *server = partition_->server();
     Ip4Address router_id(server->bgp_identifier());
-    InetMVpnPrefix prefix(InetMVpnPrefix::CMcastRoute,
+    ErmVpnPrefix prefix(ErmVpnPrefix::CMcastRoute,
         RouteDistinguisher::null_rd, router_id, group_, source_);
 
-    InetMVpnRoute rt_key(prefix);
+    ErmVpnRoute rt_key(prefix);
     DBTablePartition *tbl_partition =
         static_cast<DBTablePartition *>(partition_->GetTablePartition());
-    InetMVpnRoute *route =
-        static_cast<InetMVpnRoute *>(tbl_partition->Find(&rt_key));
+    ErmVpnRoute *route =
+        static_cast<ErmVpnRoute *>(tbl_partition->Find(&rt_key));
     if (!route) {
-        route = new InetMVpnRoute(prefix);
+        route = new ErmVpnRoute(prefix);
         tbl_partition->Add(route);
     } else {
         route->ClearDelete();
@@ -500,7 +500,7 @@ void McastSGEntry::UpdateTree(uint8_t level) {
     }
 
     // First get rid of the previous distribution tree and enqueue all the
-    // associated InetMVpnRoutes for notification.  Note that DBListeners
+    // associated ErmVpnRoutes for notification.  Note that DBListeners
     // will not get invoked until after this routine is done.
     ForwarderList *forwarders = forwarder_lists_[level];
     for (ForwarderList::iterator it = forwarders->begin();
@@ -646,7 +646,7 @@ bool McastManagerPartition::ProcessSGEntry(McastSGEntry *sg_entry) {
 }
 
 //
-// Get the DBTablePartBase for the InetMVpnTable for our partition id.
+// Get the DBTablePartBase for the ErmVpnTable for our partition id.
 //
 DBTablePartBase *McastManagerPartition::GetTablePartition() {
     return tree_manager_->GetTablePartition(part_id_);
@@ -659,7 +659,7 @@ BgpServer *McastManagerPartition::server() {
 //
 // Constructor for McastTreeManager.
 //
-McastTreeManager::McastTreeManager(InetMVpnTable *table)
+McastTreeManager::McastTreeManager(ErmVpnTable *table)
     : table_(table), table_delete_ref_(this, table->deleter()) {
     deleter_.reset(new DeleteActor(this));
 }
@@ -672,7 +672,7 @@ McastTreeManager::~McastTreeManager() {
 
 //
 // Initialize the McastTreeManager. We allocate the McastManagerPartitions
-// and register a DBListener for the InetMVpnTable.
+// and register a DBListener for the ErmVpnTable.
 //
 void McastTreeManager::Initialize() {
     AllocPartitions();
@@ -682,7 +682,7 @@ void McastTreeManager::Initialize() {
 
 //
 // Terminate the McastTreeManager. We free the McastManagerPartitions
-// and unregister from the InetMVpnTable.
+// and unregister from the ErmVpnTable.
 //
 void McastTreeManager::Terminate() {
     table_->Unregister(listener_id_);
@@ -713,17 +713,17 @@ McastManagerPartition *McastTreeManager::GetPartition(int part_id) {
 }
 
 //
-// Get the DBTablePartBase for the InetMVpnTable for given partition id.
+// Get the DBTablePartBase for the ErmVpnTable for given partition id.
 //
 DBTablePartBase *McastTreeManager::GetTablePartition(size_t part_id) {
     return table_->GetTablePartition(part_id);
 }
 
 //
-// Construct export state for the given InetMVpnRoute. Note that the route
+// Construct export state for the given ErmVpnRoute. Note that the route
 // only needs to be exported to the IPeer from which it was learnt.
 //
-UpdateInfo *McastTreeManager::GetUpdateInfo(InetMVpnRoute *route) {
+UpdateInfo *McastTreeManager::GetUpdateInfo(ErmVpnRoute *route) {
     CHECK_CONCURRENCY("db::DBTable");
 
     DBState *dbstate = route->GetState(table_, listener_id_);
@@ -736,13 +736,13 @@ UpdateInfo *McastTreeManager::GetUpdateInfo(InetMVpnRoute *route) {
 }
 
 //
-// DBListener callback handler for the InetMVpnTable. It creates or deletes
+// DBListener callback handler for the ErmVpnTable. It creates or deletes
 // the associated McastForwarder as appropriate. Also creates a McastSGEntry
 // if one doesn't already exist.  However, McastSGEntrys don't get deleted
 // from here.  They only get deleted from the WorkQueue callback routine.
 //
 void McastTreeManager::TreeNodeListener(McastManagerPartition *partition,
-        InetMVpnRoute *route) {
+        ErmVpnRoute *route) {
     CHECK_CONCURRENCY("db::DBTable");
 
     DBState *dbstate = route->GetState(table_, listener_id_);
@@ -785,7 +785,7 @@ void McastTreeManager::TreeNodeListener(McastManagerPartition *partition,
 }
 
 void McastTreeManager::TreeResultListener(McastManagerPartition *partition,
-        InetMVpnRoute *route) {
+        ErmVpnRoute *route) {
     CHECK_CONCURRENCY("db::DBTable");
 
     BgpServer *server = table_->routing_instance()->server();
@@ -825,8 +825,8 @@ void McastTreeManager::RouteListener(
     CHECK_CONCURRENCY("db::DBTable");
 
     McastManagerPartition *partition = partitions_[tpart->index()];
-    InetMVpnRoute *route = dynamic_cast<InetMVpnRoute *>(db_entry);
-    if (route->GetPrefix().type() == InetMVpnPrefix::TreeRoute) {
+    ErmVpnRoute *route = dynamic_cast<ErmVpnRoute *>(db_entry);
+    if (route->GetPrefix().type() == ErmVpnPrefix::TreeRoute) {
         TreeResultListener(partition, route);
     } else {
         TreeNodeListener(partition, route);

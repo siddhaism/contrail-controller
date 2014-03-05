@@ -175,7 +175,7 @@ TEST_F(ErmVpnNativeTest, AddDeleteSingleRoute) {
 
     ErmVpnRoute *rt = FindRoute(blue_, repr.str());
     TASK_UTIL_EXPECT_EQ(BgpAf::IPv4, rt->Afi());
-    TASK_UTIL_EXPECT_EQ(BgpAf::McastVpn, rt->Safi());
+    TASK_UTIL_EXPECT_EQ(BgpAf::ErmVpn, rt->Safi());
     TASK_UTIL_EXPECT_EQ(BgpAf::Mcast, rt->XmppSafi());
 
     DelRoute(blue_, repr.str());
@@ -316,7 +316,7 @@ TEST_F(ErmVpnCMcastTest, AddDeleteSingleRoute) {
 
     ErmVpnRoute *rt = FindRoute(blue_, repr.str());
     TASK_UTIL_EXPECT_EQ(BgpAf::IPv4, rt->Afi());
-    TASK_UTIL_EXPECT_EQ(BgpAf::McastVpn, rt->Safi());
+    TASK_UTIL_EXPECT_EQ(BgpAf::ErmVpn, rt->Safi());
 
     DelRoute(blue_, repr.str());
     task_util::WaitForIdle();
@@ -575,7 +575,7 @@ TEST_F(ErmVpnTreeTest, AddDeleteSingleRoute) {
 
     ErmVpnRoute *rt = FindRoute(blue_, repr.str());
     TASK_UTIL_EXPECT_EQ(BgpAf::IPv4, rt->Afi());
-    TASK_UTIL_EXPECT_EQ(BgpAf::McastVpn, rt->Safi());
+    TASK_UTIL_EXPECT_EQ(BgpAf::ErmVpn, rt->Safi());
 
     DelRoute(blue_, repr.str());
     task_util::WaitForIdle();

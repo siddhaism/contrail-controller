@@ -9,8 +9,8 @@
 #include "bgp/bgp_sandesh.h"
 #include "bgp/bgp_session_manager.h"
 #include "bgp/bgp_xmpp_channel.h"
-#include "bgp/inetmvpn/inetmvpn_route.h"
-#include "bgp/inetmvpn/inetmvpn_table.h"
+#include "bgp/ermvpn/ermvpn_route.h"
+#include "bgp/ermvpn/ermvpn_table.h"
 #include "bgp/test/bgp_server_test_util.h"
 #include "io/test/event_manager_test.h"
 #include "control-node/control_node.h"
@@ -282,40 +282,40 @@ protected:
 TEST_F(BgpXmppMcastErrorTest, BadGroupAddress) {
     agent_xa_->AddMcastRoute("blue", "225.0.0,90.1.1.1", "10.1.1.1", "10-20");
     task_util::WaitForIdle();
-    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
-        bs_x_->database()->FindTable("blue.inetmvpn.0"));
+    ErmVpnTable *blue_table_ = static_cast<ErmVpnTable *>(
+        bs_x_->database()->FindTable("blue.ermvpn.0"));
     EXPECT_TRUE(blue_table_->Size() == 0);
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadSourceAddress) {
     agent_xa_->AddMcastRoute("blue", "225.0.0.1,90.1.1", "10.1.1.1", "10-20");
     task_util::WaitForIdle();
-    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
-        bs_x_->database()->FindTable("blue.inetmvpn.0"));
+    ErmVpnTable *blue_table_ = static_cast<ErmVpnTable *>(
+        bs_x_->database()->FindTable("blue.ermvpn.0"));
     EXPECT_TRUE(blue_table_->Size() == 0);
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadNexthopAddress) {
     agent_xa_->AddMcastRoute("blue", "225.0.0.1,90.1.1.1", "10.1", "10-20");
     task_util::WaitForIdle();
-    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
-        bs_x_->database()->FindTable("blue.inetmvpn.0"));
+    ErmVpnTable *blue_table_ = static_cast<ErmVpnTable *>(
+        bs_x_->database()->FindTable("blue.ermvpn.0"));
     EXPECT_TRUE(blue_table_->Size() == 0);
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadLabelBlock1) {
     agent_xa_->AddMcastRoute("blue", "225.0.0.1,90.1.1.1", "10.1.1.1", "10,20");
     task_util::WaitForIdle();
-    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
-        bs_x_->database()->FindTable("blue.inetmvpn.0"));
+    ErmVpnTable *blue_table_ = static_cast<ErmVpnTable *>(
+        bs_x_->database()->FindTable("blue.ermvpn.0"));
     EXPECT_TRUE(blue_table_->Size() == 0);
 }
 
 TEST_F(BgpXmppMcastErrorTest, BadLabelBlock2) {
     agent_xa_->AddMcastRoute("blue", "225.0.0.1,90.1.1.1", "10.1.1.1", "1-2-3");
     task_util::WaitForIdle();
-    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
-        bs_x_->database()->FindTable("blue.inetmvpn.0"));
+    ErmVpnTable *blue_table_ = static_cast<ErmVpnTable *>(
+        bs_x_->database()->FindTable("blue.ermvpn.0"));
     EXPECT_TRUE(blue_table_->Size() == 0);
 }
 
@@ -437,13 +437,13 @@ TEST_F(BgpXmppMcastSubscriptionTest, SubsequentSubscribeUnsubscribe) {
     VerifyOListElem(agent_xb_.get(), "blue", mroute, 1, "10.1.1.1", label_xa);
 
     // Verify that agent a mcast route was added with instance_id = 2.
-    InetMVpnTable *blue_table_ = static_cast<InetMVpnTable *>(
-            bs_x_->database()->FindTable("blue.inetmvpn.0"));
+    ErmVpnTable *blue_table_ = static_cast<ErmVpnTable *>(
+            bs_x_->database()->FindTable("blue.ermvpn.0"));
     const char *route = "0-127.0.0.1:2-0.0.0.0,225.0.0.1,0.0.0.0";
-    InetMVpnPrefix prefix(InetMVpnPrefix::FromString(route));
-    InetMVpnTable::RequestKey key(prefix, NULL);
+    ErmVpnPrefix prefix(ErmVpnPrefix::FromString(route));
+    ErmVpnTable::RequestKey key(prefix, NULL);
     TASK_UTIL_EXPECT_TRUE(
-        dynamic_cast<InetMVpnRoute *>(blue_table_->Find(&key)) != NULL);
+        dynamic_cast<ErmVpnRoute *>(blue_table_->Find(&key)) != NULL);
 
     // Delete mcast route for all agents.
     agent_xa_->DeleteMcastRoute("blue", mroute);
@@ -762,7 +762,7 @@ TEST_F(BgpXmppMcastMultiAgentTest, Introspect) {
     sandesh_context.xmpp_peer_manager = bcm_x_.get();
     Sandesh::set_client_context(&sandesh_context);
 
-    // First get all tables - blue.inetmvpn.0 and bgp.inetmvpn.0.
+    // First get all tables - blue.ermvpn.0 and bgp.ermvpn.0.
     std::vector<size_t> result = list_of(4)(1);
     Sandesh::set_response_callback(boost::bind(ValidateShowRouteResponse, _1,
                                    result));
@@ -773,24 +773,24 @@ TEST_F(BgpXmppMcastMultiAgentTest, Introspect) {
     task_util::WaitForIdle();
     TASK_UTIL_EXPECT_EQ(1, validate_done_);
 
-    // Now get blue.inetmvpn.0.
+    // Now get blue.ermvpn.0.
     result = list_of(4);
     Sandesh::set_response_callback(boost::bind(ValidateShowRouteResponse, _1,
                                    result));
     show_req = new ShowRouteReq;
-    show_req->set_routing_table("blue.inetmvpn.0");
+    show_req->set_routing_table("blue.ermvpn.0");
     validate_done_ = 0;
     show_req->HandleRequest();
     show_req->Release();
     task_util::WaitForIdle();
     TASK_UTIL_EXPECT_EQ(1, validate_done_);
 
-    // Now get bgp.inetmvpn.0.
+    // Now get bgp.ermvpn.0.
     result = list_of(1);
     Sandesh::set_response_callback(boost::bind(ValidateShowRouteResponse, _1,
                                    result));
     show_req = new ShowRouteReq;
-    show_req->set_routing_table("bgp.inetmvpn.0");
+    show_req->set_routing_table("bgp.ermvpn.0");
     validate_done_ = 0;
     show_req->HandleRequest();
     show_req->Release();
@@ -808,12 +808,12 @@ TEST_F(BgpXmppMcastMultiAgentTest, Introspect) {
     TASK_UTIL_EXPECT_EQ(0, agent_xb_->McastRouteCount());
     TASK_UTIL_EXPECT_EQ(0, agent_xc_->McastRouteCount());
 
-    // Get blue.inetmvpn.0 again.
+    // Get blue.ermvpn.0 again.
     result.resize(0);
     Sandesh::set_response_callback(boost::bind(ValidateShowRouteResponse, _1,
                                    result));
     show_req = new ShowRouteReq;
-    show_req->set_routing_table("blue.inetmvpn.0");
+    show_req->set_routing_table("blue.ermvpn.0");
     validate_done_ = 0;
     show_req->HandleRequest();
     show_req->Release();
@@ -1132,7 +1132,7 @@ static const char *config_tmpl2 = "\
         <port>%d</port>\
         <session to=\'Y\'>\
             <address-families>\
-                <family>inet-mvpn</family>\
+                <family>erm-vpn</family>\
             </address-families>\
         </session>\
     </bgp-router>\
@@ -1142,7 +1142,7 @@ static const char *config_tmpl2 = "\
         <port>%d</port>\
         <session to=\'X\'>\
             <address-families>\
-                <family>inet-mvpn</family>\
+                <family>erm-vpn</family>\
             </address-families>\
         </session>\
     </bgp-router>\
@@ -1640,12 +1640,12 @@ static const char *config_tmpl3 = "\
         <port>%d</port>\
         <session to=\'Y\'>\
             <address-families>\
-                <family>inet-mvpn</family>\
+                <family>erm-vpn</family>\
             </address-families>\
         </session>\
         <session to=\'Z\'>\
             <address-families>\
-                <family>inet-mvpn</family>\
+                <family>erm-vpn</family>\
             </address-families>\
         </session>\
     </bgp-router>\
@@ -1655,12 +1655,12 @@ static const char *config_tmpl3 = "\
         <port>%d</port>\
         <session to=\'X\'>\
             <address-families>\
-                <family>inet-mvpn</family>\
+                <family>erm-vpn</family>\
             </address-families>\
         </session>\
         <session to=\'Z\'>\
             <address-families>\
-                <family>inet-mvpn</family>\
+                <family>erm-vpn</family>\
             </address-families>\
         </session>\
     </bgp-router>\
@@ -1670,12 +1670,12 @@ static const char *config_tmpl3 = "\
         <port>%d</port>\
         <session to=\'X\'>\
             <address-families>\
-                <family>inet-mvpn</family>\
+                <family>erm-vpn</family>\
             </address-families>\
         </session>\
         <session to=\'Y\'>\
             <address-families>\
-                <family>inet-mvpn</family>\
+                <family>erm-vpn</family>\
             </address-families>\
         </session>\
     </bgp-router>\

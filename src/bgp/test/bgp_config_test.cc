@@ -913,7 +913,7 @@ TEST_F(BgpConfigTest, AddressFamilies2) {
 
     TASK_UTIL_EXPECT_EQ(3, peer->families().size());
     TASK_UTIL_EXPECT_TRUE(peer->LookupFamily(Address::INETVPN));
-    TASK_UTIL_EXPECT_TRUE(peer->LookupFamily(Address::INETMVPN));
+    TASK_UTIL_EXPECT_TRUE(peer->LookupFamily(Address::ERMVPN));
     TASK_UTIL_EXPECT_TRUE(peer->LookupFamily(Address::EVPN));
 
     boost::replace_all(content, "<config>", "<delete>");

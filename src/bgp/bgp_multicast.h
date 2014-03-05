@@ -20,8 +20,8 @@
 
 class DBEntryBase;
 class DBTablePartBase;
-class InetMVpnRoute;
-class InetMVpnTable;
+class ErmVpnRoute;
+class ErmVpnTable;
 class McastForwarder;
 class McastManagerPartition;
 class McastSGEntry;
@@ -67,10 +67,10 @@ typedef std::vector<McastForwarder *> McastForwarderList;
 //
 class McastForwarder : public DBState {
 public:
-    McastForwarder(McastSGEntry *sg_entry, InetMVpnRoute *route);
+    McastForwarder(McastSGEntry *sg_entry, ErmVpnRoute *route);
     ~McastForwarder();
 
-    bool Update(InetMVpnRoute *route);
+    bool Update(ErmVpnRoute *route);
     std::string ToString() const;
     uint8_t GetLevel() const;
 
@@ -84,13 +84,13 @@ public:
 
     void AddTreeRoute();
     void DeleteTreeRoute();
-    UpdateInfo *GetUpdateInfo(InetMVpnTable *table);
+    UpdateInfo *GetUpdateInfo(ErmVpnTable *table);
 
     uint8_t level() const { return level_; }
     uint32_t label() const { return label_; }
     Ip4Address address() const { return address_; }
     std::vector<std::string> encap() const { return encap_; }
-    InetMVpnRoute *route() { return route_; }
+    ErmVpnRoute *route() { return route_; }
     RouteDistinguisher route_distinguisher() const { return rd_; }
     Ip4Address router_id() const { return router_id_; }
 
@@ -104,8 +104,8 @@ private:
     void AddGlobalOListElems(BgpOListPtr olist);
 
     McastSGEntry *sg_entry_;
-    InetMVpnRoute *route_;
-    InetMVpnRoute *tree_route_;
+    ErmVpnRoute *route_;
+    ErmVpnRoute *tree_route_;
     uint8_t level_;
     LabelBlockPtr label_block_;
     uint32_t label_;
@@ -186,8 +186,8 @@ public:
     Ip4Address group() const { return group_; }
     Ip4Address source() const { return source_; }
     McastManagerPartition *partition() { return partition_; }
-    const InetMVpnRoute *tree_route() const { return tree_route_; }
-    void set_tree_route(InetMVpnRoute *route) { tree_route_ = route; }
+    const ErmVpnRoute *tree_route() const { return tree_route_; }
+    void set_tree_route(ErmVpnRoute *route) { tree_route_ = route; }
     void clear_tree_route() { tree_route_ = NULL; }
 
     bool on_work_queue() { return on_work_queue_; }
@@ -209,8 +209,8 @@ private:
     McastManagerPartition *partition_;
     Ip4Address group_, source_;
     McastForwarder *forest_node_;
-    InetMVpnRoute *cmcast_route_;
-    InetMVpnRoute *tree_route_;
+    ErmVpnRoute *cmcast_route_;
+    ErmVpnRoute *tree_route_;
     std::vector<ForwarderList *> forwarder_lists_;
     std::vector<bool> update_needed_;
     bool on_work_queue_;
@@ -332,7 +332,7 @@ public:
         LevelCount = 2,
     };
 
-    McastTreeManager(InetMVpnTable *table);
+    McastTreeManager(ErmVpnTable *table);
     virtual ~McastTreeManager();
 
     virtual void Initialize();
@@ -340,9 +340,9 @@ public:
 
     McastManagerPartition *GetPartition(int part_id);
 
-    virtual UpdateInfo *GetUpdateInfo(InetMVpnRoute *route);
+    virtual UpdateInfo *GetUpdateInfo(ErmVpnRoute *route);
     DBTablePartBase *GetTablePartition(size_t part_id);
-    InetMVpnTable *table() { return table_; }
+    ErmVpnTable *table() { return table_; }
 
     void ManagedDelete();
     void Shutdown();
@@ -361,12 +361,12 @@ private:
     void AllocPartitions();
     void FreePartitions();
     void TreeNodeListener(McastManagerPartition *partition,
-        InetMVpnRoute *route);
+        ErmVpnRoute *route);
     void TreeResultListener(McastManagerPartition *partition,
-        InetMVpnRoute *route);
+        ErmVpnRoute *route);
     void RouteListener(DBTablePartBase *tpart, DBEntryBase *db_entry);
 
-    InetMVpnTable *table_;
+    ErmVpnTable *table_;
     int listener_id_;
     PartitionList partitions_;
 

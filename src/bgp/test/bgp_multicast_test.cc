@@ -11,8 +11,8 @@
 #include "base/test/task_test_util.h"
 #include "bgp/bgp_attr.h"
 #include "bgp/ipeer.h"
-#include "bgp/inetmvpn/inetmvpn_route.h"
-#include "bgp/inetmvpn/inetmvpn_table.h"
+#include "bgp/ermvpn/ermvpn_route.h"
+#include "bgp/ermvpn/ermvpn_table.h"
 #include "bgp/test/bgp_server_test_util.h"
 #include "control-node/control_node.h"
 #include "db/db.h"
@@ -40,7 +40,7 @@ public:
     }
     virtual ~XmppPeerMock() { }
 
-    void AddRoute(InetMVpnTable *table, string group_str, string source_str) {
+    void AddRoute(ErmVpnTable *table, string group_str, string source_str) {
         boost::system::error_code ec;
         RouteDistinguisher rd(address_.to_ulong(), 65535);
         Ip4Address group = Ip4Address::from_string(group_str.c_str(), ec);
@@ -48,17 +48,17 @@ public:
 
         DBRequest req;
         req.oper = DBRequest::DB_ENTRY_ADD_CHANGE;
-        InetMVpnPrefix prefix(rd, group, source);
-        req.key.reset(new InetMVpnTable::RequestKey(prefix, this));
-        req.data.reset(new InetMVpnTable::RequestData(attr, 0, 0));
+        ErmVpnPrefix prefix(rd, group, source);
+        req.key.reset(new ErmVpnTable::RequestKey(prefix, this));
+        req.data.reset(new ErmVpnTable::RequestData(attr, 0, 0));
         table->Enqueue(&req);
     }
 
-    void AddRoute(InetMVpnTable *table, string group_str) {
+    void AddRoute(ErmVpnTable *table, string group_str) {
         AddRoute(table, group_str, "0.0.0.0");
     }
 
-    void DelRoute(InetMVpnTable *table, string group_str, string source_str) {
+    void DelRoute(ErmVpnTable *table, string group_str, string source_str) {
         boost::system::error_code ec;
         RouteDistinguisher rd(address_.to_ulong(), 65535);
         Ip4Address group = Ip4Address::from_string(group_str.c_str(), ec);
@@ -66,12 +66,12 @@ public:
 
         DBRequest req;
         req.oper = DBRequest::DB_ENTRY_DELETE;
-        InetMVpnPrefix prefix(rd, group, source);
-        req.key.reset(new InetMVpnTable::RequestKey(prefix, this));
+        ErmVpnPrefix prefix(rd, group, source);
+        req.key.reset(new ErmVpnTable::RequestKey(prefix, this));
         table->Enqueue(&req);
     }
 
-    void DelRoute(InetMVpnTable *table, string group_str) {
+    void DelRoute(ErmVpnTable *table, string group_str) {
         DelRoute(table, group_str, "0.0.0.0");
     }
 
@@ -128,16 +128,16 @@ protected:
         scheduler->Start();
         task_util::WaitForIdle();
 
-        red_table_ = static_cast<InetMVpnTable *>(
-            server_.database()->FindTable("red.inetmvpn.0"));
+        red_table_ = static_cast<ErmVpnTable *>(
+            server_.database()->FindTable("red.ermvpn.0"));
         red_tm_ = red_table_->tree_manager_;
         TASK_UTIL_EXPECT_EQ(red_table_, red_tm_->table_);
         TASK_UTIL_EXPECT_EQ(DB::PartitionCount(),
                             (int)red_tm_->partitions_.size());
         TASK_UTIL_EXPECT_NE(-1, red_tm_->listener_id_);
 
-        green_table_ = static_cast<InetMVpnTable *>(
-            server_.database()->FindTable("green.inetmvpn.0"));
+        green_table_ = static_cast<ErmVpnTable *>(
+            server_.database()->FindTable("green.ermvpn.0"));
         green_tm_ = green_table_->tree_manager_;
         TASK_UTIL_EXPECT_EQ(green_table_, green_tm_->table_);
         TASK_UTIL_EXPECT_EQ(DB::PartitionCount(),
@@ -163,7 +163,7 @@ protected:
         }
     }
 
-    void AddRoutePeers(InetMVpnTable *table,
+    void AddRoutePeers(ErmVpnTable *table,
             string group_str, string source_str, bool even, bool odd) {
         for (vector<XmppPeerMock *>::iterator it = peers_.begin();
              it != peers_.end(); ++it) {
@@ -174,34 +174,34 @@ protected:
         }
     }
 
-    void AddRouteAllPeers(InetMVpnTable *table,
+    void AddRouteAllPeers(ErmVpnTable *table,
             string group_str, string source_str) {
         AddRoutePeers(table, group_str, source_str, true, true);
     }
 
-    void AddRouteAllPeers(InetMVpnTable *table, string group_str) {
+    void AddRouteAllPeers(ErmVpnTable *table, string group_str) {
         AddRouteAllPeers(table, group_str, "0.0.0.0");
     }
 
-    void AddRouteEvenPeers(InetMVpnTable *table,
+    void AddRouteEvenPeers(ErmVpnTable *table,
             string group_str, string source_str) {
         AddRoutePeers(table, group_str, source_str, true, false);
     }
 
-    void AddRouteEvenPeers(InetMVpnTable *table, string group_str) {
+    void AddRouteEvenPeers(ErmVpnTable *table, string group_str) {
         AddRouteEvenPeers(table, group_str, "0.0.0.0");
     }
 
-    void AddRouteOddPeers(InetMVpnTable *table,
+    void AddRouteOddPeers(ErmVpnTable *table,
             string group_str, string source_str) {
         AddRoutePeers(table, group_str, source_str, false, true);
     }
 
-    void AddRouteOddPeers(InetMVpnTable *table, string group_str) {
+    void AddRouteOddPeers(ErmVpnTable *table, string group_str) {
         AddRouteOddPeers(table, group_str, "0.0.0.0");
     }
 
-    void DelRoutePeers(InetMVpnTable *table,
+    void DelRoutePeers(ErmVpnTable *table,
             string group_str, string source_str, bool even, bool odd) {
         for (vector<XmppPeerMock *>::iterator it = peers_.begin();
              it != peers_.end(); ++it) {
@@ -212,34 +212,34 @@ protected:
         }
     }
 
-    void DelRouteAllPeers(InetMVpnTable *table,
+    void DelRouteAllPeers(ErmVpnTable *table,
             string group_str, string source_str) {
         DelRoutePeers(table, group_str, source_str, true, true);
     }
 
-    void DelRouteAllPeers(InetMVpnTable *table, string group_str) {
+    void DelRouteAllPeers(ErmVpnTable *table, string group_str) {
         DelRouteAllPeers(table, group_str, "0.0.0.0");
     }
 
-    void DelRouteEvenPeers(InetMVpnTable *table,
+    void DelRouteEvenPeers(ErmVpnTable *table,
             string group_str, string source_str) {
         DelRoutePeers(table, group_str, source_str, true, false);
     }
 
-    void DelRouteEvenPeers(InetMVpnTable *table, string group_str) {
+    void DelRouteEvenPeers(ErmVpnTable *table, string group_str) {
         DelRouteEvenPeers(table, group_str, "0.0.0.0");
     }
 
-    void DelRouteOddPeers(InetMVpnTable *table,
+    void DelRouteOddPeers(ErmVpnTable *table,
             string group_str, string source_str) {
         DelRoutePeers(table, group_str, source_str, false, true);
     }
 
-    void DelRouteOddPeers(InetMVpnTable *table, string group_str) {
+    void DelRouteOddPeers(ErmVpnTable *table, string group_str) {
         DelRouteOddPeers(table, group_str, "0.0.0.0");
     }
 
-    void VerifyRouteCount(InetMVpnTable *table, size_t count) {
+    void VerifyRouteCount(ErmVpnTable *table, size_t count) {
         TASK_UTIL_EXPECT_EQ(count, table->Size());
     }
 
@@ -253,7 +253,7 @@ protected:
         TASK_UTIL_EXPECT_EQ(count, total);
     }
 
-    void VerifyForwarderProperties(InetMVpnTable *table,
+    void VerifyForwarderProperties(ErmVpnTable *table,
             McastForwarder *forwarder) {
         ConcurrencyScope scope("db::DBTable");
 
@@ -272,7 +272,7 @@ protected:
         EXPECT_LE(olist->elements.size(), McastTreeManager::kDegree + 1);
     }
 
-    void VerifyOnlyForwarderProperties(InetMVpnTable *table,
+    void VerifyOnlyForwarderProperties(ErmVpnTable *table,
             McastForwarder *forwarder) {
         ConcurrencyScope scope("db::DBTable");
 
@@ -343,8 +343,8 @@ protected:
 
     EventManager evm_;
     BgpServer server_;
-    InetMVpnTable *red_table_;
-    InetMVpnTable *green_table_;
+    ErmVpnTable *red_table_;
+    ErmVpnTable *green_table_;
     McastTreeManager *red_tm_;
     McastTreeManager *green_tm_;
     scoped_ptr<BgpInstanceConfig> master_cfg_;

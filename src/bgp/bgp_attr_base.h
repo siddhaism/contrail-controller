@@ -65,7 +65,7 @@ struct BgpProtoPrefix : public ParseObject {
     BgpProtoPrefix();
     std::vector<uint8_t> prefix;
     int prefixlen;
-    uint8_t type; // only applicable for evpn and inetmvpn
+    uint8_t type; // only applicable for evpn and ermvpn
 };
 
 // Base class to manage BGP Path Attributes database. This class provides

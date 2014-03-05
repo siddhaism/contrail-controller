@@ -25,8 +25,8 @@
 #include "bgp/bgp_session_manager.h"
 #include "bgp/bgp_peer_types.h"
 #include "bgp/bgp_sandesh.h"
+#include "bgp/ermvpn/ermvpn_table.h"
 #include "bgp/evpn/evpn_table.h"
-#include "bgp/inetmvpn/inetmvpn_table.h"
 #include "bgp/inet/inet_table.h"
 #include "bgp/l3vpn/inetvpn_table.h"
 #include "bgp/routing-instance/peer_manager.h"
@@ -431,8 +431,8 @@ bool BgpPeer::IsFamilyNegotiated(Address::Family family) {
     case Address::EVPN:
         return MpNlriAllowed(BgpAf::L2Vpn, BgpAf::EVpn);
         break;
-    case Address::INETMVPN:
-        return MpNlriAllowed(BgpAf::IPv4, BgpAf::McastVpn);
+    case Address::ERMVPN:
+        return MpNlriAllowed(BgpAf::IPv4, BgpAf::ErmVpn);
         break;
     default:
         break;
@@ -582,8 +582,8 @@ void BgpPeer::RegisterAllTables() {
         }
     }
 
-    if (IsFamilyNegotiated(Address::INETMVPN)) {
-        BgpTable *vtable = instance->GetTable(Address::INETMVPN);
+    if (IsFamilyNegotiated(Address::ERMVPN)) {
+        BgpTable *vtable = instance->GetTable(Address::ERMVPN);
         BGP_LOG_PEER_TABLE(this, SandeshLevel::SYS_DEBUG, BGP_LOG_FLAG_TRACE,
                            vtable, "Register peer with the table");
         if (vtable) {
@@ -611,7 +611,7 @@ void BgpPeer::SendOpen(TcpSession *session) {
         { 0, BgpAf::IPv4,  0, BgpAf::Unicast },
         { 0, BgpAf::IPv4,  0, BgpAf::Vpn },
         { 0, BgpAf::L2Vpn, 0, BgpAf::EVpn },
-        { 0, BgpAf::IPv4, 0, BgpAf::McastVpn },
+        { 0, BgpAf::IPv4, 0, BgpAf::ErmVpn },
     };
 
     BgpProto::OpenMessage::OptParam *opt_param =
@@ -638,7 +638,7 @@ void BgpPeer::SendOpen(TcpSession *session) {
                         cap_mp[2], 4);
         opt_param->capabilities.push_back(cap);
     }
-    if (LookupFamily(Address::INETMVPN)) {
+    if (LookupFamily(Address::ERMVPN)) {
         BgpProto::OpenMessage::Capability *cap =
                 new BgpProto::OpenMessage::Capability(
                         BgpProto::OpenMessage::Capability::MpExtension,
@@ -946,26 +946,26 @@ void BgpPeer::ProcessUpdate(const BgpProto::Update *msg) {
             break;
         }
 
-        case Address::INETMVPN: {
-            InetMVpnTable *table;
-            table = static_cast<InetMVpnTable *>(instance->GetTable(family));
+        case Address::ERMVPN: {
+            ErmVpnTable *table;
+            table = static_cast<ErmVpnTable *>(instance->GetTable(family));
             assert(table);
 
             vector<BgpProtoPrefix *>::const_iterator it;
             for (it = nlri->nlri.begin(); it < nlri->nlri.end(); it++) {
-                if (!InetMVpnPrefix::IsValidForBgp((*it)->type)) {
+                if (!ErmVpnPrefix::IsValidForBgp((*it)->type)) {
                     BGP_LOG_PEER(Message, this, SandeshLevel::SYS_WARN,
                         BGP_LOG_FLAG_ALL, BGP_PEER_DIR_IN,
-                        "INETMVPN: Unsupported route type " << (*it)->type);
+                        "ERMVPN: Unsupported route type " << (*it)->type);
                     continue;
                 }
                 DBRequest req;
                 req.oper = oper;
                 if (oper == DBRequest::DB_ENTRY_ADD_CHANGE)
-                    req.data.reset(new InetMVpnTable::RequestData(attr, flags,
+                    req.data.reset(new ErmVpnTable::RequestData(attr, flags,
                                                               0));
-                req.key.reset(new InetMVpnTable::RequestKey(
-                                  InetMVpnPrefix(**it), this));
+                req.key.reset(new ErmVpnTable::RequestKey(
+                                  ErmVpnPrefix(**it), this));
                 table->Enqueue(&req);
             }
             break;

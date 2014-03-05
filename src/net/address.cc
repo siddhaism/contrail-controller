@@ -25,7 +25,7 @@ static const std::map<string, Address::Family>
         ("inet6mcast", Address::INET6MCAST)
         ("enet", Address::ENET)
         ("e-vpn", Address::EVPN)
-        ("inet-mvpn", Address::INETMVPN);
+        ("erm-vpn", Address::ERMVPN);
 
 static const std::map<Address::Family, string>  
     toString = boost::assign::map_list_of
@@ -41,7 +41,7 @@ static const std::map<Address::Family, string>
         (Address::INET6MCAST, "inet6mcast")
         (Address::ENET, "enet")
         (Address::EVPN, "e-vpn")
-        (Address::INETMVPN, "inet-mvpn");
+        (Address::ERMVPN, "erm-vpn");
 
 static const std::map<string, Address::Family>
     fromTableName = boost::assign::map_list_of
@@ -57,7 +57,7 @@ static const std::map<string, Address::Family>
         ("inet6mcast", Address::INET6MCAST)
         ("enet", Address::ENET)
         ("evpn", Address::EVPN)
-        ("inetmvpn", Address::INETMVPN);
+        ("ermvpn", Address::ERMVPN);
 
 static const std::map<Address::Family, string>
     toTableName = boost::assign::map_list_of
@@ -73,7 +73,7 @@ static const std::map<Address::Family, string>
         (Address::INET6MCAST, "inet6mcast")
         (Address::ENET, "enet")
         (Address::EVPN, "evpn")
-        (Address::INETMVPN, "inetmvpn");
+        (Address::ERMVPN, "ermvpn");
 
 Address::Family Address::FamilyFromString(std::string family) {
     return fromString.find(family)->second;

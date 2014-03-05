@@ -220,7 +220,7 @@ const char *MiniSystemTest::config_tmpl = "\
         <session to=\'B\'>\
             <address-families>\
             <family>inet-vpn</family>\
-            <family>inet-mvpn</family>\
+            <family>erm-vpn</family>\
             </address-families>\
         </session>\
     </bgp-router>\
@@ -231,7 +231,7 @@ const char *MiniSystemTest::config_tmpl = "\
         <session to=\'A\'>\
             <address-families>\
             <family>inet-vpn</family>\
-            <family>inet-mvpn</family>\
+            <family>erm-vpn</family>\
             </address-families>\
         </session>\
     </bgp-router>\

@@ -125,7 +125,7 @@ class RtUnicastTest : public ::testing::Test {
                     << control_nodes_[j]->localname() << "\'>"
                     << "<address-families>"
                     << "<family>inet-vpn</family>"
-                    << "<family>inet-mvpn</family>"
+                    << "<family>erm-vpn</family>"
                     << "</address-families>"
                     << "</session>";                
             }
