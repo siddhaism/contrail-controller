@@ -6,6 +6,7 @@
 #include <cmn/agent_cmn.h>
 
 #include <base/logging.h>
+#include <base/timer.h>
 #include <oper/route_common.h>
 #include <oper/interface_common.h>
 #include <oper/nexthop.h>
@@ -19,8 +20,10 @@
 #include <sandesh/sandesh_constants.h>
 #include <sandesh/sandesh.h>
 #include <sandesh/sandesh_trace.h>
+#include <tbb/mutex.h>
 
 using namespace std;
+#define INVALID_PEER_IDENTIFIER 0xFFFFFFFFFFFFFFFF
 
 MulticastHandler *MulticastHandler::obj_;
 SandeshTraceBufferPtr MulticastTraceBuf(SandeshTraceBufferCreate("Multicast",
@@ -170,7 +173,7 @@ void MulticastHandler::DeleteSubnetRoute(const std::string &vrf_name,
         this->FindGroupObject(vrf_name, addr);
     if (subnet_broadcast != NULL) {
         subnet_broadcast->Deleted(true);
-        subnet_broadcast->SetSourceMPLSLabel(0);
+        subnet_broadcast->FlushAllPeerInfo(INVALID_PEER_IDENTIFIER);
         MCTRACE(Log, "rt gone mc obj marked for deletion for subnet route ", 
                 vrf_name, addr.to_string(), 0);
     }
@@ -497,7 +500,7 @@ void MulticastHandler::DeleteRouteandMPLS(MulticastGroupObject *obj)
         Layer2AgentRouteTable::DeleteBroadcastReq(obj->vrf_name());
     }
     /* delete the MPLS label route */
-    obj->SetSourceMPLSLabel(0);
+    obj->FlushAllPeerInfo(INVALID_PEER_IDENTIFIER);
     MCTRACE(Log, "delete route mpls ", obj->vrf_name(),
             obj->GetGroupAddress().to_string(),
             obj->GetSourceMPLSLabel());
@@ -534,7 +537,7 @@ void MulticastHandler::DeleteVmInterface(const Interface *intf)
         if((*it)->GetLocalListSize() == 0) {
             MCTRACE(Info, "Del vm notify ", vm_itf->ip_addr().to_string());
             //Empty tunnel list
-            (*it)->FlushAllFabricOlist();
+            (*it)->FlushAllPeerInfo(INVALID_PEER_IDENTIFIER);
             //Update comp nh
             if ((*it)->IsDeleted() == false) {
                 this->TriggerCompositeNHChange(*it);
@@ -559,6 +562,7 @@ void MulticastHandler::DeleteVmInterface(const Interface *intf)
 //Delete multicast object for vrf/G
 void MulticastHandler::DeleteMulticastObject(const std::string &vrf_name,
                                              const Ip4Address &grp_addr) {
+    tbb::mutex::scoped_lock lock(mutex_);
     MCTRACE(Log, "delete obj  vrf/grp/size ", vrf_name, grp_addr.to_string(),
         this->GetMulticastObjList().size());
     for(std::set<MulticastGroupObject *>::iterator it =
@@ -834,13 +838,26 @@ void MulticastHandler::AddVmInterfaceInSubnet(const std::string &vrf_name,
 /*
  * Release all info coming via ctrl node for this multicast object
  */
-bool MulticastGroupObject::ModifyFabricMembers(const TunnelOlist &olist) 
+bool MulticastGroupObject::ModifyFabricMembers(const TunnelOlist &olist, 
+                                               uint64_t peer_identifier,
+                                               bool delete_op, uint32_t label) 
 {
     DBRequest req;
     NextHopKey *key; 
     TunnelNHData *tnh_data;
 
-    GetTunnelOlist().clear();
+    tbb::mutex::scoped_lock lock(mutex_);
+    //Ignore any modification operation for lesser value as obj is updated 
+    if (peer_identifier < peer_identifier_) {
+        return true;
+    }
+    tunnel_olist_.clear();
+    SetSourceMPLSLabel(label);
+    if (delete_op) {
+        return true;
+    }
+
+    peer_identifier_ = peer_identifier;
 
     for (TunnelOlist::const_iterator it = olist.begin();
          it != olist.end(); it++) {
@@ -871,7 +888,8 @@ void MulticastHandler::ModifyFabricMembers(const std::string &vrf_name,
                                            const Ip4Address &grp, 
                                            const Ip4Address &src, 
                                            uint32_t label, 
-                                           const TunnelOlist &olist)
+                                           const TunnelOlist &olist,
+                                           uint64_t peer_identifier)
 {
     MulticastGroupObject *obj = 
         MulticastHandler::GetInstance()->FindGroupObject(vrf_name, grp);
@@ -883,8 +901,7 @@ void MulticastHandler::ModifyFabricMembers(const std::string &vrf_name,
         return;
     }
 
-    obj->SetSourceMPLSLabel(label);
-    if (obj->ModifyFabricMembers(olist) == true) {
+    if (obj->ModifyFabricMembers(olist, peer_identifier, false, label) == true) {
         MulticastHandler::GetInstance()->TriggerCompositeNHChange(obj);
     }
 
@@ -892,22 +909,34 @@ void MulticastHandler::ModifyFabricMembers(const std::string &vrf_name,
 }
 
 //Helper to delete fabric nh
-void MulticastGroupObject::FlushAllFabricOlist() {
-    GetTunnelOlist().clear();
+void MulticastGroupObject::FlushAllPeerInfo(uint64_t peer_identifier) {
+    TunnelOlist olist;
+    ModifyFabricMembers(olist, peer_identifier, true, 0);
 }
 
 /*
  * XMPP peer has gone down, so flush off all the information
  * coming via control node i.e. MPLS label and tunnel info
  */
-void MulticastHandler::HandlePeerDown() {
-    for (std::set<MulticastGroupObject *>::iterator it =
-         MulticastHandler::GetInstance()->GetMulticastObjList().begin(); 
-         it != MulticastHandler::GetInstance()->GetMulticastObjList().end(); it++) {
-        //Delete the label
-        (*it)->SetSourceMPLSLabel(0);
+void MulticastHandler::RemoveStaleBgpPeer(uint64_t peer_sequence) {
+    Timer *timer = MulticastHandler::GetInstance()->stale_timer();
+    //Start a timer
+    if (timer) {
+        timer->Cancel();
+    }
+    timer = TimerManager::CreateTimer(*(Agent::GetInstance()->
+                GetEventManager()->io_service()), "MulticastOldPeerFlushTimer");
+    timer->Start(kMulticastTimeout, boost::bind(&MulticastHandler::TimerExpired,
+                            MulticastHandler::GetInstance(), peer_sequence));
+}
+
+bool MulticastHandler::TimerExpired(uint64_t peer_sequence) {
+    tbb::mutex::scoped_lock lock(mutex_);
+    for (std::set<MulticastGroupObject *>::iterator it = 
+         GetMulticastObjList().begin(); it != GetMulticastObjList().end(); 
+         it++) {
         //Empty the tunnel OLIST
-        (*it)->FlushAllFabricOlist();
+        (*it)->FlushAllPeerInfo(peer_sequence);
         //Update comp NH
         //Ignore modification of comp NH if route is not present i.e. multicast
         //object is marked for deletion.
@@ -915,6 +944,7 @@ void MulticastHandler::HandlePeerDown() {
             MulticastHandler::GetInstance()->TriggerCompositeNHChange(*it);
         }
     }
+    return true;
 }
 
 /*
@@ -960,7 +990,7 @@ void MulticastHandler::Shutdown() {
          MulticastHandler::GetInstance()->GetMulticastObjList().begin(); 
          it != MulticastHandler::GetInstance()->GetMulticastObjList().end(); it++) {
         //Empty the tunnel OLIST
-        (*it)->FlushAllFabricOlist();
+        (*it)->FlushAllPeerInfo(INVALID_PEER_IDENTIFIER);
         //Update comp NH
         MulticastHandler::GetInstance()->TriggerCompositeNHChange(*it);
         //Delete the label and route
