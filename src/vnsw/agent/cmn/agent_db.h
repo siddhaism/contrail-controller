@@ -80,6 +80,7 @@ struct AgentKey : public DBRequestKey {
         // Change an entry if its already present and not in deleted state
         // Its a no-op if entry is not present or is in deleted state
         RESYNC,
+        STALE,
     } DBSubOperation;
 
     AgentKey() : DBRequestKey(), sub_op_(ADD_DEL_CHANGE) { };
