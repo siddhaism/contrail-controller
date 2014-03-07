@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <boost/bind.hpp>
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/program_options.hpp>
@@ -15,11 +16,15 @@
 
 #include <base/task.h>
 #include <base/logging.h>
+#include <base/cpuinfo.h>
+#include <base/timer.h>
 #include <sandesh/sandesh_types.h>
 #include <sandesh/sandesh.h>
 #include <sandesh/common/vns_constants.h>
 #include <sandesh/common/vns_types.h>
 #include <sandesh/common/flow_types.h>
+
+#include <vrouter_types.h>
 
 namespace opt = boost::program_options;
 
@@ -50,7 +55,9 @@ public:
         num_flows_per_vm_(num_flows_per_vm),
         rgen_(std::time(0)),
         u_rgen_(&rgen_),
-        evm_(evm) {
+        evm_(evm),
+        cpu_info_timer_(NULL) {
+        vrouter_stats_.set_name(hostname_);
     }
 
     bool Run() {
@@ -64,10 +71,29 @@ public:
         SendFlowTask *ftask(new SendFlowTask(this,
             scheduler->GetTaskId("mockgen::SendFlowTask"), -1));
         scheduler->Enqueue(ftask);
+        // Start 60 sec timer to send CPU info
+        cpu_info_timer_ = TimerManager::CreateTimer(*evm_->io_service(),
+                                                    "CPU Info Timer");
+        cpu_info_timer_->Start(60 * 1000,
+            boost::bind(&MockGenerator::CpuInfoTimerHandler, this), NULL);
         return true; 
     }
 
 private:
+
+    bool CpuInfoTimerHandler() {
+        CpuLoadData::FillCpuInfo(vrouter_cpu_info_, true);
+        vrouter_stats_.set_cpu_info(vrouter_cpu_info_);
+        vrouter_stats_.set_cpu_share(vrouter_cpu_info_.get_cpu_share());
+        vrouter_stats_.set_virt_mem(
+            vrouter_cpu_info_.get_meminfo().get_virt());
+        vrouter_stats_.set_used_sys_mem(
+            vrouter_cpu_info_.get_sys_mem_info().get_used());
+        vrouter_stats_.set_one_min_avg_cpuload(
+            vrouter_cpu_info_.get_cpuload().get_one_min_avg());
+        VrouterStats::Send(vrouter_stats_);
+        return true;
+    }
 
     class SendFlowTask : public Task {
     public:
@@ -193,6 +219,9 @@ private:
     boost::random::mt19937 rgen_;
     boost::uuids::random_generator u_rgen_;
     EventManager *evm_;
+    Timer *cpu_info_timer_;
+    CpuLoadInfo vrouter_cpu_info_;
+    VrouterStatsAgent vrouter_stats_;
 
     friend class SendFlowTask;
 };
@@ -249,6 +278,7 @@ int main(int argc, char *argv[]) {
     }
 
     LoggingInit();
+    CpuLoadData::Init();
 
     int gen_id(var_map["generator_id"].as<int>());
     int ngens(var_map["num_generators"].as<int>());
