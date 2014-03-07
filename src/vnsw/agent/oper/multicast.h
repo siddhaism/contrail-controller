@@ -168,10 +168,11 @@ public:
                                     const Ip4Address &source, 
                                     uint32_t source_label,
                                     const TunnelOlist &olist,
-                                    uint64_t peer_identifier);
+                                    uint64_t peer_identifier = 0);
     /* Ctrl node came up, start timer to flush all source label and 
      * tunnel sent by former peer */
     static void RemoveStaleBgpPeer(uint64_t peer_sequence);
+    static void CancelStaleBgpPeerTimer();
     //Registered for VN notification
     static void ModifyVN(DBTablePartBase *partition, DBEntryBase *e);
     //Registered for VM notification

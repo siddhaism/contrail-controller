@@ -930,6 +930,13 @@ void MulticastHandler::RemoveStaleBgpPeer(uint64_t peer_sequence) {
                             MulticastHandler::GetInstance(), peer_sequence));
 }
 
+void MulticastHandler::CancelStaleBgpPeerTimer() {
+    Timer *timer = MulticastHandler::GetInstance()->stale_timer();
+    if (timer) {
+        timer->Cancel();
+    }
+}
+
 bool MulticastHandler::TimerExpired(uint64_t peer_sequence) {
     tbb::mutex::scoped_lock lock(mutex_);
     for (std::set<MulticastGroupObject *>::iterator it = 

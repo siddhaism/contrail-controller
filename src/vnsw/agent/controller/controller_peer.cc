@@ -787,7 +787,7 @@ void AgentXmppChannel::HandleXmppClientChannelEvent(AgentXmppChannel *peer,
 
             } else {
                 Agent::GetInstance()->SetControlNodeMulticastBuilder(NULL);
-
+                MulticastHandler::CancelStaleBgpPeerTimer();
                 CONTROLLER_TRACE(Session, peer->GetXmppServer(), "NOT_READY", "NULL",
                                  "No elected Multicast Tree Builder"); 
             }

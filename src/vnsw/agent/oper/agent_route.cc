@@ -147,6 +147,10 @@ bool AgentRouteTable::DelExplicitRouteWalkerCb(DBTablePartBase *part,
 bool AgentRouteTable::PathSelection(const Path &path1, const Path &path2) {
     const AgentPath &l_path = dynamic_cast<const AgentPath &> (path1);
     const AgentPath &r_path = dynamic_cast<const AgentPath &> (path2);
+
+    if (l_path.is_stale() != r_path.is_stale()) {
+        return (l_path.is_stale() < r_path.is_stale());
+    }
     return l_path.peer()->IsLess(r_path.peer());
 }
 
@@ -290,23 +294,30 @@ void AgentRouteTable::Input(DBTablePartition *part, DBClient *client,
     AgentRoute *rt = static_cast<AgentRoute *>(part->Find(key));
 
     if (req->oper == DBRequest::DB_ENTRY_ADD_CHANGE) {
-        if (key->sub_op_ == AgentKey::RESYNC) {
-            // Ignore RESYNC if received on deleted VRF
-            if(vrf->IsDeleted()) {
-                return;
-            }
+        // Ignore ADD_CHANGE if received on deleted VRF
+        if(vrf->IsDeleted()) {
+            return;
+        }
 
+        if (key->sub_op_ == AgentKey::RESYNC) {
             // Ignore RESYNC if received on non-existing or deleted route entry
             if (rt && (rt->IsDeleted() == false)) {
                 rt->Sync();
                 notify = true;
             }
-        } else if (key->sub_op_ == AgentKey::ADD_DEL_CHANGE) {
-            // Ignore ADD_CHANGE if received on deleted VRF
-            if(vrf->IsDeleted()) {
+        } else if (key->sub_op_ == AgentKey::STALE) {
+            path = rt->FindPath(key->peer());
+            if (path == NULL) {
                 return;
             }
 
+            if (rt && (rt->IsDeleted() == false)) {
+                path->set_is_stale(true);
+                rt->GetPathList().sort(&AgentRouteTable::PathSelection);
+                rt->Sync();
+                notify = true;
+            }
+        } else if (key->sub_op_ == AgentKey::ADD_DEL_CHANGE) {
             // Renew the route if its in deleted state
             if (rt && rt->IsDeleted()) {
                 rt->ClearDelete();
@@ -350,6 +361,7 @@ void AgentRouteTable::Input(DBTablePartition *part, DBClient *client,
                 OPER_TRACE(Route, rt_info);
             } else {
                 // Let path know of route change and update itself
+                path->set_is_stale(false);
                 notify = data->AddChangePath(agent_, path);
                 RouteInfo rt_info;
 
@@ -726,4 +738,13 @@ bool AgentRoute::Sync(void) {
         }
     }
     return ret;
+}
+
+bool AgentRoute::StalePathFromPeer(DBTablePartBase *part, const Peer *peer) {
+    DBRequest  req(DBRequest::DB_ENTRY_ADD_CHANGE);
+    req.key = GetDBRequestKey();
+    (static_cast<AgentKey *>(req.key.get()))->sub_op_ = AgentKey::STALE;
+    (static_cast<AgentRouteKey*>(req.key.get()))->peer_ = peer;
+    get_table()->Enqueue(&req);
+    return true;
 }

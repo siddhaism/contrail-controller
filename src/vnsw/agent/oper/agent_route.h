@@ -228,6 +228,7 @@ public:
     bool HasUnresolvedPath();
     bool CanDissociate() const;
     bool Sync(void);
+    bool StalePathFromPeer(DBTablePartBase *part, const Peer *peer);
 
     //TODO Move dependantroutes and nh  to inet4
     void UpdateDependantRoutes();// analogous to updategatewayroutes
