@@ -146,6 +146,7 @@ public:
     bool DeleteAllBgpPath(DBTablePartBase *part, DBEntryBase *entry);
     bool DelExplicitRouteWalkerCb(DBTablePartBase *part, DBEntryBase *entry);
     bool DelPeerRoutes(DBTablePartBase *part, DBEntryBase *entry, Peer *peer);
+    bool StalePeerRoutes(DBTablePartBase *part, DBEntryBase *entry, Peer *peer);
 
     // Lifetime actor routines
     LifetimeActor *deleter();
@@ -168,6 +169,8 @@ private:
     void Input(DBTablePartition *part, DBClient *client, DBRequest *req);
     void DeletePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
                             const Peer *peer);
+    void StalePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
+                            const Peer *peer);
 
     Agent *agent_;
     UnresolvedRouteTree unresolved_rt_tree_;
@@ -187,6 +190,7 @@ public:
         ADD_PATH,
         DELETE_PATH,
         CHANGE_PATH,
+        STALE_PATH,
     };
 
     typedef DependencyList<AgentRoute, AgentRoute> RouteDependencyList;
