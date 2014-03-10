@@ -764,6 +764,7 @@ bool AgentRoute::StalePathFromPeer(DBTablePartBase *part, const Peer *peer) {
     req.key = GetDBRequestKey();
     (static_cast<AgentKey *>(req.key.get()))->sub_op_ = AgentKey::STALE;
     (static_cast<AgentRouteKey*>(req.key.get()))->peer_ = peer;
+    //TODO can this be made part->Process(NULL, &req);
     get_table()->Enqueue(&req);
     return true;
 }
