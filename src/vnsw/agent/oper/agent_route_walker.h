@@ -39,6 +39,7 @@
 
 class AgentRouteWalker {
 public:
+    typedef boost::function<void()> WalkDone;
     enum WalkType {
         UNICAST,
         MULTICAST,
@@ -63,13 +64,20 @@ public:
 
     virtual void VrfWalkDone(DBTableBase *part);
     virtual void RouteWalkDone(DBTableBase *part);
-    bool IsWalkCompleted();
+    void WalkDoneCallback(WalkDone cb);
+    uint32_t walk_count() const {return walk_count_;}
+    bool IsWalkCompleted() const {return (walk_count_ == 0);}
+    const Agent *agent() const {return agent_;}
 
 private:
+    void DecrementWalkCount();
+
     Agent *agent_;
     AgentRouteWalker::WalkType walk_type_;    
+    uint32_t walk_count_;
     DBTableWalker::WalkId vrf_walkid_;
     VrfRouteWalkerIdMap route_walkid_[Agent::ROUTE_TABLE_MAX];
+    WalkDone walk_done_cb_;
     DISALLOW_COPY_AND_ASSIGN(AgentRouteWalker);
 };
 
