@@ -11,8 +11,9 @@
 using namespace std;
 
 AgentRouteWalker::AgentRouteWalker(Agent *agent, WalkType type) :
-    agent_(agent), walk_type_(type), walk_count_(0), 
+    agent_(agent), walk_type_(type),
     vrf_walkid_(DBTableWalker::kInvalidWalkerId), walk_done_cb_() {
+    walk_count_ = AgentRouteWalker::kInvalidWalkCount;
     for (uint8_t table_type = 0; table_type < Agent::ROUTE_TABLE_MAX; 
          table_type++) {
         route_walkid_[table_type].clear();
@@ -74,10 +75,10 @@ void AgentRouteWalker::StartVrfWalk()
                                     boost::bind(&AgentRouteWalker::VrfWalkDone, 
                                                 this, _1));
     if (vrf_walkid_ != DBTableWalker::kInvalidWalkerId) {
+        IncrementWalkCount();
         AGENT_LOG(AgentRouteWalkerLog, vrf_walkid_, walk_type_,
                   "VRF table walk started ", "", 0);
     }
-    walk_count_++;
 }
 
 /*
@@ -103,11 +104,13 @@ void AgentRouteWalker::StartRouteWalk(const VrfEntry *vrf) {
                                          this, _1, _2),
                              boost::bind(&AgentRouteWalker::RouteWalkDone, 
                                          this, _1));
-        AGENT_LOG(AgentRouteWalkerLog, walkid, walk_type_,
-                  "Route table walk started for vrf ", vrf->GetName(), 
-                  table_type);
-        route_walkid_[table_type][vrf_id] = walkid;
-        walk_count_++;
+        if (walkid != DBTableWalker::kInvalidWalkerId) {
+            IncrementWalkCount();
+            route_walkid_[table_type][vrf_id] = walkid;
+            AGENT_LOG(AgentRouteWalkerLog, walkid, walk_type_,
+                      "Route table walk started for vrf ", vrf->GetName(), 
+                      table_type);
+        }
     }
 }
 
@@ -143,7 +146,8 @@ void AgentRouteWalker::VrfWalkDone(DBTableBase *part) {
     AGENT_LOG(AgentRouteWalkerLog, vrf_walkid_, walk_type_,
               "VRF table walk done ", "",  0);
     vrf_walkid_ = DBTableWalker::kInvalidWalkerId;
-    walk_count_--;
+    DecrementWalkCount();
+    OnWalkComplete();
 }
 
 /*
@@ -167,14 +171,19 @@ void AgentRouteWalker::RouteWalkDone(DBTableBase *part) {
                   walk_type_, "Route table walk done for vrf ", 
                   table->vrf_name(), table_type);
         route_walkid_[table_type].erase(vrf_id);
-        walk_count_--;
+        DecrementWalkCount();
+        OnWalkComplete();
     }
 }
 
 void AgentRouteWalker::DecrementWalkCount() {
-    bool walk_done = false;
+    if (walk_count_ != AgentRouteWalker::kInvalidWalkCount) {
+        walk_count_--;
+    }
+}
 
-    walk_count_--;
+void AgentRouteWalker::OnWalkComplete() {
+    bool walk_done = false;
     if (!walk_count_ && walk_done_cb_) {
         walk_done_cb_();
     }
@@ -187,7 +196,7 @@ void AgentRouteWalker::DecrementWalkCount() {
             if (route_walkid_[table_type].size() != 0) {
                 //Route walk pending
                 walk_done = false;
-                if (!walk_count_) {
+                if (walk_count_ == AgentRouteWalker::kInvalidWalkCount) {
                     assert(0);
                 }
                 break;
