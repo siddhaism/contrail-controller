@@ -281,6 +281,7 @@ public:
     static Type ComputeType(TypeBmap bmap);
     static Type DefaultType() {return default_type_;}
     static TypeBmap DefaultTypeBmap() {return (1 << DefaultType());}
+    static TypeBmap VxlanType() {return (1 << VXLAN);};
     static TypeBmap MplsType() {return ((1 << MPLS_GRE) | (1 << MPLS_UDP));};
     static TypeBmap AllType() {return ((1 << MPLS_GRE) | (1 << MPLS_UDP) | 
                                        (1 << VXLAN));}
@@ -435,7 +436,7 @@ public:
         return DBEntryBase::KeyPtr(new DiscardNHKey());
     };
 
-    static void CreateReq();
+    static void Create();
 
 private:
     DISALLOW_COPY_AND_ASSIGN(DiscardNH);
@@ -547,7 +548,7 @@ public:
         return DBEntryBase::KeyPtr(new ResolveNHKey());
     };
 
-    static void CreateReq();
+    static void Create();
 private:
     DISALLOW_COPY_AND_ASSIGN(ResolveNH);
 };
@@ -772,7 +773,8 @@ public:
     static void DeleteVmInterfaceNHReq(const uuid &intf_uuid);
     static void CreatePacketInterfaceNhReq(const string &ifname);
     static void DeleteHostPortReq(const string &ifname);
-    static void CreateInetInterfaceNextHop(const string &ifname);
+    static void CreateInetInterfaceNextHop(const string &ifname,
+                                           const string &vrf_name);
     static void DeleteInetInterfaceNextHop(const string &ifname);
 
 private:
@@ -1279,10 +1281,15 @@ public:
     static DBTableBase *CreateTable(DB *db, const std::string &name);
     static NextHopTable *GetInstance() {return nexthop_table_;};
 
+    void set_discard_nh(NextHop *nh) { discard_nh_ = nh; }
+    NextHop *discard_nh() const {return discard_nh_;}
+
 private:
-    static NextHopTable *nexthop_table_;
     NextHop *AllocWithKey(const DBRequestKey *k) const;
     virtual std::auto_ptr<DBEntry> GetEntry(const DBRequestKey *key) const;
+
+    NextHop *discard_nh_;
+    static NextHopTable *nexthop_table_;
     DISALLOW_COPY_AND_ASSIGN(NextHopTable);
 };
 #endif // vnsw_agent_nexthop_hpp

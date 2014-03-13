@@ -189,7 +189,7 @@ static bool IntfHasFloatingIp(const Interface *intf) {
 
 static bool IsLinkLocalRoute(const Inet4UnicastRouteEntry *rt) {
     const AgentPath *path = rt->GetActivePath();
-    if (path && path->peer() == Agent::GetInstance()->GetLinkLocalPeer())
+    if (path && path->peer() == Agent::GetInstance()->link_local_peer())
         return true;
 
     return false;
@@ -201,7 +201,7 @@ static const string *RouteToVn(const Inet4UnicastRouteEntry *rt) {
         path = rt->GetActivePath();
     }
     if (path == NULL) {
-        return NULL;
+        return &(Agent::NullString());
     }
 
     return &path->dest_vn_name();
@@ -266,10 +266,10 @@ static void SetInEcmpIndex(const PktInfo *pkt, PktFlowInfo *flow_info,
     } else {
         //Destination on remote server
         //Choose local path, which will also pointed by MPLS label
-        if (in->rt_->FindPath(Agent::GetInstance()->GetLocalVmPeer())) {
+        if (in->rt_->FindPath(Agent::GetInstance()->local_vm_peer())) {
             Agent *agent = static_cast<AgentRouteTable *>
                 (in->rt_->get_table())->agent();
-            nh = in->rt_->FindPath(agent->GetLocalVmPeer())->nexthop(agent);
+            nh = in->rt_->FindPath(agent->local_vm_peer())->nexthop(agent);
         } else {
             const CompositeNH *comp_nh = static_cast<const CompositeNH *>
                 (in->rt_->GetActiveNextHop());
@@ -309,6 +309,61 @@ void PktFlowInfo::SetEcmpFlowInfo(const PktInfo *pkt, const PktControlInfo *in,
     nat_dest_vrf = pkt->vrf;
 }
 
+// For link local services, we bind to a local port & use it as NAT source port.
+// The socket is closed when the flow entry is deleted.
+uint32_t PktFlowInfo::LinkLocalBindPort(const VmEntry *vm, uint8_t proto) {
+    if (vm == NULL)
+        return 0;
+    // Do not allow more than max link local flows
+    if (flow_table->linklocal_flow_count() >=
+        flow_table->agent()->params()->linklocal_system_flows())
+        return 0;
+    if (flow_table->VmLinkLocalFlowCount(vm) >=
+        flow_table->agent()->params()->linklocal_vm_flows())
+        return 0;
+
+    if (proto == IPPROTO_TCP) {
+        linklocal_src_port_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    } else if (proto == IPPROTO_UDP) {
+        linklocal_src_port_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    }
+
+    if (linklocal_src_port_fd == -1) {
+        return 0;
+    }
+
+    // allow the socket to be reused upon close
+    int optval = 1;
+    setsockopt(linklocal_src_port_fd, SOL_SOCKET, SO_REUSEADDR,
+               &optval, sizeof(optval));
+
+    struct sockaddr_in address;
+    memset(&address, '0', sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = 0;
+    address.sin_port = 0;
+    struct sockaddr_in bound_to;
+    socklen_t len = sizeof(bound_to);
+    if (bind(linklocal_src_port_fd, (struct sockaddr*) &address,
+             sizeof(address)) == -1) {
+        goto error;
+    }
+
+    if (getsockname(linklocal_src_port_fd, (struct sockaddr*) &bound_to,
+                    &len) == -1) {
+        goto error;
+    }
+
+    return ntohs(bound_to.sin_port);
+
+error:
+    if (linklocal_src_port_fd != kLinkLocalInvalidFd) {
+        close(linklocal_src_port_fd);
+        linklocal_src_port_fd = kLinkLocalInvalidFd;
+    }
+    return 0;
+}
+
 void PktFlowInfo::LinkLocalServiceFromVm(const PktInfo *pkt, PktControlInfo *in,
                                          PktControlInfo *out) {
     const VmInterface *vm_port = 
@@ -340,11 +395,15 @@ void PktFlowInfo::LinkLocalServiceFromVm(const PktInfo *pkt, PktControlInfo *in,
         // the packet not coming to vrouter for reverse NAT.
         // Destination would be local host (FindLinkLocalService returns this)
         nat_ip_saddr = vm_port->mdata_ip_addr().to_ulong();
+        nat_sport = pkt->sport;
     } else {
         nat_ip_saddr = Agent::GetInstance()->GetRouterId().to_ulong();
+        // we bind to a local port & use it as NAT source port (cannot use
+        // incoming src port); init here and bind in Add;
+        nat_sport = 0;
+        linklocal_bind_local_port = true;
     }
     nat_ip_daddr = nat_server.to_ulong();
-    nat_sport = pkt->sport;
     nat_dport = nat_port;
 
     nat_vrf = dest_vrf;
@@ -475,20 +534,23 @@ void PktFlowInfo::FloatingIpSNat(const PktInfo *pkt, PktControlInfo *in,
     const VmInterface::FloatingIpSet &fip_list = intf->floating_ip_list().list_;
     VmInterface::FloatingIpSet::const_iterator it = fip_list.begin();
     FlowTable *ftable = Agent::GetInstance()->pkt()->flow_table();
+    const Inet4UnicastRouteEntry *rt = out->rt_;
     // Find Floating-IP matching destination-ip
     for ( ; it != fip_list.end(); ++it) {
         if (it->vrf_.get() == NULL) {
             continue;
         }
 
-        out->rt_ = ftable->GetUcRoute(it->vrf_.get(), Ip4Address(pkt->ip_daddr));
-        if (out->rt_ != NULL) {
+        const Inet4UnicastRouteEntry *rt_match = ftable->GetUcRoute(it->vrf_.get(),
+                Ip4Address(pkt->ip_daddr));
+        if (rt_match != NULL) {
+            out->rt_ = rt_match;
             break;
         }
     }
 
-    if (out->rt_ == NULL) {
-        // No floating-ip found
+    if (out->rt_ == rt) {
+        // No change in route, no floating-ip found
         return;
     }
 
@@ -569,8 +631,10 @@ void PktFlowInfo::IngressProcess(const PktInfo *pkt, PktControlInfo *in,
         }
     }
 
-    // If no route for DA and floating-ip configured try floating-ip SNAT
-    if (out->rt_ == NULL) {
+    // If no route for DA or route points to a different VN
+    // and floating-ip configured try floating-ip SNAT
+    if (out->rt_ == NULL ||
+        (in->vn_ != NULL && *RouteToVn(out->rt_) != in->vn_->GetName())) {
         if (IntfHasFloatingIp(in->intf_)) {
             FloatingIpSNat(pkt, in, out);
         }
@@ -709,10 +773,23 @@ void PktFlowInfo::Add(const PktInfo *pkt, PktControlInfo *in,
                 pkt->ip_proto, pkt->sport, pkt->dport);
     FlowEntryPtr flow(Agent::GetInstance()->pkt()->flow_table()->Allocate(key));
 
-    FlowEntryPtr rflow(NULL);
+    if (linklocal_bind_local_port &&
+        flow->linklocal_src_port_fd() == PktFlowInfo::kLinkLocalInvalidFd) {
+        nat_sport = LinkLocalBindPort(in->vm_, pkt->ip_proto);
+        if (!nat_sport) {
+            short_flow = true;
+        }
+    }
+    
+    // In case the packet is for a reverse flow of a linklocal flow,
+    // link to that flow (avoid creating a new reverse flow entry for the case)
+    FlowEntryPtr rflow = flow->reverse_flow_entry();
+    if (rflow && rflow->is_flags_set(FlowEntry::LinkLocalBindLocalSrcPort)) {
+        return;
+    }
+
     uint16_t r_sport;
     uint16_t r_dport;
-
     if (pkt->ip_proto == IPPROTO_ICMP) {
         r_sport = pkt->sport;
         r_dport = pkt->dport;

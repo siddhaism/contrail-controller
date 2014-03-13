@@ -165,11 +165,14 @@ public:
             const VmInterface::SecurityGroupEntrySet sg_list = intf->sg_list().list_;
             VmInterface::SecurityGroupEntrySet::const_iterator it;
             for (it = sg_list.begin(); it != sg_list.end(); it++) {
-                if (it->sg_->GetAcl() == NULL) {
+                if (it->sg_->GetEgressAcl() == NULL &&
+                    it->sg_->GetIngressAcl() == NULL) {
                     continue;
                 }
-                if (FindAcl(flow->match_p().m_sg_acl_l,
-                            it->sg_->GetAcl()) == false) {
+                if (FindAcl(flow->match_p().m_sg_acl_l, 
+                            (it->sg_->GetEgressAcl())) == false &&
+                    FindAcl(flow->match_p().m_sg_acl_l, 
+                            (it->sg_->GetIngressAcl())) == false) {
                     EXPECT_STREQ("SG not found in flow", "");
                     ret = false;
                 }
@@ -204,11 +207,14 @@ public:
             const VmInterface::SecurityGroupEntrySet sg_list = intf->sg_list().list_;
             VmInterface::SecurityGroupEntrySet::const_iterator it;
             for (it = sg_list.begin(); it != sg_list.end(); it++) {
-                if (it->sg_->GetAcl() == NULL) {
+                if (it->sg_->GetEgressAcl() == NULL &&
+                    it->sg_->GetIngressAcl() == NULL) {
                     continue;
                 }
                 if (FindAcl(flow->match_p().m_out_sg_acl_l,
-                            it->sg_->GetAcl()) == false) {
+                            it->sg_->GetEgressAcl()) == false &&
+                    FindAcl(flow->match_p().m_out_sg_acl_l,
+                            it->sg_->GetIngressAcl()) == false) {
                     EXPECT_STREQ("Out SG not found in flow", "");
                     ret = false;
                 }
@@ -232,7 +238,7 @@ public:
         FlowEntry *flow = Agent::GetInstance()->pkt()->flow_table()->Allocate(key);
 
         boost::shared_ptr<PktInfo> pkt_info(new PktInfo());
-        PktFlowInfo info(pkt_info);
+        PktFlowInfo info(pkt_info, Agent::GetInstance()->pkt()->flow_table());
         PktInfo *pkt = pkt_info.get();
         info.source_vn = t->svn_;
         info.dest_vn = t->dvn_;
@@ -399,7 +405,8 @@ TEST_F(FlowTableTest, FlowAdd_non_local_1) {
 int main(int argc, char *argv[]) {
     GETUSERARGS();
 
-    client = TestInit(init_file, ksync_init, true, true, true, (1000000 * 60 * 10));
+    client = TestInit(init_file, ksync_init, true, true, true, (1000000 * 60 * 10),
+            FlowStatsCollector::FlowStatsInterval, true, false);
     if (vm.count("config")) {
         FlowTableTest::eth_itf = Agent::GetInstance()->GetIpFabricItfName();
     } else {

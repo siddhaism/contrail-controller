@@ -41,7 +41,11 @@ AgentXmppChannel::AgentXmppChannel(XmppChannel *channel, std::string xmpp_server
     DBTableBase::ListenerId id = 
         Agent::GetInstance()->GetVrfTable()->Register(boost::bind(&VrfExport::Notify,
                                        this, _1, _2)); 
-    bgp_peer_id_ = new BgpPeer(Agent::GetInstance()->GetXmppServer(xs_idx_), this, id);
+    boost::system::error_code ec;
+    const string &addr = Agent::GetInstance()->GetXmppServer(xs_idx_);
+    Ip4Address ip = Ip4Address::from_string(addr.c_str(), ec);
+    assert(ec.value() == 0);
+    bgp_peer_id_ = new BgpPeer(ip, addr, this, id);
 }
 
 AgentXmppChannel::~AgentXmppChannel() {
@@ -406,7 +410,7 @@ void AgentXmppChannel::AddRemoteEvpnRoute(string vrf_name,
     if (encap == (1 << TunnelType::VXLAN)) {
         VrfEntry *vrf = 
             Agent::GetInstance()->GetVrfTable()->FindVrfFromName(vrf_name);
-        Layer2RouteKey key(Agent::GetInstance()->GetLocalVmPeer(), 
+        Layer2RouteKey key(Agent::GetInstance()->local_vm_peer(), 
                            vrf_name, mac);
         if (vrf != NULL) {
             Layer2RouteEntry *route = 
@@ -434,9 +438,18 @@ void AgentXmppChannel::AddRemoteEvpnRoute(string vrf_name,
         switch(nh->GetType()) {
         case NextHop::INTERFACE: {
             const InterfaceNH *intf_nh = static_cast<const InterfaceNH *>(nh);
-            rt_table->AddLocalVmRouteReq(bgp_peer_id_, intf_nh->GetIfUuid(),
-                                          "", vrf_name, label, encap, 
-                                          mac, prefix_addr, prefix_len);
+            if (encap == TunnelType::VxlanType()) {
+                rt_table->AddLocalVmRouteReq(bgp_peer_id_, intf_nh->GetIfUuid(),
+                                             "", vrf_name,
+                                             MplsTable::kInvalidLabel,
+                                             label, mac, prefix_addr,
+                                             prefix_len);
+            } else {
+                rt_table->AddLocalVmRouteReq(bgp_peer_id_, intf_nh->GetIfUuid(),
+                                             "", vrf_name, label,
+                                             VxLanTable::kInvalidvxlan_id,
+                                             mac, prefix_addr, prefix_len);
+            }
             break;
             }
         default:
