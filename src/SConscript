@@ -14,7 +14,6 @@ subdirs = [
            'base',
            'bgp',
            'cdb',
-           'config',
            'control-node',
            'db',
            'discovery',
@@ -67,6 +66,8 @@ if sys.platform.startswith('linux'):
     BuildEnv.Append(CCFLAGS = ['-DLINUX'])
 elif sys.platform.startswith('darwin'):
     BuildEnv.Append(CCFLAGS = ['-DDARWIN'])
+
+BuildEnv.SConscript(dirs=['config'], exports='BuildEnv')
 
 for dir in subdirs:
     BuildEnv.SConscript(dir + '/SConscript',
