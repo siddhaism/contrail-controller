@@ -68,7 +68,7 @@ public:
     void WalkDoneCallback(WalkDone cb);
     int walk_count() const {return walk_count_;}
     bool IsWalkCompleted() const {return (walk_count_ == 0);}
-    const Agent *agent() const {return agent_;}
+    Agent *agent() const {return agent_;}
 
 private:
     void OnWalkComplete();

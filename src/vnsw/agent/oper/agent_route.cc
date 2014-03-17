@@ -102,16 +102,6 @@ auto_ptr<DBEntry> AgentRouteTable::AllocEntry(const DBRequestKey *k) const {
     return auto_ptr<DBEntry>(static_cast<DBEntry *>(route));
 }
 
-// Delete path from a peer. Deletes route if no path left
-bool AgentRouteTable::DelPeerRoutes(DBTablePartBase *part, 
-                                    DBEntryBase *entry, Peer *peer) {
-    AgentRoute *route = static_cast<AgentRoute *>(entry);
-    if (route) {
-        DeletePathFromPeer(part, route, peer, false);
-    }
-    return true;
-}
-
 bool AgentRouteTable::StalePeerRoutes(DBTablePartBase *part, 
                                       DBEntryBase *entry, Peer *peer) {
     AgentRoute *route = static_cast<AgentRoute *>(entry);
@@ -468,117 +458,6 @@ AgentRoute *AgentRouteTable::FindActiveEntry(const AgentRouteKey *key) {
         return NULL;
     }
     return entry;
-}
-
-bool AgentRouteTable::NotifyRouteEntryWalk(AgentXmppChannel *bgp_xmpp_peer,
-                                  DBState *vrf_entry_state, bool associate,
-                                  bool unicast_walk, bool multicast_walk,
-                                  DBTablePartBase *part, DBEntryBase *entry) {
-    AgentRoute *route = static_cast<AgentRoute *>(entry);
-    VrfExport::State *vs = static_cast<VrfExport::State *>(vrf_entry_state);
-
-    if (!(unicast_walk && multicast_walk)) {
-        if ((unicast_walk && route->is_multicast()) ||
-            (multicast_walk && !route->is_multicast())) {
-            return true;
-        }
-    }
-
-    RouteExport::State *state =
-        static_cast<RouteExport::State *>(route->GetState(part->parent(),
-                      vs->rt_export_[GetTableType()]->GetListenerId()));
-    if (state) {
-        state->force_chg_ = true;
-    }
-
-    vs->rt_export_[GetTableType()]->
-        Notify(bgp_xmpp_peer, associate, GetTableType(), part, entry);
-    return true;
-}
-
-void AgentRouteTable::MulticastRouteNotifyDone(DBTableBase *base,
-                                      DBState *state, Peer *peer) {
-    VrfExport::State *vrf_state = static_cast<VrfExport::State *>(state);
-
-    AGENT_DBWALK_TRACE(AgentDBWalkLog, "Done walk ", GetTableName(),
-                    vrf_state->mcwalkid_[GetTableType()], 
-                    peer->GetName(),
-                    "Add/Del Route", peer->NoOfWalks());
-
-    vrf_state->mcwalkid_[GetTableType()] = 
-        DBTableWalker::kInvalidWalkerId;
-}
-
-void AgentRouteTable::UnicastRouteNotifyDone(DBTableBase *base,
-                                             DBState *state, Peer *peer) {
-    VrfExport::State *vrf_state = static_cast<VrfExport::State *>(state);
-
-    AGENT_DBWALK_TRACE(AgentDBWalkLog, "Done walk ", GetTableName(),
-                    vrf_state->ucwalkid_[GetTableType()], 
-                    peer->GetName(),
-                    "Add/Del Route", peer->NoOfWalks());
-
-    vrf_state->ucwalkid_[GetTableType()] = 
-        DBTableWalker::kInvalidWalkerId;
-}
-
-void AgentRouteTable::RouteTableWalkerNotify(VrfEntry *vrf,
-                                            AgentXmppChannel *bgp_xmpp_peer,
-                                            DBState *state,
-                                            bool associate, bool unicast_walk,
-                                            bool multicast_walk) {
-    boost::system::error_code ec;
-    DBTableWalker *walker = agent_->GetDB()->GetWalker();
-    VrfExport::State *vrf_state = static_cast<VrfExport::State *>(state);
-
-    if (multicast_walk) {
-        if (vrf_state->mcwalkid_[GetTableType()] != 
-                DBTableWalker::kInvalidWalkerId) {
-            AGENT_DBWALK_TRACE(AgentDBWalkLog, "Cancel multicast/bcast walk ", 
-                  GetTableName(), vrf_state->mcwalkid_[GetTableType()], 
-                  bgp_xmpp_peer->GetBgpPeer()->GetName(), 
-                  "Add/Withdraw Route",
-                  bgp_xmpp_peer->GetBgpPeer()->NoOfWalks()); 
-            walker->WalkCancel(vrf_state->mcwalkid_[GetTableType()]);
-        }
-        vrf_state->mcwalkid_[GetTableType()] = 
-            walker->WalkTable(this, NULL,
-             boost::bind(&AgentRouteTable::NotifyRouteEntryWalk, this,
-             bgp_xmpp_peer, state, associate, false, true, _1, _2),
-             boost::bind(&AgentRouteTable::MulticastRouteNotifyDone, 
-                        this, _1, state, bgp_xmpp_peer->GetBgpPeer()));
-
-        AGENT_DBWALK_TRACE(AgentDBWalkLog, "Start multicast/bcast walk ", 
-                  GetTableName(), vrf_state->mcwalkid_[GetTableType()], 
-                  bgp_xmpp_peer->GetBgpPeer()->GetName(), 
-                  (associate)? "Add route": "Withdraw Route",
-                  bgp_xmpp_peer->GetBgpPeer()->NoOfWalks());
-    } 
-    
-    if (unicast_walk) {
-        if (vrf_state->ucwalkid_[GetTableType()] != 
-                DBTableWalker::kInvalidWalkerId) {
-            AGENT_DBWALK_TRACE(AgentDBWalkLog, "Cancel ucast walk ", 
-                  GetTableName(),
-                  vrf_state->ucwalkid_[GetTableType()], 
-                  bgp_xmpp_peer->GetBgpPeer()->GetName(), 
-                  "Add/Withdraw Route",
-                  bgp_xmpp_peer->GetBgpPeer()->NoOfWalks());
-            walker->WalkCancel(vrf_state->ucwalkid_[GetTableType()]);
-        }
-        vrf_state->ucwalkid_[GetTableType()] = 
-            walker->WalkTable(this, NULL,
-             boost::bind(&AgentRouteTable::NotifyRouteEntryWalk, this,
-             bgp_xmpp_peer, state, associate, true, false, _1, _2),
-             boost::bind(&AgentRouteTable::UnicastRouteNotifyDone, 
-                        this, _1, state, bgp_xmpp_peer->GetBgpPeer()));
-
-        AGENT_DBWALK_TRACE(AgentDBWalkLog, "Start ucast walk ", 
-                  GetTableName(), vrf_state->ucwalkid_[GetTableType()], 
-                  bgp_xmpp_peer->GetBgpPeer()->GetName(), 
-                  (associate)? "Add route": "Withdraw Route",
-                  bgp_xmpp_peer->GetBgpPeer()->NoOfWalks());
-    }
 }
 
 uint32_t AgentRoute::GetMplsLabel() const { 

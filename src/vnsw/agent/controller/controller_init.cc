@@ -152,13 +152,10 @@ void VNController::XmppServerDisConnect() {
     uint8_t count = 0;
     while (count < MAX_XMPP_SERVERS) {
         if ((cl = Agent::GetInstance()->GetAgentXmppClient(count)) != NULL) {
-
-            // No of vrf-table entries + No of route-table walks per vrf-entry 
-            VrfTable *vrf_table = Agent::GetInstance()->GetVrfTable();
             Peer *peer = Agent::GetInstance()->GetAgentXmppChannel(count)->GetBgpPeer();
-            peer->SetNoOfWalks(vrf_table->Size() + 
-                               (vrf_table->Size() * Agent::ROUTE_TABLE_MAX));
-       
+            // Sets the context of walk to decide on callback when walks are
+            // done
+            peer->set_is_disconnect_walk(true);
             //shutdown triggers cleanup of routes learnt from
             //the control-node. 
             cl->Shutdown();

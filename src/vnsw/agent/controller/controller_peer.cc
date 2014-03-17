@@ -683,7 +683,7 @@ void AgentXmppChannel::WriteReadyCb(const boost::system::error_code &ec) {
 }
 
 void AgentXmppChannel::BgpPeerDelDone() {
-    if (GetBgpPeer()->NoOfWalks() == 0) {
+    if (GetBgpPeer()->is_disconnect_walk()) {
         VNController::Cleanup();
     }
 }

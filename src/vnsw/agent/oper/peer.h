@@ -19,6 +19,7 @@
 #define ECMP_PEER_NAME "Ecmp"
 
 class AgentXmppChannel;
+class ControllerRouteWalker;
 
 class Peer {
 public:
@@ -35,13 +36,8 @@ public:
         NOVA_PEER
     };
 
-    Peer(Type type, const std::string &name) : type_(type), name_(name),
-        vrf_uc_walkid_(DBTableWalker::kInvalidWalkerId),
-        vrf_mc_walkid_(DBTableWalker::kInvalidWalkerId) {
-        num_walks_ = -1;
-    }
-    virtual ~Peer() {
-    }
+    Peer(Type type, const std::string &name);
+    virtual ~Peer();
     void DelPeerRoutes(DelPeerDone cb);
     void PeerNotifyRoutes();
     void PeerNotifyMulticastRoutes(bool associate);
@@ -56,46 +52,18 @@ public:
 
     const std::string &GetName() const { return name_; }
     const Type GetType() const { return type_; }
-
-    DBTableWalker::WalkId GetPeerVrfUCWalkId() { return vrf_uc_walkid_; }
-    DBTableWalker::WalkId GetPeerVrfMCWalkId() { 
-        return vrf_mc_walkid_; 
-    }
-    void SetPeerVrfUCWalkId(DBTableWalker::WalkId id) {
-        vrf_uc_walkid_ = id;
-    }
-    void SetPeerVrfMCWalkId(DBTableWalker::WalkId id) {
-        vrf_mc_walkid_ = id;
-    }
-    void ResetPeerVrfUCWalkId() {
-        vrf_uc_walkid_ = DBTableWalker::kInvalidWalkerId;
-    }
-    void ResetPeerVrfMCWalkId() {
-        vrf_mc_walkid_ = DBTableWalker::kInvalidWalkerId;
-    }
-    
-    void SetNoOfWalks(int walks) {
-        num_walks_ = walks;
-    }
-
-    void DecrementWalks() { 
-        if (num_walks_ > 0) {
-            num_walks_--; 
-        }
-    }
-
-    tbb::atomic<int> NoOfWalks() { return num_walks_; }
-
-    void ResetWalks() { 
-        num_walks_ = 0; 
+    ControllerRouteWalker *route_walker() const {
+        return route_walker_.get(); }
+    bool is_disconnect_walk() const {return is_disconnect_walk_;}
+    void set_is_disconnect_walk(bool is_disconnect_walk) {
+        is_disconnect_walk_ = is_disconnect_walk;
     }
 
 private:
     Type type_;
     std::string name_;
-    DBTableWalker::WalkId vrf_uc_walkid_;
-    DBTableWalker::WalkId vrf_mc_walkid_;
-    tbb::atomic<int> num_walks_;
+    boost::scoped_ptr<ControllerRouteWalker> route_walker_;
+    tbb::atomic<bool> is_disconnect_walk_;
     DISALLOW_COPY_AND_ASSIGN(Peer);
 };
 

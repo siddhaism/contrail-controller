@@ -59,15 +59,6 @@ public:
     bool DBEntrySandesh(Sandesh *sresp, std::string &name) const;
     Inet4UnicastRouteEntry *GetUcRoute(const Ip4Address &addr) const;
     Inet4UnicastRouteEntry *GetUcRoute(const Inet4UnicastRouteEntry &rt_key) const;
-    static bool DelPeerRoutes(DBTablePartBase *part, DBEntryBase *entry,
-                              Peer *peer);
-
-    static bool VrfNotifyEntryWalk(DBTablePartBase *part, 
-                                   DBEntryBase *entry, 
-                                   Peer *peer);
-    static bool VrfNotifyEntryMulticastWalk(DBTablePartBase *part, 
-                                            DBEntryBase *entry, 
-                                            Peer *peer, bool associate);
 
     LifetimeActor *deleter();
     void SendObjectLog(AgentLogEvent::type event) const;
@@ -91,9 +82,6 @@ public:
 private:
     friend class VrfTable;
     class DeleteActor;
-    static void DelPeerDone(DBTableBase *base, DBState *state, 
-                            uint8_t table_type, const string &name,
-                            Peer *peer);
     string name_;
     uint32_t id_;
     DBTableWalker::WalkId walkid_;
@@ -146,9 +134,6 @@ public:
     VrfEntry *FindVrfFromId(size_t index);
     void FreeVrfId(size_t index) {index_table_.Remove(index);};
 
-    void DelPeerRoutes(Peer *peer, Peer::DelPeerDone cb);
-    void VrfTableWalkerNotify(Peer *peer);
-    void VrfTableWalkerMulticastNotify(Peer *peer, bool associate);
     virtual bool CanNotify(IFMapNode *dbe);
     
     AgentRouteTable *GetInet4UnicastRouteTable(const std::string &vrf_name);
@@ -164,9 +149,6 @@ public:
 
 private:
     friend class VrfEntry;
-    void DelPeerDone(DBTableBase *base, Peer *,Peer::DelPeerDone cb);
-    void VrfNotifyDone(DBTableBase *base, Peer *);
-    void VrfNotifyMulticastDone(DBTableBase *base, Peer *);
     DB *db_;
     static VrfTable *vrf_table_;
     IndexVector<VrfEntry> index_table_;

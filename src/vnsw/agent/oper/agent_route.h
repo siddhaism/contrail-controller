@@ -100,20 +100,6 @@ public:
     virtual void ProcessDelete(AgentRoute *rt) { }
     virtual void ProcessAdd(AgentRoute *rt) { }
 
-    void RouteTableWalkerNotify(VrfEntry *vrf, AgentXmppChannel *, DBState *,
-                                bool associate, bool unicast_walk,
-                                bool multicast_walk);
-    //TODO Evaluate pushing walks to controller
-    bool NotifyRouteEntryWalk(AgentXmppChannel *, 
-                              DBState *state, 
-                              bool associate,
-                              bool unicast_walk,
-                              bool multicast_walk,
-                              DBTablePartBase *part,
-                              DBEntryBase *entry);
-    void UnicastRouteNotifyDone(DBTableBase *base, DBState *, Peer *);
-    void MulticastRouteNotifyDone(DBTableBase *base, DBState *, Peer *);
-
     // Unresolved route tree accessors
     UnresolvedRouteTree::const_iterator unresolved_route_begin() const {
         return unresolved_rt_tree_.begin();
@@ -145,7 +131,6 @@ public:
     // Helper functions to delete routes
     bool DeleteAllBgpPath(DBTablePartBase *part, DBEntryBase *entry);
     bool DelExplicitRouteWalkerCb(DBTablePartBase *part, DBEntryBase *entry);
-    bool DelPeerRoutes(DBTablePartBase *part, DBEntryBase *entry, Peer *peer);
     bool StalePeerRoutes(DBTablePartBase *part, DBEntryBase *entry, Peer *peer);
 
     // Lifetime actor routines
@@ -159,6 +144,8 @@ public:
     // Path comparator
     static bool PathSelection(const Path &path1, const Path &path2);
     static const std::string &GetSuffix(Agent::RouteTableType type);
+    void DeletePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
+                            const Peer *peer, bool stale);
 private:
     class DeleteActor;
     void AddUnresolvedRoute(const AgentRoute *rt);
@@ -167,8 +154,6 @@ private:
     void DeleteRouteDone(DBTableBase *base, RouteTableWalkerState *state);
 
     void Input(DBTablePartition *part, DBClient *client, DBRequest *req);
-    void DeletePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
-                            const Peer *peer, bool stale);
     void StalePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
                             const Peer *peer);
 

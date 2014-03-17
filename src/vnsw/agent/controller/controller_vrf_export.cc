@@ -7,6 +7,7 @@
 #include <cmn/agent_cmn.h>
 #include <controller/controller_export.h>
 #include <controller/controller_vrf_export.h>
+#include <controller/controller_route_walker.h>
 #include <oper/vrf.h>
 #include <oper/mirror_table.h>
 #include <controller/controller_peer.h>
@@ -103,16 +104,7 @@ void VrfExport::Notify(AgentXmppChannel *bgp_xmpp_peer,
             state->exported_ = true; 
             if (state->force_chg_ == true) {
                 if (vrf->GetName().compare(Agent::GetInstance()->GetDefaultVrf()) != 0) {
-                    bool associate = true;
-                    AgentRouteTable *table;
-                    uint8_t table_type;
-                    for (table_type = 0; table_type < Agent::ROUTE_TABLE_MAX;
-                         table_type++) {
-                        table = static_cast<AgentRouteTable *>
-                            (vrf->GetRouteTable(table_type));
-                        table->RouteTableWalkerNotify(vrf, bgp_xmpp_peer, state,
-                                                      associate, true, true);
-                    }
+                    bgp_peer->route_walker()->StartRouteWalk(vrf);
                 }
             }
             return;
