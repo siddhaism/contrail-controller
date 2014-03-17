@@ -10,13 +10,35 @@
 #include "oper/mirror_table.h"
 #include "oper/agent_sandesh.h"
 
-//Routines for peer notification
-PeerNotifyRouteWalker::PeerNotifyRouteWalker(Agent *agent, const Peer *peer, bool associate) : 
-    AgentRouteWalker(agent, AgentRouteWalker::ALL), peer_(peer), associate_(associate) {
+ControllerRouteWalker::ControllerRouteWalker(Agent *agent, const Peer *peer) : 
+    AgentRouteWalker(agent, AgentRouteWalker::ALL), peer_(peer), associate_(false),
+    type_(NOTIFYALL) {
 }
 
-bool PeerNotifyRouteWalker::VrfWalkNotify(DBTablePartBase *partition,
+bool ControllerRouteWalker::VrfWalkNotify(DBTablePartBase *partition,
                                           DBEntryBase *entry) {
+    switch (type_) {
+    case NOTIFYALL:
+        return NotifyAll(partition, entry);
+    case NOTIFYMULTICAST:
+        return Notify(partition, entry);
+    case DELPEER:
+        return DelPeer(partition, entry);
+    case STALE:
+        if (associate_) {
+            return Notify(partition, entry);
+        } else {
+            //On route notify check nature of walk and take action
+            return DelPeer(partition, entry);
+        }
+        break;
+    default:
+        return false;
+    }
+    return false;
+}
+
+void ControllerRouteWalker::NotifyAll(DBTablePartBase *partition, DBEntryBase *e) {
     VrfEntry *vrf = static_cast<VrfEntry *>(entry);
     if (peer_->GetType() == Peer::BGP_PEER) {
         BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
@@ -39,8 +61,70 @@ bool PeerNotifyRouteWalker::VrfWalkNotify(DBTablePartBase *partition,
     return false;
 }
 
-bool PeerNotifyRouteWalker::RouteWalkNotify(DBTablePartBase *partition,
+bool ControllerRouteWalker::DelPeer(DBTablePartBase *partition,
+                                    DBEntryBase *entry) {
+    VrfEntry *vrf = static_cast<VrfEntry *>(entry);
+    if (entry->IsDeleted()) {
+        return true;
+    }
+
+    if (peer_->GetType() == Peer::BGP_PEER) {
+        BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
+
+        DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
+        VrfExport::State *state = 
+            static_cast<VrfExport::State *>(vrf->GetState(partition->parent(), id)); 
+        if (state == NULL) {
+            return true;
+        }
+
+        StartRouteWalk(vrf);
+        return true;
+    }
+    return false;
+}
+
+//Common routeine if basic vrf and peer check is required for the walk
+bool ControllerRouteWalker::Notify(DBTablePartBase *partition, DBEntryBase *entry) {
+    VrfEntry *vrf = static_cast<VrfEntry *>(entry);
+    if (peer_->GetType() == Peer::BGP_PEER) {
+        BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
+
+        DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
+        VrfExport::State *state = 
+            static_cast<VrfExport::State *>(vrf->GetState(partition->parent(), id)); 
+        if (state && (vrf->GetName().compare(agent()->GetDefaultVrf()) != 0)) {
+            StartRouteWalk(vrf);
+        }
+
+        return true;
+    }
+    return false;
+}
+
+bool ControllerRouteWalker::RouteWalkNotify(DBTablePartBase *partition,
                                       DBEntryBase *e) {
+    switch (type_) {
+    case NOTIFYALL:
+    case NOTIFYMULTICAST:
+        return RouteNotifyAll(partition, entry);
+    case DELPEER:
+        return RouteDelPeer(partition, entry);
+    case STALE:
+        if (associate_) {
+            return RouteStaleMarker(partition, entry);
+        } else {
+            //On route notify check nature of walk and take action
+            return RouteDelPeer(partition, entry);
+        }
+        break;
+    default:
+        return false;
+    }
+    return false;
+}
+
+bool ControllerRouteWalker::RouteNotifyAll(DBTablePartBase *partition, DBEntryBase *e) {
     AgentRoute *route = static_cast<AgentRoute *>(e);
     BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
     Agent::RouteTableType table_type = route->GetTableType();
@@ -63,108 +147,30 @@ bool PeerNotifyRouteWalker::RouteWalkNotify(DBTablePartBase *partition,
     return true;
 }
 
-void PeerNotifyRouteWalker::Start() {
-    StartVrfWalk(); 
-}
-
-void PeerNotifyRouteWalker::Cancel() {
-    CancelVrfWalk(); 
-}
-
-//Delete peer walker
-DelPeerRouteWalker::DelPeerRouteWalker(Agent *agent, const Peer *peer) : 
-    AgentRouteWalker(agent, AgentRouteWalker::ALL), peer_(peer) {
-}
-
-bool DelPeerRouteWalker::VrfWalkNotify(DBTablePartBase *partition,
-                                          DBEntryBase *entry) {
-    VrfEntry *vrf = static_cast<VrfEntry *>(entry);
-    if (entry->IsDeleted()) {
-        return true;
-    }
-
-    if (peer_->GetType() == Peer::BGP_PEER) {
-        BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
-
-        DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
-        VrfExport::State *state = 
-            static_cast<VrfExport::State *>(vrf->GetState(partition->parent(), id)); 
-        if (state == NULL) {
-            return true;
-        }
-
-        StartRouteWalk(vrf);
-        return true;
-    }
-    return false;
-}
-
-bool DelPeerRouteWalker::RouteWalkNotify(DBTablePartBase *partition,
-                                      DBEntryBase *e) {
+bool ControllerRouteWalker::RouteDelPeer(DBTablePartBase *partition,
+                                         DBEntryBase *e) {
     AgentRoute *route = static_cast<AgentRoute *>(entry);
     if (route) {
-        DeletePathFromPeer(partition, route, peer_);
+        bool stale = (type_ == STALE);
+        DeletePathFromPeer(partition, route, peer_, stale);
     }
     return true;
 }
 
-void DelPeerRouteWalker::Start() {
-    StartVrfWalk(); 
-}
-
-void DelPeerRouteWalker::Cancel() {
-    CancelVrfWalk(); 
-}
-
-//Routines for multicast notification
-MulticastRouteWalker::MulticastRouteWalker(Agent *agent, const Peer *peer, bool associate) : 
-    PeerNotifyRouteWalker(agent, AgentRouteWalker::ALL, associate) {
-}
-
-bool MulticastRouteWalker::VrfWalkNotify(DBTablePartBase *partition,
-                                         DBEntryBase *entry) {
-    VrfEntry *vrf = static_cast<VrfEntry *>(entry);
-    if (peer_->GetType() == Peer::BGP_PEER) {
-        BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
-
-        DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
-        VrfExport::State *state = 
-            static_cast<VrfExport::State *>(vrf->GetState(partition->parent(), id)); 
-        if (state && (vrf->GetName().compare(agent()->GetDefaultVrf()) != 0)) {
-            StartRouteWalk(vrf);
-        }
-
-        return true;
-    }
-    return false;
-}
-
-//Routines for stale peer handling
-StaleRouteWalker::StaleRouteWalker(Agent *agent, const Peer *peer) : 
-    AgentRouteWalker(agent, AgentRouteWalker::ALL) {
-}
-
-bool StaleRouteWalker::VrfWalkNotify(DBTablePartBase *partition,
-                                     DBEntryBase *entry) {
-    VrfEntry *vrf = static_cast<VrfEntry *>(entry);
-    if (peer_->GetType() == Peer::BGP_PEER) {
-        BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
-
-        DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
-        VrfExport::State *state = 
-            static_cast<VrfExport::State *>(vrf->GetState(partition->parent(), id)); 
-        if (state) {
-            StartRouteWalk(vrf);
-        }
-        return true;
-    }
-    return false;
-}
-
-bool StaleRouteWalker::RouteWalkNotify(DBTablePartBase *partition, DBEntryBase *e) {
+bool ControllerRouteWalker::RouteStaleMarker(DBTablePartBase *partition, DBEntryBase *e) {
     AgentRoute *route = static_cast<AgentRoute *>(entry);
     if (route) {
         route->StalePathFromPeer(partition, peer_);
     }
     return true;
+}
+
+void ControllerRouteWalker::Start(Type type, bool associate) {
+    associate_ = associate;
+    type_ = type;
+    StartVrfWalk(); 
+}
+
+void ControllerRouteWalker::Cancel() {
+    CancelVrfWalk(); 
 }

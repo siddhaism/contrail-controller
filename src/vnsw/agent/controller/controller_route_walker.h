@@ -8,57 +8,35 @@
 #include "cmn/agent_cmn.h"
 #include "oper/agent_route_walker.h"
 
-class PeerNotifyRouteWalker : public AgentRouteWalker {
+class ControllerRouteWalker : public AgentRouteWalker {
 public:    
-    PeerNotifyRouteWalker(Agent *agent, const Peer *peer, bool associate);
-    virtual ~PeerNotifyRouteWalker() { }
+    enum Type {
+        NOTIFYALL,
+        NOTIFYMULTICAST,
+        DELPEER,
+        STALE,
+    };
+    ControllerRouteWalker(Agent *agent, const Peer *peer);
+    virtual ~ControllerRouteWalker() { }
 
-    void Start();
+    void Start(Type type, bool associate);
     void Cancel();
     virtual bool VrfWalkNotify(DBTablePartBase *partition, DBEntryBase *e);
     virtual bool RouteWalkNotify(DBTablePartBase *partition, DBEntryBase *e);
 
 private:
-    Peer *peer_;
+    void Notify(DBTablePartBase *partition, DBEntryBase *e);
+    void NotifyAll(DBTablePartBase *partition, DBEntryBase *e);
+    void DelPeer(DBTablePartBase *partition, DBEntryBase *e);
+    void StaleMarker(DBTablePartBase *partition, DBEntryBase *e);
+    void RouteNotifyAll(DBTablePartBase *partition, DBEntryBase *e);
+    void RouteDelPeer(DBTablePartBase *partition, DBEntryBase *e);
+    void RouteStaleMarker(DBTablePartBase *partition, DBEntryBase *e);
+
+    const Peer *peer_;
     bool associate_;
-    DISALLOW_COPY_AND_ASSIGN(PeerNotifyRouteWalker);
+    Type type_;
+    DISALLOW_COPY_AND_ASSIGN(ControllerRouteWalker);
 };
 
-class DelPeerRouteWalker : public AgentRouteWalker {
-public:    
-    DelPeerRouteWalker(Agent *agent, const Peer *peer);
-    virtual ~DelPeerRouteWalker() { }
-
-    void Start();
-    void Cancel();
-    virtual bool VrfWalkNotify(DBTablePartBase *partition, DBEntryBase *e);
-    virtual bool RouteWalkNotify(DBTablePartBase *partition, DBEntryBase *e);
-
-private:
-    Peer *peer_;
-    DISALLOW_COPY_AND_ASSIGN(DelPeerRouteWalker);
-};
-
-class MulticastRouteWalker : public PeerNotifyRouteWalker {
-public:    
-    MulticastRouteWalker(Agent *agent, const Peer *peer, bool associate);
-    virtual ~MulticastRouteWalker() { }
-
-    virtual bool VrfWalkNotify(DBTablePartBase *partition, DBEntryBase *e);
-
-private:
-    DISALLOW_COPY_AND_ASSIGN(MulticastRouteWalker);
-}
-
-class StaleRouteWalker : public AgentRouteWalker {
-public:    
-    StaleRouteWalker(Agent *agent, const Peer *peer);
-    virtual ~StaleRouteWalker() { }
-
-    virtual bool VrfWalkNotify(DBTablePartBase *partition, DBEntryBase *e);
-    virtual bool RouteWalkNotify(DBTablePartBase *partition, DBEntryBase *e);
-
-private:
-    DISALLOW_COPY_AND_ASSIGN(StaleRouteWalker);
-}
 #endif

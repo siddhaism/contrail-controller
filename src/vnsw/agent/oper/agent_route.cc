@@ -107,7 +107,7 @@ bool AgentRouteTable::DelPeerRoutes(DBTablePartBase *part,
                                     DBEntryBase *entry, Peer *peer) {
     AgentRoute *route = static_cast<AgentRoute *>(entry);
     if (route) {
-        DeletePathFromPeer(part, route, peer);
+        DeletePathFromPeer(part, route, peer, false);
     }
     return true;
 }
@@ -133,7 +133,7 @@ bool AgentRouteTable::DeleteAllBgpPath(DBTablePartBase *part,
             const Peer *peer = path->peer();
             it++;
             if (peer && peer->GetType() == Peer::BGP_PEER) {
-                DeletePathFromPeer(part, route, path->peer());
+                DeletePathFromPeer(part, route, path->peer(), false);
             }
         }
     }
@@ -219,7 +219,7 @@ void AgentRouteTable::RemoveUnresolvedRoute(const AgentRoute *rt) {
 // LOCAL_VM peer path. But, controller-peer needs to know deletion of 
 // LOCAL_VM path to retract the route.  So, force notify deletion of any path.
 void AgentRouteTable::DeletePathFromPeer(DBTablePartBase *part,
-                                         AgentRoute *rt, const Peer *peer) {
+                                         AgentRoute *rt, const Peer *peer, bool stale) {
     if (rt == NULL) {
         return;
     }
@@ -232,6 +232,11 @@ void AgentRouteTable::DeletePathFromPeer(DBTablePartBase *part,
     OPER_TRACE(Route, rt_info);
 
     if (path == NULL) {
+        return;
+    }
+
+    // If stale path needs to be deleted check for stale flags
+    if (stale && !path->is_stale()) {
         return;
     }
 
@@ -408,7 +413,7 @@ void AgentRouteTable::Input(DBTablePartition *part, DBClient *client,
         }
     } else if (req->oper == DBRequest::DB_ENTRY_DELETE) {
         assert (key->sub_op_ == AgentKey::ADD_DEL_CHANGE);
-        DeletePathFromPeer(part, rt, key->peer());
+        DeletePathFromPeer(part, rt, key->peer(), false);
     } else {
         assert(0);
     }
