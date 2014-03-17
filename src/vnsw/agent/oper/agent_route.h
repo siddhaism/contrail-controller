@@ -168,7 +168,7 @@ private:
 
     void Input(DBTablePartition *part, DBClient *client, DBRequest *req);
     void DeletePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
-                            const Peer *peer);
+                            const Peer *peer, bool stale);
     void StalePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
                             const Peer *peer);
 
