@@ -62,6 +62,7 @@ public:
                                         uint32_t mpls_label, 
                                         uint32_t tunnel_bmap, 
                                         bool add_route);
+    static uint64_t GetGlobalMulticastIdentifier();
     Peer *GetBgpPeer() { return bgp_peer_id_; }
     std::string GetXmppServer() { return xmpp_server_; }
     uint8_t GetXmppServerIdx() { return xs_idx_; }
