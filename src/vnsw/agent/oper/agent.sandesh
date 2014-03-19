@@ -173,6 +173,7 @@ struct PathSandeshData {
    10: optional list<i32> sg_list;
    11: string supported_tunnel_type;
    12: string active_tunnel_type;
+   13: bool stale;
 }
 
 struct RouteUcSandeshData {
@@ -282,6 +283,7 @@ request sandesh Inet4UcRouteReq {
     1: i32 vrf_index = 0;             // send route entries for the VRF index
     2: string src_ip;
     3: u16 prefix_len;
+    4: bool stale = 0;                // Display stale entries only if set
 }
 
 response sandesh Inet4UcRouteResp {
@@ -290,6 +292,7 @@ response sandesh Inet4UcRouteResp {
 
 request sandesh Inet4McRouteReq {
     1: i32 vrf_index = 0;             // send route entries for the VRF index
+    2: bool stale = 0;                // Display stale entries only if set
 }
 
 response sandesh Inet4McRouteResp {
@@ -299,6 +302,7 @@ response sandesh Inet4McRouteResp {
 request sandesh Layer2RouteReq {
     1: i32 vrf_index = 0;
     2: string mac;
+    3: bool stale = 0;                // Display stale entries only if set
 }
 
 response sandesh Layer2RouteResp {

@@ -1258,3 +1258,7 @@ bool AgentXmppChannel::ControllerSendMcastRoute(AgentXmppChannel *peer,
     // send data
     return (peer->SendUpdate(data_,datalen_));
 }
+
+uint64_t AgentXmppChannel::GetGlobalMulticastIdentifier() {
+    return multicast_peer_identifier;
+}

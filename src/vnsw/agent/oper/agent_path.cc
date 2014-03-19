@@ -758,4 +758,5 @@ void AgentPath::SetSandeshData(PathSandeshData &pdata) const {
             TunnelType(tunnel_type()).ToString());
     pdata.set_supported_tunnel_type(
             TunnelType::GetString(tunnel_bmap()));
+    pdata.set_stale(is_stale());
 }

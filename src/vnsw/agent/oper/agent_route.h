@@ -193,7 +193,7 @@ public:
     // Virtual functions defined by AgentRoute
     virtual int CompareTo(const Route &rhs) const = 0;
     virtual Agent::RouteTableType GetTableType() const = 0;
-    virtual bool DBEntrySandesh(Sandesh *sresp) const = 0;
+    virtual bool DBEntrySandesh(Sandesh *sresp, bool stale) const = 0;
     virtual std::string ToString() const = 0;
     virtual const std::string GetAddressString() const = 0;
     virtual bool EcmpAddPath(AgentPath *path) {return false;}
