@@ -75,6 +75,25 @@ xml_node MessageHeader(xml_document *xdoc, std::string vrf) {
     return(xitems);
 }
 
+xml_node MulticastMessageHeader(xml_document *xdoc, std::string vrf) {
+    xml_node msg = xdoc->append_child("message");
+    msg.append_attribute("type") = "set";
+    msg.append_attribute("from") = XmppInit::kAgentNodeJID; 
+    string str(XmppInit::kControlNodeJID);
+    str += "/";
+    str += XmppInit::kBgpPeer;
+    msg.append_attribute("to") = str.c_str();
+
+    xml_node event = msg.append_child("event");
+    event.append_attribute("xmlns") = "http://jabber.org/protocol/pubsub";
+    xml_node xitems = event.append_child("items");
+    stringstream ss;
+    ss << "1" << "/" << "241" << "/" << vrf.c_str();
+    std::string node_str(ss.str());
+    xitems.append_attribute("node") = node_str.c_str();
+    return(xitems);
+}
+
 xml_node L2MessageHeader(xml_document *xdoc, std::string vrf) {
     xml_node msg = xdoc->append_child("message");
     msg.append_attribute("type") = "set";
@@ -145,7 +164,8 @@ private:
 
 class ControlNodeMockBgpXmppPeer {
 public:
-    ControlNodeMockBgpXmppPeer() : channel_ (NULL), rx_count_(0) {
+    ControlNodeMockBgpXmppPeer() : channel_ (NULL), rx_count_(0),
+    label1_(1000), label2_(5000) {
     }
 
     void ReflectIpv4Route(string vrf_name, const pugi::xml_node &node, 
@@ -169,6 +189,20 @@ public:
     }
 
     void ReflectMulticast(string vrf_name, const pugi::xml_node &node, bool add_change) {
+        autogen::McastItemType item;
+        item.Clear();
+
+        EXPECT_TRUE(item.XmlParse(node));
+        EXPECT_TRUE(item.entry.nlri.af == BgpAf::IPv4);
+        EXPECT_TRUE(item.entry.nlri.safi == BgpAf::Mcast);
+        EXPECT_TRUE(!item.entry.nlri.group.empty());
+
+        if (add_change) {
+            SendBcastRouteMessage(vrf_name, item.entry.nlri.group, label1_++, 
+                                  "127.0.0.1", label1_++, label1_++);
+        } else {
+            SendBcastRouteDelete(vrf_name, item.entry.nlri.group, "127.0.0.1");
+        }
     }
 
     void ReflectEnetRoute(string vrf_name, const pugi::xml_node &node, bool add_change) {
@@ -286,6 +320,64 @@ public:
         SendDocument(xdoc);
     }
 
+    void SendBcastRouteMessage(std::string vrf, std::string subnet_addr, 
+                               int src_label, std::string agent_addr, 
+                               int dest_label1, int dest_label2) {
+        xml_document xdoc;
+        xml_node xitems = MulticastMessageHeader(&xdoc, vrf);
+
+        autogen::McastItemType item;
+        item.entry.nlri.af = BgpAf::IPv4;
+        item.entry.nlri.safi = BgpAf::Mcast;
+        item.entry.nlri.group = subnet_addr.c_str();
+        item.entry.nlri.source = "0.0.0.0";
+        item.entry.nlri.source_label = src_label; //label allocated by control-node
+
+        autogen::McastNextHopType nh;
+        nh.af = item.entry.nlri.af;
+        nh.address = "127.0.0.2"; // agent-b, does not exist
+        stringstream label1;       
+        label1 << dest_label1;
+        nh.label = label1.str(); 
+
+        //Add to olist
+        item.entry.olist.next_hop.push_back(nh);
+
+        autogen::McastNextHopType nh2;
+        nh2.af = item.entry.nlri.af;
+        nh2.address = "127.0.0.3"; // agent-c, does not exist
+        stringstream label2;       
+        label2 << dest_label2;
+        nh2.label = label2.str(); 
+
+        //Add to olist
+        item.entry.olist.next_hop.push_back(nh2);
+
+        xml_node node = xitems.append_child("item");
+        //Route-Distinguisher
+        stringstream ss;
+        ss << agent_addr.c_str() << ":" << "65535:" << subnet_addr.c_str() << ",0.0.0.0"; 
+        string node_str(ss.str());
+        node.append_attribute("id") = node_str.c_str();
+        item.Encode(&node);
+
+        SendDocument(xdoc);
+    }
+    void SendBcastRouteDelete(std::string vrf, std::string addr, 
+                              std::string agent_addr) {
+        xml_document xdoc;
+        xml_node xitems = MulticastMessageHeader(&xdoc, vrf);
+        xml_node node = xitems.append_child("retract");
+        //Route-Distinguisher
+        stringstream ss;
+        ss << agent_addr.c_str() << ":" << "65535:" << addr.c_str() 
+                                        << "," << "0.0.0.0"; 
+        string node_str(ss.str());
+        node.append_attribute("id") = node_str.c_str();
+
+        SendDocument(xdoc);
+    }
+
     void ReceiveUpdate(const XmppStanza::XmppMessage *msg) {
         rx_count_++;
         if (msg && msg->type == XmppStanza::IQ_STANZA) {
@@ -369,6 +461,8 @@ public:
 private:
     XmppChannel *channel_;
     size_t rx_count_;
+    uint32_t label1_;
+    uint32_t label2_;
 };
 
 
@@ -506,17 +600,6 @@ protected:
         //Create vn,vrf,vm,vm-port and route entry in vrf1 
         CreateVmportEnv(input, (intf_id - 1));
         client->WaitForIdle();
-
-        /*
-struct PortInfo {
-    char name[32];
-    uint8_t intf_id;
-    char addr[32];
-    char mac[32];
-    int vn_id;
-    int vm_id;
-};
-        */
     }
 
     void VerifyVmPortActive(bool active) {
@@ -525,6 +608,27 @@ struct PortInfo {
                 EXPECT_TRUE(VmPortActive(input, i));
             } else {
                 EXPECT_FALSE(VmPortActive(input, i));
+            }
+        }
+    }
+
+    void VerifyUnicastRoutes(bool deleted) {
+        int intf_id = 1;
+        for (int vn_cnt = 1; vn_cnt <= num_vns; vn_cnt++) {
+            stringstream ip_addr;
+            ip_addr << vn_cnt << ".1.1.0";
+            Ip4Address addr = 
+                IncrementIpAddress(Ip4Address::from_string(ip_addr.str()));
+            for (int vm_cnt = 0; vm_cnt < num_vms_per_vn; vm_cnt++) {
+                stringstream name;
+                int cnt = intf_id - 1;
+                name << "vrf" << intf_id;
+                if (deleted) {
+                    EXPECT_FALSE(RouteFind(name.str(), addr.to_string(), 32));
+                } else {
+                    EXPECT_TRUE(RouteFind(name.str(), addr.to_string(), 32));
+                }
+                addr = IncrementIpAddress(addr);
             }
         }
     }
@@ -551,25 +655,6 @@ struct PortInfo {
     Agent *agent_;
     struct PortInfo *input;
 };
-
-TEST_F(AgentBasicScaleTest, Basic) {
-    client->Reset();
-    client->WaitForIdle();
-
-    XmppConnectionSetUp();
-    BuildVmPortEnvironment();
-
-    //expect subscribe message+route at the mock server
-    WAIT_FOR(100, 10000, (mock_peer[0].get()->Count() == 
-                          (6 * num_vns * num_vms_per_vn)));
-    client->WaitForIdle();
-
-    VerifyVmPortActive(true);
-    //Delete vm-port and route entry in vrf1
-    DeleteVmportEnv(input, (num_vns * num_vms_per_vn), true);
-    WAIT_FOR(1000, 1000, (Agent::GetInstance()->GetVnTable()->Size() == 0));
-    client->WaitForIdle();
-}
 
 #define GETSCALEARGS()                          \
     bool ksync_init = false;                    \
@@ -612,33 +697,4 @@ TEST_F(AgentBasicScaleTest, Basic) {
         strncpy(init_file, vm["config"].as<string>().c_str(), (sizeof(init_file) - 1) ); \
     } else {                                    \
         strcpy(init_file, DEFAULT_VNSW_CONFIG_FILE); \
-    }                                           \
-
-
-int main(int argc, char **argv) {
-    GETSCALEARGS();
-    if (num_vns > MAX_VN) {
-        LOG(DEBUG, "Max VN is 254");
-        return false;
-    }
-    if (num_vms_per_vn > MAX_VMS_PER_VN) {
-        LOG(DEBUG, "Max VM per VN is 100");
-        return false;
-    }
-    if (num_ctrl_peers == 0 || num_ctrl_peers > MAX_CONTROL_PEER) {
-        LOG(DEBUG, "Supported values - 1, 2");
-        return false;
-    }
-    if (num_vms_per_vn > MAX_REMOTE_ROUTES_PER_VN) {
-        LOG(DEBUG, "Max remote route per vn is 100");
-        return false;
-    }
-
-    client = TestInit(init_file, ksync_init);
-    InitXmppServers();
-
-    int ret = RUN_ALL_TESTS();
-    Agent::GetInstance()->GetEventManager()->Shutdown();
-    AsioStop();
-    return ret;
-}
+    }                                           
