@@ -68,6 +68,7 @@ public:
                                         bool add_route);
     void CreateBgpPeer();
     void DeCommissionBgpPeer();
+    static uint64_t GetGlobalMulticastIdentifier();
     Peer *GetBgpPeer() { return bgp_peer_id_; }
     std::string GetXmppServer() { return xmpp_server_; }
     uint8_t GetXmppServerIdx() { return xs_idx_; }

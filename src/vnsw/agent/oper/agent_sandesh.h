@@ -108,12 +108,13 @@ private:
 
 class AgentInet4UcRtSandesh : public AgentSandesh {
 public:
-    AgentInet4UcRtSandesh(VrfEntry *vrf, std::string context) : AgentSandesh(context, ""), vrf_(vrf){
+    AgentInet4UcRtSandesh(VrfEntry *vrf, std::string context, bool stale) : 
+        AgentSandesh(context, ""), vrf_(vrf), stale_(stale) {
         dump_table_ = true;
     }
     AgentInet4UcRtSandesh(VrfEntry *vrf, std::string context,
-                          Ip4Address addr, uint8_t plen) : AgentSandesh(context, ""), vrf_(vrf),
-                                                           addr_(addr), plen_(plen){
+                          Ip4Address addr, uint8_t plen, bool stale) : 
+        AgentSandesh(context, ""), vrf_(vrf), addr_(addr), plen_(plen), stale_(stale) {
         dump_table_ = false;
     }
 
@@ -125,13 +126,15 @@ private:
     VrfEntry *vrf_;
     Ip4Address addr_;
     uint8_t plen_;
+    bool stale_;
     bool dump_table_;
 };
 
 class AgentInet4McRtSandesh : public AgentSandesh {
 public:
     AgentInet4McRtSandesh(VrfEntry *vrf, std::string context,
-                          std::string name) : AgentSandesh(context, name), vrf_(vrf){}
+                std::string name, bool stale) : AgentSandesh(context, name), 
+                vrf_(vrf), stale_(stale) {}
 
 private:
     DBTable *AgentGetTable();
@@ -139,12 +142,14 @@ private:
     bool UpdateResp(DBEntryBase *entry);
 
     VrfEntry *vrf_;
+    bool stale_;
 };
 
 class AgentLayer2RtSandesh : public AgentSandesh {
 public:
     AgentLayer2RtSandesh(VrfEntry *vrf, std::string context,
-                          std::string name) : AgentSandesh(context, name), vrf_(vrf){}
+                          std::string name, bool stale) : AgentSandesh(context, name), 
+                          vrf_(vrf), stale_(stale) {}
 
 private:
     DBTable *AgentGetTable();
@@ -152,6 +157,7 @@ private:
     bool UpdateResp(DBEntryBase *entry);
 
     VrfEntry *vrf_;
+    bool stale_;
 };
 
 class AgentAclSandesh : public AgentSandesh {

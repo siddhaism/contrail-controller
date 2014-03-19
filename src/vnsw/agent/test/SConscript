@@ -132,6 +132,9 @@ if sys.platform != 'darwin':
     test_basic_scale = env.Program(target = 'test_basic_scale', source = ['test_basic_scale.cc'])
     env.Alias('controller/agent:test_basic_scale', test_basic_scale)
 
+    test_multicast_headless = env.Program(target = 'test_multicast_headless', source = ['test_multicast_headless.cc'])
+    env.Alias('controller/agent:test_multicast_headless', test_multicast_headless)
+
 #    test_sg = env.Program(target = 'test_sg', source = ['test_sg.cc'])
 #    env.Alias('controller/agent:test_sg', test_sg)
 

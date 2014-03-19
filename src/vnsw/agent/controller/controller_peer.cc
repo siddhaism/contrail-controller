@@ -71,8 +71,6 @@ void AgentXmppChannel::DeCommissionBgpPeer() {
     Agent::GetInstance()->GetVrfTable()->Unregister(id);
 
     // Add the peer to global decommisioned list
-    //ControllerPeer::AgentBgpPeerList.push_front(bgp_peer); 
-    //Controller_Peer.AgentBgpPeerList.push_front(bgp_peer); 
     Agent::GetInstance()->ControllerPeerList.push_front(bgp_peer);
 }
 
@@ -1282,4 +1280,8 @@ bool AgentXmppChannel::ControllerSendMcastRoute(AgentXmppChannel *peer,
     datalen_ = XmppProto::EncodeMessage(impl.get(), data_, sizeof(data_));
     // send data
     return (peer->SendUpdate(data_,datalen_));
+}
+
+uint64_t AgentXmppChannel::GetGlobalMulticastIdentifier() {
+    return multicast_peer_identifier;
 }
