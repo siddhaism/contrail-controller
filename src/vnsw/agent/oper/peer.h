@@ -38,9 +38,13 @@ public:
 
     Peer(Type type, const std::string &name);
     virtual ~Peer();
+
+    // Table Walkers
     void DelPeerRoutes(DelPeerDone cb);
     void PeerNotifyRoutes();
     void PeerNotifyMulticastRoutes(bool associate);
+    void StalePeerRoutes();
+
     bool IsLess(const Peer *rhs) const {
         if  (type_ != rhs->type_) {
             return type_ < rhs->type_;
