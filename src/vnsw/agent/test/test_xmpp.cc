@@ -776,6 +776,40 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown) {
     EXPECT_FALSE(VrfFind("vrf1"));
 }
 
+TEST_F(AgentXmppUnitTest, ConnectionUpDown_DecomissionedPeers) {
+
+    client->Reset();
+    client->WaitForIdle();
+
+    XmppConnectionSetUp();
+    //wait for connection establishment
+    WAIT_FOR(100, 10000, (sconnection->GetStateMcState() == xmsm::ESTABLISHED));
+    WAIT_FOR(100, 10000, (cchannel->GetPeerState() == xmps::READY));
+
+    ASSERT_TRUE(Agent::GetInstance()->ControllerPeerList.size() == 0);
+
+    //bring-down the channel
+    bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
+    client->WaitForIdle();
+
+    ASSERT_TRUE(Agent::GetInstance()->ControllerPeerList.size() == 1);
+
+    //bring up the channel
+    bgp_peer.get()->HandleXmppChannelEvent(xmps::READY);
+    client->WaitForIdle();
+
+    ASSERT_TRUE(Agent::GetInstance()->ControllerPeerList.size() == 1);
+
+    //bring-down the channel
+    bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
+    client->WaitForIdle();
+
+    ASSERT_TRUE(Agent::GetInstance()->ControllerPeerList.size() == 2);
+
+    xc->ConfigUpdate(new XmppConfigData());
+    client->WaitForIdle(5);
+}
+
 TEST_F(AgentXmppUnitTest, SgList) {
 
     client->Reset();

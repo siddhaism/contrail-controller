@@ -21,6 +21,10 @@ class XmlPugi;
 
 class AgentXmppChannel {
 public:
+    typedef enum {
+        DOWN = 0,
+        UP = 1,
+    } AgentXmppChannelState;
     explicit AgentXmppChannel(XmppChannel *channel);
     AgentXmppChannel(XmppChannel *channel, std::string xmpp_server, 
                      std::string label_range, uint8_t xs_idx);
@@ -62,12 +66,16 @@ public:
                                         uint32_t mpls_label, 
                                         uint32_t tunnel_bmap, 
                                         bool add_route);
-    static uint64_t GetGlobalMulticastIdentifier();
+    void CreateBgpPeer();
+    void DeCommissionBgpPeer();
     Peer *GetBgpPeer() { return bgp_peer_id_; }
     std::string GetXmppServer() { return xmpp_server_; }
     uint8_t GetXmppServerIdx() { return xs_idx_; }
     std::string GetMcastLabelRange() { return label_range_; }
 
+    void SetState(AgentXmppChannelState state) { state_ = state; }
+    AgentXmppChannelState GetState() { return state_; }
+   
 protected:
     virtual void WriteReadyCb(const boost::system::error_code &ec);
 
@@ -89,6 +97,7 @@ private:
     std::string label_range_;
     uint8_t xs_idx_;
     Peer *bgp_peer_id_;
+    AgentXmppChannelState state_;
 };
 
 #endif // __CONTROLLER_PEER_H__
