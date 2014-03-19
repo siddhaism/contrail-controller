@@ -40,6 +40,18 @@ AgentXmppChannel::AgentXmppChannel(XmppChannel *channel, std::string xmpp_server
     channel_->RegisterReceive(xmps::BGP, 
                               boost::bind(&AgentXmppChannel::ReceiveInternal, 
                                           this, _1));
+}
+
+AgentXmppChannel::~AgentXmppChannel() {
+    channel_->UnRegisterReceive(xmps::BGP);
+}
+
+void AgentXmppChannel::CreateBgpPeer() {
+
+    SetState(AgentXmppChannel::UP);
+
+    //Ensure older bgp_peer_id_ in decommisioned list
+
     DBTableBase::ListenerId id = 
         Agent::GetInstance()->GetVrfTable()->Register(boost::bind(&VrfExport::Notify,
                                        this, _1, _2)); 
@@ -50,15 +62,20 @@ AgentXmppChannel::AgentXmppChannel(XmppChannel *channel, std::string xmpp_server
     bgp_peer_id_ = new BgpPeer(ip, addr, this, id);
 }
 
-AgentXmppChannel::~AgentXmppChannel() {
+void AgentXmppChannel::DeCommissionBgpPeer() {
+
+    SetState(AgentXmppChannel::DOWN);
 
     BgpPeer *bgp_peer = static_cast<BgpPeer *>(bgp_peer_id_);
     DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
-
     Agent::GetInstance()->GetVrfTable()->Unregister(id);
-    delete bgp_peer_id_;
-    channel_->UnRegisterReceive(xmps::BGP);
+
+    // Add the peer to global decommisioned list
+    //ControllerPeer::AgentBgpPeerList.push_front(bgp_peer); 
+    //Controller_Peer.AgentBgpPeerList.push_front(bgp_peer); 
+    Agent::GetInstance()->ControllerPeerList.push_front(bgp_peer);
 }
+
 
 bool AgentXmppChannel::SendUpdate(uint8_t *msg, size_t size) {
 
@@ -694,6 +711,9 @@ void AgentXmppChannel::BgpPeerDelDone() {
 void AgentXmppChannel::HandleXmppClientChannelEvent(AgentXmppChannel *peer,
                                                     xmps::PeerState state) {
     if (state == xmps::READY) {
+        // Create a new BgpPeer every-time a channel is UP
+        peer->CreateBgpPeer();
+
         Agent::GetInstance()->SetAgentXmppChannelSetupTime(UTCTimestampUsec(), 
                                             peer->GetXmppServerIdx());
         // Switch-over Config Control-node
@@ -746,10 +766,12 @@ void AgentXmppChannel::HandleXmppClientChannelEvent(AgentXmppChannel *peer,
 
     } else {
 
+        // Add BgpPeer to global decommissioned list
+        peer->DeCommissionBgpPeer();
+
         //Enqueue cleanup of unicast routes
         peer->GetBgpPeer()->DelPeerRoutes(
             boost::bind(&AgentXmppChannel::BgpPeerDelDone, peer));
-
         
         // Switch-over Config Control-node
         if (Agent::GetInstance()->GetXmppCfgServer().compare(peer->GetXmppServer()) == 0) {

@@ -26,3 +26,7 @@ void Peer::PeerNotifyMulticastRoutes(bool associate) {
     route_walker_->Start(ControllerRouteWalker::NOTIFYMULTICAST, associate, 
                          NULL);
 }
+
+void Peer::StalePeerRoutes() {
+    route_walker_->Start(ControllerRouteWalker::STALE, true, NULL);
+}
