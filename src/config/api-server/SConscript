@@ -45,22 +45,37 @@ generated_rule = env.Command(generated_files,
 setup_sources = [
            'setup.py',
            'MANIFEST.in',
+           'requirements.txt',
+           'contrail-config/__init__.py',
+           'contrail-config/provision_defaults.py',
+           'contrail-config/vnc_addr_mgmt.py',
+           'contrail-config/vnc_auth_keystone.py',
+           'contrail-config/vnc_auth.py',
+           'contrail-config/vnc_cfg_api_server.py',
+           'contrail-config/vnc_cfg_ifmap.py',
+           'contrail-config/vnc_cfg_types.py',
+           'contrail-config/vnc_perms.py',
           ]
 
 bottle_sources_rules = []
 bottle_sources_rules.append(env.Install("contrail-config", '#/third_party/bottle-0.11.6/bottle.py'))
 
-generateds_rule = env.Install("contrail-config/gen", "../common/generatedssuper.py")
-cfixture_rule = env.Install("contrail-config/gen", "../common/cfixture.py")
+common_files = ['generatedssuper.py', 'cfixture.py']
+common_install_rule = env.Install("contrail-config/gen",
+                                  map(lambda x :
+                                          "#controller/src/config/common/" + x,
+                                      common_files))
+#doc_sources_rules = SConscript(dirs=['doc'], exports = 'CfgmEnv')
 
-doc_sources_rules = SConscript(dirs=['doc'], exports = 'CfgmEnv')
-
-sdist_depends = [generated_rule, generateds_rule, cfixture_rule]
+sdist_depends = [generated_rule, common_install_rule]
 sdist_depends.extend(bottle_sources_rules)
-sdist_depends.extend(doc_sources_rules)
+#sdist_depends.extend(doc_sources_rules)
 
 # TODO: deprecate
-sdist_gen = env.Command('dist', 'setup.py', 'python setup.py sdist', chdir=1)
+sdist_gen = env.Command('dist',
+                        setup_sources,
+                        'python setup.py sdist',
+                        chdir=1)
 
 env.Default(sdist_gen)
 
@@ -72,10 +87,24 @@ env.Depends(generated_rule, [autogen_infra_sources, autogen_sources])
 env.Depends(sdist_gen, sdist_depends)
 
 if 'install' in BUILD_TARGETS:
-    install_cmd = env.Command(None, 'setup.py',
+    install_cmd = env.Command(None, setup_sources,
                               'python setup.py install %s' %
                               env['PYTHON_INSTALL_OPT'],
                               chdir = 1)
     env.Depends(install_cmd, sdist_depends)
     env.Alias('install', install_cmd)
 
+test_sources = [
+    'run_tests.sh',
+    '.testr.conf',
+    'requirements.txt',
+    'test-requirements.txt',
+    'tools/colorizer.py',
+    'tools/install_venv_common.py',
+    'tools/install_venv.py',
+    'tools/with_venv.sh',
+    'contrail-config/tests/__init__.py',
+    'contrail-config/tests/test_addr_mgmt.py',
+]
+
+tests = env.Command(None, test_sources, 'bash run_tests.sh -V', chdir = 1)

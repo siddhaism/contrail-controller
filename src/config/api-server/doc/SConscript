@@ -14,7 +14,7 @@ doc_sources_rules = []
 
 generated = ['vnc_cfg_api_server.rst', 'modules.rst']
 if os.path.exists('/usr/bin/sphinx-apidoc'):
-    apidoc_rule = env.Command(generated, '', 'SPHINX_APIDOC_OPTIONS="members,show-inheritance" sphinx-apidoc -f -o ' + Dir('.').path + ' ' + Dir('../vnc_cfg_api_server').path + ' ' + Dir('.').path)
+    apidoc_rule = env.Command(generated, '', 'SPHINX_APIDOC_OPTIONS="members,show-inheritance" sphinx-apidoc -f -o ' + Dir('.').path + ' ' + Dir('../contrail-config').path + ' ' + Dir('.').path)
 
     userdoc_rule = env.Install(Dir('.'), Glob('#controller/src/config/api-server/doc/source/*'))
     schema_rule = env.Install(Dir('.'), Glob('#controller/src/schema/*.xsd'))
@@ -24,6 +24,6 @@ if os.path.exists('/usr/bin/sphinx-apidoc'):
     env.Depends(html_gen_rule, [apidoc_rule, userdoc_rule, schema_rule])
 
 
-    doc_sources_rules.append(env.Install("../vnc_cfg_api_server", Dir('.')))
+    doc_sources_rules.append(env.Install("../contrail-config", Dir('.')))
 
 Return('doc_sources_rules')

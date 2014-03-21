@@ -10,17 +10,31 @@ import sys
 
 Import('BuildEnv')
 
+#
+# platform independent python packages
+#
 CfgmEnv = BuildEnv.Clone()
-CfgmEnv.SConscript(dirs=['api-server'], exports='CfgmEnv',
-                   variant_dir='build/noarch', duplicate = 1)
+subdirs = ['api-server']
+for sdir in subdirs:
+    CfgmEnv.SConscript(sdir + '/SConscript',
+                       exports='CfgmEnv',
+                       variant_dir = '#build/noarch/config/' + sdir,
+                       duplicate = 1)
 
-CfgmEnv.SConscript(
-    dirs=['uve',
-          'common',
-          'schema-transformer',
-          'svc-monitor',
-          'vnc_openstack',
-          'test'],
-    exports='CfgmEnv',
-#   variant_dir=CfgmEnv['TOP'] + '/config',
-    duplicate = 0)
+#
+# TODO: makes these conform to the scheme above
+#
+subdirs=['uve',
+         'common',
+         'schema-transformer',
+         'svc-monitor',
+         'vnc_openstack',
+         'test'
+         ]
+
+for sdir in subdirs:
+    CfgmEnv.SConscript(
+        sdir + '/SConscript',
+        exports='CfgmEnv',
+        variant_dir = CfgmEnv['TOP'] + '/config/' + sdir,
+        duplicate = 0)
