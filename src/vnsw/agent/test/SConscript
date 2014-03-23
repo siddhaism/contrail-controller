@@ -135,6 +135,9 @@ if sys.platform != 'darwin':
     test_multicast_headless = env.Program(target = 'test_multicast_headless', source = ['test_multicast_headless.cc'])
     env.Alias('controller/agent:test_multicast_headless', test_multicast_headless)
 
+    test_scale_walk = env.Program(target = 'test_scale_walk', source = ['test_scale_walk.cc'])
+    env.Alias('controller/agent:test_scale_walk', test_scale_walk)
+
 #    test_sg = env.Program(target = 'test_sg', source = ['test_sg.cc'])
 #    env.Alias('controller/agent:test_sg', test_sg)
 

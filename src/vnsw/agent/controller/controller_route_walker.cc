@@ -167,7 +167,7 @@ bool ControllerRouteWalker::RouteDelPeer(DBTablePartBase *partition,
     AgentRoute *route = static_cast<AgentRoute *>(entry);
     if (route) {
         route->vrf()->GetRouteTable(route->GetTableType())->
-            DeletePathFromPeer(partition, route, peer_, (type_ == STALE));
+            DeletePathFromPeer(partition, route, peer_);
     }
     return true;
 }

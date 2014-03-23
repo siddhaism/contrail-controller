@@ -145,7 +145,7 @@ public:
     static bool PathSelection(const Path &path1, const Path &path2);
     static const std::string &GetSuffix(Agent::RouteTableType type);
     void DeletePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
-                            const Peer *peer, bool stale);
+                            const Peer *peer);
 private:
     class DeleteActor;
     void AddUnresolvedRoute(const AgentRoute *rt);

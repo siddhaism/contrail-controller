@@ -159,7 +159,7 @@ private:
 class MulticastHandler {
 public:
     static const uint32_t kMulticastTimeout = 5 * 60 * 1000;
-    MulticastHandler(Agent *agent) : agent_(agent) { obj_ = this; }
+    MulticastHandler(Agent *agent);
     virtual ~MulticastHandler() { }
 
     /* Called by XMPP to add ctrl node sent olist and label */
@@ -173,6 +173,7 @@ public:
      * tunnel sent by former peer */
     static void RemoveStaleBgpPeer(uint64_t peer_sequence);
     static void CancelStaleBgpPeerTimer();
+    static void HandlePeerDown();
     //Registered for VN notification
     static void ModifyVN(DBTablePartBase *partition, DBEntryBase *e);
     //Registered for VM notification
@@ -196,7 +197,7 @@ public:
     MulticastGroupObject *FindFloodGroupObject(const std::string &vrf_name);
     MulticastGroupObject *FindGroupObject(const std::string &vrf_name,
                                           const Ip4Address &dip);
-    bool TimerExpired(uint64_t peer_sequence);
+    bool FlushPeerInfo(uint64_t peer_sequence);
     Timer *stale_timer() const {return stale_timer_;}
 private:
     //operations on list of all objectas per group/source/vrf
