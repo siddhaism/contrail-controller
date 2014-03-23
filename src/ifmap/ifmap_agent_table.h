@@ -107,6 +107,7 @@ public:
     IFMapAgentStaleCleaner(DB *db, DBGraph *graph, boost::asio::io_service &io_service);
     ~IFMapAgentStaleCleaner();
     void StaleCleanup(uint64_t seq);
+    void CancelCleanup();
     class IFMapAgentStaleCleanerWorker;
     void Clear();
 private:

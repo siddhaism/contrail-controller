@@ -637,6 +637,12 @@ void IFMapAgentStaleCleaner::StaleCleanup(uint64_t seq) {
     timer_->Start(timeout_, boost::bind(&IFMapAgentStaleCleaner::StaleTimeout, this), NULL);
 }
 
+void IFMapAgentStaleCleaner::CancelCleanup() {
+    if (timer_->running()) {
+        timer_->Cancel();
+    }
+}
+
 void IFMapAgentStaleCleaner::Clear() {
     IFMapLinkTable *table = static_cast<IFMapLinkTable *>(
         db_->FindTable(IFMAP_AGENT_LINK_DB_NAME));

@@ -7,6 +7,7 @@
 
 #include <sandesh/sandesh_trace.h>
 #include <discovery_client.h>
+#include <controller/controller_global.h>
 
 class AgentXmppChannel;
 class AgentDnsXmppChannel;
@@ -29,6 +30,12 @@ class VNController {
 
         static AgentDnsXmppChannel *FindAgentDnsXmppChannel(std::string server_ip);
         static void ApplyDiscoveryDnsXmppServices(std::vector<DSResponse> resp); 
+
+        static Agent *agent() {return global_controller_data_->agent();}
+        static void CreateGlobalControllerData();
+        static AgentControllerGlobalData *global_controller_data();
+
+        static AgentControllerGlobalData *global_controller_data_;
 };
 
 extern SandeshTraceBufferPtr ControllerTraceBuf;

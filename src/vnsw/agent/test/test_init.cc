@@ -48,6 +48,7 @@ TestClient *TestInit(const char *init_file, bool ksync_init, bool pkt_init,
                      bool asio, bool ksync_sync_mode) {
     TestClient *client = new TestClient();
     agent_init = new AgentTestInit(client);
+    VNController::CreateGlobalControllerData();
 
     // Read agent parameters from config file and arguments
     Agent *agent = agent_init->agent();

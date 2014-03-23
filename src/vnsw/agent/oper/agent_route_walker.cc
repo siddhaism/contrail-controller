@@ -184,25 +184,22 @@ void AgentRouteWalker::DecrementWalkCount() {
 
 void AgentRouteWalker::OnWalkComplete() {
     bool walk_done = false;
-    if (!walk_count_ && walk_done_cb_) {
-        walk_done_cb_();
-    }
-
-    //Double verification to see if all walks are done.
-    //TODO remove it as being redundant after some basic tests
     if (vrf_walkid_ == DBTableWalker::kInvalidWalkerId) {
+        walk_done = true;
         for (uint8_t table_type = 0; table_type < Agent::ROUTE_TABLE_MAX; 
              table_type++) {
             if (route_walkid_[table_type].size() != 0) {
                 //Route walk pending
                 walk_done = false;
-                if (walk_count_ == AgentRouteWalker::kInvalidWalkCount) {
-                    assert(0);
-                }
                 break;
             }
         }
-        walk_done = true;
+    }
+    if (walk_done && walk_count_) {
+        assert(0);
+    }
+    if (walk_done && !walk_count_ && walk_done_cb_) {
+        walk_done_cb_();
     }
 }
 

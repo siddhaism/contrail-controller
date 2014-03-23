@@ -22,16 +22,22 @@
 #include "controller/controller_peer.h" 
 
 #define MAX_CHANNEL 10 
-#define MAX_VN 200
-#define MAX_VMS_PER_VN 100
 #define MAX_CONTROL_PEER 2
-#define MAX_REMOTE_ROUTES_PER_VN 100
+#define MAX_INTERFACES 250
+#define DEFAULT_WALKER_YIELD 1024
 
 using namespace pugi;
 int num_vns = 1;
 int num_vms_per_vn = 1;
 int num_ctrl_peers = 1;
-int num_remote_route = 1;
+int walker_wait_usecs = 0;
+int walker_yield = 0;
+
+void SetWalkerYield(int yield) {
+    char iterations_env[80];
+    sprintf(iterations_env, "DB_ITERATION_TO_YIELD=%d", yield);
+    putenv(iterations_env);
+}
 
 void WaitForIdle2(int wait_seconds = 30) {
     static const int kTimeoutUsecs = 1000;
@@ -166,6 +172,7 @@ class ControlNodeMockBgpXmppPeer {
 public:
     ControlNodeMockBgpXmppPeer() : channel_ (NULL), rx_count_(0),
     label1_(1000), label2_(5000) {
+        peer_skip_route_list_.clear();
     }
 
     void ReflectIpv4Route(string vrf_name, const pugi::xml_node &node, 
@@ -173,11 +180,13 @@ public:
         autogen::ItemType item;
         item.Clear();
 
-        //item.XmlParse(node);
         EXPECT_TRUE(item.XmlParse(node));
         EXPECT_TRUE(item.entry.nlri.af == BgpAf::IPv4);
-        //Ip4Address addr = Ip4Address::from_string(item.entry.nlri.address);
         uint32_t label = 0;
+        if (peer_skip_route_list_.find(item.entry.nlri.address) !=
+           peer_skip_route_list_.end()) {
+            return;
+        }
         if (add_change) {
             EXPECT_TRUE(!item.entry.next_hops.next_hop.empty());
             //Assuming one interface NH has come
@@ -197,6 +206,10 @@ public:
         EXPECT_TRUE(item.entry.nlri.safi == BgpAf::Mcast);
         EXPECT_TRUE(!item.entry.nlri.group.empty());
 
+        if (peer_skip_route_list_.find(item.entry.nlri.group) !=
+           peer_skip_route_list_.end()) {
+            return;
+        }
         if (add_change) {
             SendBcastRouteMessage(vrf_name, item.entry.nlri.group, label1_++, 
                                   "127.0.0.1", label1_++, label1_++);
@@ -209,11 +222,13 @@ public:
         autogen::EnetItemType item;
         item.Clear();
 
-        //item.XmlParse(node);
         EXPECT_TRUE(item.XmlParse(node));
         EXPECT_TRUE(item.entry.nlri.af == BgpAf::L2Vpn);
-        //Ip4Address addr = Ip4Address::from_string(item.entry.nlri.address);
         uint32_t label = 0;
+        if (peer_skip_route_list_.find(item.entry.nlri.mac) !=
+           peer_skip_route_list_.end()) {
+            return;
+        }
         if (add_change) {
             EXPECT_TRUE(!item.entry.next_hops.next_hop.empty());
             //Assuming one interface NH has come
@@ -221,6 +236,7 @@ public:
                                item.entry.nlri.address, 
                                item.entry.next_hops.next_hop[0].label);
         } else {
+            //TODO check why retract parsing fails
             //SendL2RouteDeleteMessage(item.entry.nlri.mac, vrf_name, 
             //                         item.entry.nlri.address);
         }
@@ -380,6 +396,12 @@ public:
 
     void ReceiveUpdate(const XmppStanza::XmppMessage *msg) {
         rx_count_++;
+
+        if (!channel_ ||
+            (channel_->GetPeerState() != xmps::READY)) {
+            return;
+        }
+
         if (msg && msg->type == XmppStanza::IQ_STANZA) {
             const XmppStanza::XmppMessageIq *iq =
                 static_cast<const XmppStanza::XmppMessageIq *>(msg);
@@ -455,6 +477,10 @@ public:
     void WriteReadyCb(const boost::system::error_code &ec) {
     }
 
+    void SkipRoute(std::string addr) {
+        peer_skip_route_list_.insert(addr);
+    }
+
     size_t Count() const { return rx_count_; }
     virtual ~ControlNodeMockBgpXmppPeer() {
     }
@@ -463,12 +489,14 @@ private:
     size_t rx_count_;
     uint32_t label1_;
     uint32_t label2_;
+    std::set<string> peer_skip_route_list_;
 };
 
 
-class AgentBasicScaleTest : public ::testing::Test { 
+class AgentBasicScaleTest : public ::testing::Test {
 protected:
-    AgentBasicScaleTest() : thread_(&evm_), agent_(Agent::GetInstance())  {}
+    AgentBasicScaleTest() : thread_(&evm_), agent_(Agent::GetInstance())  {
+    }
  
     virtual void SetUp() {
         AgentIfMapVmExport::Init();
@@ -511,8 +539,7 @@ protected:
         return cfg;
     }
 
-
-    void VerifyConnections(int i) {
+    void VerifyConnections(int i, int mock_peer_count = 1) {
         XmppServer *xs_l = xs[i];
         XmppClient *xc_l = xc[i];
 
@@ -527,11 +554,12 @@ protected:
 
         XmppChannel *cchannel_l = cchannel[i];;
         WAIT_FOR(100, 10000, (cchannel_l->GetPeerState() == xmps::READY));
-        client->WaitForIdle();
+        if (mock_peer_count == 1)
+            client->WaitForIdle();
         //expect subscribe for __default__ at the mock server
 
         ControlNodeMockBgpXmppPeer *mock_peer_l = mock_peer[i].get();
-        WAIT_FOR(100, 10000, (mock_peer_l->Count() == 1));
+        WAIT_FOR(1000, 10000, (mock_peer_l->Count() == mock_peer_count));
     }
 
     void BuildControlPeers() {
@@ -599,38 +627,91 @@ protected:
         }
         //Create vn,vrf,vm,vm-port and route entry in vrf1 
         CreateVmportEnv(input, (intf_id - 1));
-        client->WaitForIdle();
+        WAIT_FOR(10000, 10000, (agent_->GetInterfaceTable()->Size() == 
+                                ((num_vns * num_vms_per_vn) + 3)));
+        VerifyVmPortActive(true);
+        VerifyRoutes(false);
     }
 
     void VerifyVmPortActive(bool active) {
+        int intf_id;
         for (int i = 0; i < (num_vns * num_vms_per_vn); i++) {
+            intf_id = input[i].intf_id;
             if (active) {
-                EXPECT_TRUE(VmPortActive(input, i));
+                WAIT_FOR(1000, 1000, VmPortActive(intf_id));
             } else {
-                EXPECT_FALSE(VmPortActive(input, i));
+                WAIT_FOR(1000, 1000, !VmPortActive(intf_id));
             }
         }
     }
 
-    void VerifyUnicastRoutes(bool deleted) {
+    void DeleteVmPortEnvironment() {
+        char vrf_name[80];
+        PortInfo *del_input = NULL;
+        int input_id = 0;
+        int intf_count = agent_->GetInterfaceTable()->Size();
+        for (int vn_cnt = 1; vn_cnt <= num_vns; vn_cnt++) {
+            for (int j = 0; j < num_vms_per_vn; j++) {
+                del_input = &input[input_id];
+                DeleteVmportEnv(del_input, 1, 1);
+                input_id++;
+            }
+            sprintf(vrf_name, "vrf%d", vn_cnt);
+            WAIT_FOR(10000, 10000, !VnFind(vn_cnt));
+            WAIT_FOR(10000, 10000, !VrfFind(vrf_name));
+        }
+        WAIT_FOR(10000, 10000, (agent_->GetInterfaceTable()->Size() == 3));
+        VerifyRoutes(true);
+        VerifyVmPortActive(false);
+        WAIT_FOR(10000, 10000, (Agent::GetInstance()->GetVrfTable()->Size() == 1));
+        WAIT_FOR(1000, 1000, (Agent::GetInstance()->GetVnTable()->Size() == 0));
+    }
+
+    void VerifyRoutes(bool deleted) {
         int intf_id = 1;
+        struct ether_addr *flood_mac = 
+            (struct ether_addr *)malloc(sizeof(struct ether_addr));
+        stringstream flood_mac_str;
+        flood_mac_str << "ff:ff:ff:ff:ff:ff";
+        memcpy (flood_mac, ether_aton(flood_mac_str.str().c_str()), 
+                sizeof(struct ether_addr));
+        struct ether_addr *local_vm_mac = 
+            (struct ether_addr *)malloc(sizeof(struct ether_addr));
         for (int vn_cnt = 1; vn_cnt <= num_vns; vn_cnt++) {
             stringstream ip_addr;
             ip_addr << vn_cnt << ".1.1.0";
             Ip4Address addr = 
                 IncrementIpAddress(Ip4Address::from_string(ip_addr.str()));
+            stringstream name;
+            name << "vrf" << intf_id;
             for (int vm_cnt = 0; vm_cnt < num_vms_per_vn; vm_cnt++) {
-                stringstream name;
-                int cnt = intf_id - 1;
-                name << "vrf" << intf_id;
+                stringstream mac;
+                mac << "00:00:00:00:" << std::hex << vn_cnt << ":" << 
+                    std::hex << (vm_cnt + 1);
+                memcpy (local_vm_mac, ether_aton(mac.str().c_str()), 
+                        sizeof(struct ether_addr));
                 if (deleted) {
-                    EXPECT_FALSE(RouteFind(name.str(), addr.to_string(), 32));
+                    WAIT_FOR(1000, 1000, !(RouteFind(name.str(), addr.to_string(), 32)));
+                    WAIT_FOR(1000, 1000, !(L2RouteFind(name.str(), *local_vm_mac)));
                 } else {
-                    EXPECT_TRUE(RouteFind(name.str(), addr.to_string(), 32));
+                    WAIT_FOR(1000, 1000, (RouteFind(name.str(), addr.to_string(), 32)));
+                    WAIT_FOR(1000, 1000, (L2RouteFind(name.str(), *local_vm_mac)));
                 }
                 addr = IncrementIpAddress(addr);
             }
+            if (deleted) {
+                WAIT_FOR(1000, 1000, !(MCRouteFind(name.str(), 
+                                                   Ip4Address::from_string("255.255.255.255"))));
+                WAIT_FOR(1000, 1000, !(L2RouteFind(name.str(), *flood_mac)));
+            } else {
+                WAIT_FOR(1000, 1000, (MCRouteFind(name.str(), 
+                                                  Ip4Address::from_string("255.255.255.255"))));
+                WAIT_FOR(1000, 1000, (L2RouteFind(name.str(), *flood_mac)));
+            }
+            intf_id++;
         }
+        delete flood_mac;
+        delete local_vm_mac;
     }
 
     void XmppConnectionSetUp() {
@@ -671,7 +752,8 @@ protected:
         ("vn", opt::value<int>(), "Number of VN")                   \
         ("vm", opt::value<int>(), "Number of VM per VN")            \
         ("control", opt::value<int>(), "Number of control peer")     \
-        ("remote_route", opt::value<int>(), "Number of remote route");\
+        ("wait_usecs", opt::value<int>(), "Walker Wait in msecs") \
+        ("yield", opt::value<int>(), "Walker yield (default 1)");\
     opt::store(opt::parse_command_line(argc, argv, desc), vm); \
     opt::notify(vm);                            \
     if (vm.count("help")) {                     \
@@ -690,8 +772,11 @@ protected:
     if (vm.count("control")) {                      \
         num_ctrl_peers = vm["control"].as<int>();   \
     }                                           \
-    if (vm.count("remote_route")) {                      \
-        num_remote_route = vm["remote_route"].as<int>();   \
+    if (vm.count("wait_usecs")) {                      \
+        walker_wait_usecs = vm["wait_usecs"].as<int>();   \
+    }                                           \
+    if (vm.count("yield")) {                      \
+        walker_yield = vm["yield"].as<int>();   \
     }                                           \
     if (vm.count("config")) {                   \
         strncpy(init_file, vm["config"].as<string>().c_str(), (sizeof(init_file) - 1) ); \

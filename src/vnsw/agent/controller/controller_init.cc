@@ -20,6 +20,7 @@
 #include "bind/bind_resolver.h"
 
 using namespace boost::asio;
+AgentControllerGlobalData *VNController::global_controller_data_;
 
 SandeshTraceBufferPtr ControllerTraceBuf(SandeshTraceBufferCreate(
     "Controller", 1000));
@@ -27,6 +28,10 @@ SandeshTraceBufferPtr ControllerTraceBuf(SandeshTraceBufferCreate(
 void VNController::XmppServerConnect() {
 
     uint8_t count = 0;
+
+    //Setup the global controller
+    VNController::CreateGlobalControllerData();
+
     while (count < MAX_XMPP_SERVERS) {
         if (!Agent::GetInstance()->GetXmppServer(count).empty()) {
 
@@ -135,7 +140,6 @@ void VNController::DnsXmppServerConnect() {
 }
 
 void VNController::Connect() {
-
     /* Connect to Control-Node Xmpp Server */
     VNController::XmppServerConnect();
 
@@ -225,6 +229,7 @@ void VNController::Cleanup() {
     }
 
     Agent::GetInstance()->SetControlNodeMulticastBuilder(NULL);
+    delete global_controller_data_;
     AgentIfMapVmExport::Shutdown();
 }
 
@@ -401,4 +406,16 @@ void VNController::ApplyDiscoveryDnsXmppServices(std::vector<DSResponse> resp) {
     } 
 
     VNController::DnsXmppServerConnect();
+}
+
+void VNController::CreateGlobalControllerData() {
+    //Setup the global controller
+    if (!global_controller_data_) {
+        global_controller_data_ = 
+            new AgentControllerGlobalData(Agent::GetInstance(), true);
+    }
+}
+
+AgentControllerGlobalData *VNController::global_controller_data() {
+    return (global_controller_data_ ? global_controller_data_ : NULL);
 }
