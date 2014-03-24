@@ -23,6 +23,7 @@ public:
 
     void WalkDoneNotifications() {
         walk_done_ = true;
+        cout << "DEBUGROUTE " << route_count_ << endl;
     }
 
     uint32_t vrf_count_;
@@ -53,6 +54,53 @@ TEST_F(AgentBasicScaleTest, Basic) {
     int expected_route_count = 6 + (2 * num_vns) + (3 * total_interface); 
     EXPECT_TRUE(expected_route_count == route_walker_test->route_count_);
     route_walker_test->vrf_count_ = route_walker_test->route_count_ = 0;
+
+    //Cleanup
+    delete route_walker_test;
+    delete dummy_peer;
+    DeleteVmPortEnvironment();
+}
+
+TEST_F(AgentBasicScaleTest, local_and_remote) {
+    client->Reset();
+    client->WaitForIdle();
+
+    //Setup 
+    XmppConnectionSetUp();
+    BuildVmPortEnvironment();
+
+    int total_interface = num_vns * num_vms_per_vn;
+    //int num_remote = num_remote;
+    int total_v4_routes = Agent::GetInstance()->GetVrfTable()->
+        GetInet4UnicastRouteTable("vrf1")->Size();
+
+    mock_peer[0].get()->AddRemoteV4Routes(num_remote, "vrf1", "vn1", 
+                                          "172.0.0.0");
+    WAIT_FOR(10000, 10000, (Agent::GetInstance()->GetVrfTable()->
+                            GetInet4UnicastRouteTable("vrf1")->Size() == 
+                            (total_v4_routes + num_remote)));
+
+    //Create a walker and pass callback
+    Peer *dummy_peer = new Peer(Peer::BGP_PEER, "dummy_peer");
+    ControllerRouteWalkerTest *route_walker_test = 
+        new ControllerRouteWalkerTest(dummy_peer);
+    SetWalkerYield(walker_yield);
+    route_walker_test->Start(ControllerRouteWalker::NOTIFYALL, true,
+                            boost::bind(&ControllerRouteWalkerTest::WalkDoneNotifications,
+                                        route_walker_test));
+    WAIT_FOR(10000, 10000, route_walker_test->walk_done_);
+    SetWalkerYield(DEFAULT_WALKER_YIELD);
+    
+    int expected_route_count = 6 + (2 * num_vns) + (3 * total_interface) + 
+        num_remote; 
+    EXPECT_TRUE(expected_route_count == route_walker_test->route_count_);
+    route_walker_test->vrf_count_ = route_walker_test->route_count_ = 0;
+
+    mock_peer[0].get()->DeleteRemoteV4Routes(num_remote, "vrf1", 
+                                             "172.0.0.0");
+    WAIT_FOR(10000, 10000, (Agent::GetInstance()->GetVrfTable()->
+                            GetInet4UnicastRouteTable("vrf1")->Size() == 
+                            total_v4_routes));
 
     //Cleanup
     delete route_walker_test;

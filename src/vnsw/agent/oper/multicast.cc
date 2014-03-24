@@ -1019,5 +1019,4 @@ void MulticastHandler::Shutdown() {
         //Delete the multicast object
         delete (*it);
     }
-    delete GetInstance()->stale_timer_;
 }

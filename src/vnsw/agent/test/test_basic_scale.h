@@ -32,6 +32,7 @@ int num_vms_per_vn = 1;
 int num_ctrl_peers = 1;
 int walker_wait_usecs = 0;
 int walker_yield = 0;
+int num_remote = 0;
 
 void SetWalkerYield(int yield) {
     char iterations_env[80];
@@ -191,7 +192,7 @@ public:
             EXPECT_TRUE(!item.entry.next_hops.next_hop.empty());
             //Assuming one interface NH has come
             SendRouteMessage(vrf_name, item.entry.nlri.address, 
-                             item.entry.next_hops.next_hop[0].label);
+                             item.entry.next_hops.next_hop[0].label, false);
         } else {
             SendRouteDeleteMessage(vrf_name, item.entry.nlri.address);
         }
@@ -252,14 +253,18 @@ public:
         SendUpdate(buf, msg.size());
     }
 
-    void SendRouteMessage(std::string vrf, std::string address, int label, 
+    void SendRouteMessage(std::string vrf, std::string address, int label, bool remote,
                           const char *vn = "vn1") {
         xml_document xdoc;
         xml_node xitems = MessageHeader(&xdoc, vrf);
 
         autogen::NextHopType item_nexthop;
         item_nexthop.af = BgpAf::IPv4;
-        item_nexthop.address = Agent::GetInstance()->GetRouterId().to_string();;
+        if (remote) {
+            item_nexthop.address = "127.127.127.127";
+        } else {
+            item_nexthop.address = Agent::GetInstance()->GetRouterId().to_string();
+        }
         item_nexthop.label = label;
 
         autogen::ItemType item;
@@ -472,6 +477,27 @@ public:
                    boost::bind(&ControlNodeMockBgpXmppPeer::WriteReadyCb, this, _1));
         }
         return false;
+    }
+
+    //TODO need to be moved to use gateway
+    void AddRemoteV4Routes(int num_routes, std::string vrf_name, std::string vn_name, 
+                           std::string ip_prefix) {
+        uint32_t label = 6000;
+        Ip4Address addr = Ip4Address::from_string(ip_prefix);
+        for (int i = 0; i < num_routes; i++) {
+            addr = IncrementIpAddress(addr);
+            stringstream addr_str;
+            addr_str << addr.to_string() << "/32";
+            SendRouteMessage(vrf_name, addr_str.str(), label++, true, vn_name.c_str());
+        }
+    }
+
+    void DeleteRemoteV4Routes(int num_routes, std::string vrf_name, std::string ip_prefix) {
+        Ip4Address addr = Ip4Address::from_string(ip_prefix);
+        for (int i = 0; i < num_routes; i++) {
+            addr = IncrementIpAddress(addr);
+            SendRouteDeleteMessage(vrf_name, addr.to_string()); 
+        }
     }
 
     void WriteReadyCb(const boost::system::error_code &ec) {
@@ -691,22 +717,22 @@ protected:
                 memcpy (local_vm_mac, ether_aton(mac.str().c_str()), 
                         sizeof(struct ether_addr));
                 if (deleted) {
-                    WAIT_FOR(1000, 1000, !(RouteFind(name.str(), addr.to_string(), 32)));
-                    WAIT_FOR(1000, 1000, !(L2RouteFind(name.str(), *local_vm_mac)));
+                    WAIT_FOR(1000, 10000, !(RouteFind(name.str(), addr.to_string(), 32)));
+                    WAIT_FOR(1000, 10000, !(L2RouteFind(name.str(), *local_vm_mac)));
                 } else {
-                    WAIT_FOR(1000, 1000, (RouteFind(name.str(), addr.to_string(), 32)));
-                    WAIT_FOR(1000, 1000, (L2RouteFind(name.str(), *local_vm_mac)));
+                    WAIT_FOR(1000, 10000, (RouteFind(name.str(), addr.to_string(), 32)));
+                    WAIT_FOR(1000, 10000, (L2RouteFind(name.str(), *local_vm_mac)));
                 }
                 addr = IncrementIpAddress(addr);
             }
             if (deleted) {
-                WAIT_FOR(1000, 1000, !(MCRouteFind(name.str(), 
+                WAIT_FOR(1000, 10000, !(MCRouteFind(name.str(), 
                                                    Ip4Address::from_string("255.255.255.255"))));
-                WAIT_FOR(1000, 1000, !(L2RouteFind(name.str(), *flood_mac)));
+                WAIT_FOR(1000, 10000, !(L2RouteFind(name.str(), *flood_mac)));
             } else {
-                WAIT_FOR(1000, 1000, (MCRouteFind(name.str(), 
+                WAIT_FOR(1000, 10000, (MCRouteFind(name.str(), 
                                                   Ip4Address::from_string("255.255.255.255"))));
-                WAIT_FOR(1000, 1000, (L2RouteFind(name.str(), *flood_mac)));
+                WAIT_FOR(1000, 10000, (L2RouteFind(name.str(), *flood_mac)));
             }
             intf_id++;
         }
@@ -752,6 +778,7 @@ protected:
         ("vn", opt::value<int>(), "Number of VN")                   \
         ("vm", opt::value<int>(), "Number of VM per VN")            \
         ("control", opt::value<int>(), "Number of control peer")     \
+        ("remote", opt::value<int>(), "Number of remote routes")     \
         ("wait_usecs", opt::value<int>(), "Walker Wait in msecs") \
         ("yield", opt::value<int>(), "Walker yield (default 1)");\
     opt::store(opt::parse_command_line(argc, argv, desc), vm); \
@@ -771,6 +798,9 @@ protected:
     }                                           \
     if (vm.count("control")) {                      \
         num_ctrl_peers = vm["control"].as<int>();   \
+    }                                           \
+    if (vm.count("remote")) {                      \
+        num_remote = vm["remote"].as<int>();   \
     }                                           \
     if (vm.count("wait_usecs")) {                      \
         walker_wait_usecs = vm["wait_usecs"].as<int>();   \
