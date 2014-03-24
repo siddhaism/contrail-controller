@@ -22,6 +22,7 @@ public:
     void AddToControllerPeerList(Peer *peer) {
         controller_peer_list_.push_back(peer);
     }
+    uint32_t ControllerPeerListSize() const {return controller_peer_list_.size();}
     bool headless_agent() const {return headless_agent_;}
 
 private:

@@ -229,7 +229,10 @@ void VNController::Cleanup() {
     }
 
     Agent::GetInstance()->SetControlNodeMulticastBuilder(NULL);
+    //TODO Make it a scoped ptr once vncontroller is converted to object from
+    //static instance
     delete global_controller_data_;
+    global_controller_data_ = NULL;
     AgentIfMapVmExport::Shutdown();
 }
 
