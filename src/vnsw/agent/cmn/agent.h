@@ -537,8 +537,6 @@ public:
     VirtualGateway *vgw() const {return vgw_.get(); }
     OperDB *oper_db() const {return oper_db_.get(); }
 
-    std::list<Peer *>ControllerPeerList;
-
 private:
     void GetConfig();
 

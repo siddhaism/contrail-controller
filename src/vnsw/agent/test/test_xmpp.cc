@@ -786,25 +786,29 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown_DecomissionedPeers) {
     WAIT_FOR(100, 10000, (sconnection->GetStateMcState() == xmsm::ESTABLISHED));
     WAIT_FOR(100, 10000, (cchannel->GetPeerState() == xmps::READY));
 
-    ASSERT_TRUE(Agent::GetInstance()->ControllerPeerList.size() == 0);
+    ASSERT_TRUE(VNController::global_controller_data()->ControllerPeerListSize()
+                == 0);
 
     //bring-down the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
     client->WaitForIdle();
 
-    ASSERT_TRUE(Agent::GetInstance()->ControllerPeerList.size() == 1);
+    ASSERT_TRUE(VNController::global_controller_data()->ControllerPeerListSize()
+                == 1);
 
     //bring up the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::READY);
     client->WaitForIdle();
 
-    ASSERT_TRUE(Agent::GetInstance()->ControllerPeerList.size() == 1);
+    ASSERT_TRUE(VNController::global_controller_data()->ControllerPeerListSize()
+                == 1);
 
     //bring-down the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
     client->WaitForIdle();
 
-    ASSERT_TRUE(Agent::GetInstance()->ControllerPeerList.size() == 2);
+    ASSERT_TRUE(VNController::global_controller_data()->ControllerPeerListSize()
+                == 2);
 
     xc->ConfigUpdate(new XmppConfigData());
     client->WaitForIdle(5);
