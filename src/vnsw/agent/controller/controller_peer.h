@@ -26,7 +26,7 @@ public:
         UP = 1,
     } AgentXmppChannelState;
     explicit AgentXmppChannel(XmppChannel *channel);
-    AgentXmppChannel(XmppChannel *channel, std::string xmpp_server, 
+    AgentXmppChannel(Agent *agent, XmppChannel *channel, std::string xmpp_server, 
                      std::string label_range, uint8_t xs_idx);
     virtual ~AgentXmppChannel();
 
@@ -36,7 +36,7 @@ public:
     virtual void ReceiveEvpnUpdate(XmlPugi *pugi);
     virtual void ReceiveMulticastUpdate(XmlPugi *pugi);
     XmppChannel *GetXmppChannel() { return channel_; }
-    static void HandleXmppClientChannelEvent(AgentXmppChannel *peer, 
+    static void HandleXmppClientChannelEvent(AgentXmppChannel *peer,
                                              xmps::PeerState state);
     static bool ControllerSendCfgSubscribe(AgentXmppChannel *peer);
     static bool ControllerSendVmCfgSubscribe(AgentXmppChannel *peer, 
@@ -75,6 +75,7 @@ public:
 
     void SetState(AgentXmppChannelState state) { state_ = state; }
     AgentXmppChannelState GetState() { return state_; }
+    Agent *agent() const {return agent_;}
    
 protected:
     virtual void WriteReadyCb(const boost::system::error_code &ec);
@@ -98,6 +99,7 @@ private:
     uint8_t xs_idx_;
     Peer *bgp_peer_id_;
     AgentXmppChannelState state_;
+    Agent *agent_;
 };
 
 #endif // __CONTROLLER_PEER_H__

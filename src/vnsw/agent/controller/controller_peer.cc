@@ -13,7 +13,6 @@
 #include "controller/controller_ifmap.h"
 #include "controller/controller_vrf_export.h"
 #include "controller/controller_init.h"
-#include "controller/controller_global.h"
 #include "oper/vrf.h"
 #include "oper/nexthop.h"
 #include "oper/mirror_table.h"
@@ -31,10 +30,10 @@
 using namespace boost::asio;
 using namespace autogen;
  
-AgentXmppChannel::AgentXmppChannel(XmppChannel *channel, std::string xmpp_server, 
+AgentXmppChannel::AgentXmppChannel(Agent *agent, XmppChannel *channel, std::string xmpp_server, 
                                    std::string label_range, uint8_t xs_idx) 
     : channel_(channel), xmpp_server_(xmpp_server), label_range_(label_range),
-      xs_idx_(xs_idx) {
+      xs_idx_(xs_idx), agent_(agent) {
 
     channel_->RegisterReceive(xmps::BGP, 
                               boost::bind(&AgentXmppChannel::ReceiveInternal, 
@@ -52,10 +51,10 @@ void AgentXmppChannel::CreateBgpPeer() {
     //Ensure older bgp_peer_id_ in decommisioned list
 
     DBTableBase::ListenerId id = 
-        Agent::GetInstance()->GetVrfTable()->Register(boost::bind(&VrfExport::Notify,
+        agent_->GetVrfTable()->Register(boost::bind(&VrfExport::Notify,
                                        this, _1, _2)); 
     boost::system::error_code ec;
-    const string &addr = Agent::GetInstance()->GetXmppServer(xs_idx_);
+    const string &addr = agent_->GetXmppServer(xs_idx_);
     Ip4Address ip = Ip4Address::from_string(addr.c_str(), ec);
     assert(ec.value() == 0);
     bgp_peer_id_ = new BgpPeer(ip, addr, this, id);
@@ -67,17 +66,12 @@ void AgentXmppChannel::DeCommissionBgpPeer() {
 
     BgpPeer *bgp_peer = static_cast<BgpPeer *>(bgp_peer_id_);
     DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
-    Agent::GetInstance()->GetVrfTable()->Unregister(id);
+    agent_->GetVrfTable()->Unregister(id);
 
     // Add the peer to global decommisioned list
-<<<<<<< HEAD
     //ControllerPeer::AgentBgpPeerList.push_front(bgp_peer); 
     //Controller_Peer.AgentBgpPeerList.push_front(bgp_peer); 
-    Agent::GetInstance()->ControllerPeerList.push_front(bgp_peer);
-=======
-    VNController::global_controller_data()->AddToControllerPeerList(bgp_peer);
-    //Agent::GetInstance()->ControllerPeerList.push_front(bgp_peer);
->>>>>>> Add global controller data class; add knob for headless; remove stale from delbgppeer in agentroute; add scale test cases
+    agent_->controller()->AddToControllerPeerList(bgp_peer);
 }
 
 
@@ -104,7 +98,7 @@ void AgentXmppChannel::ReceiveEvpnUpdate(XmlPugi *pugi) {
     const std::string vrf(vrf_name);
     Layer2AgentRouteTable *rt_table = 
         static_cast<Layer2AgentRouteTable *>
-        (Agent::GetInstance()->GetVrfTable()->GetLayer2RouteTable(vrf_name));
+        (agent_->GetVrfTable()->GetLayer2RouteTable(vrf_name));
 
     pugi::xml_node node_check = pugi->FindNode("retract");
     if (!pugi->IsNull(node_check)) {
@@ -213,7 +207,7 @@ void AgentXmppChannel::ReceiveMulticastUpdate(XmlPugi *pugi) {
         pugi->ReadNode("retract"); //sets the context
         std::string retract_id = pugi->ReadAttrib("id");
         if (bgp_peer_id_ !=
-            Agent::GetInstance()->GetControlNodeMulticastBuilder()->
+            agent_->GetControlNodeMulticastBuilder()->
             GetBgpPeer()) {
             CONTROLLER_TRACE(Trace, bgp_peer_id_->GetName(), vrf_name,
                        "Ignore retract request from non multicast tree "
@@ -258,7 +252,7 @@ void AgentXmppChannel::ReceiveMulticastUpdate(XmlPugi *pugi) {
 
                 MulticastHandler::ModifyFabricMembers(vrf, g_addr.to_v4(),
                         s_addr.to_v4(), 0, olist,
-                        VNController::global_controller_data()->multicast_peer_identifier());
+                        agent_->controller()->multicast_peer_identifier());
             }
         }
         return;
@@ -269,7 +263,7 @@ void AgentXmppChannel::ReceiveMulticastUpdate(XmlPugi *pugi) {
         pugi->ReadNode("item"); //sets the context
         std::string item_id = pugi->ReadAttrib("id");
         if (bgp_peer_id_ !=
-            Agent::GetInstance()->GetControlNodeMulticastBuilder()->
+            agent_->GetControlNodeMulticastBuilder()->
             GetBgpPeer()) {
             CONTROLLER_TRACE(Trace, bgp_peer_id_->GetName(), vrf_name,
                              "Ignore request from non multicast tree "
@@ -336,7 +330,7 @@ void AgentXmppChannel::ReceiveMulticastUpdate(XmlPugi *pugi) {
 
         MulticastHandler::ModifyFabricMembers(vrf, g_addr.to_v4(),
                 s_addr.to_v4(), item->entry.nlri.source_label,
-                olist, VNController::global_controller_data()->multicast_peer_identifier());
+                olist, agent_->controller()->multicast_peer_identifier());
     }
 }
 
@@ -344,7 +338,7 @@ void AgentXmppChannel::AddEcmpRoute(string vrf_name, Ip4Address prefix_addr,
                                     uint32_t prefix_len, ItemType *item) {
     Inet4UnicastAgentRouteTable *rt_table = 
         static_cast<Inet4UnicastAgentRouteTable *>
-        (Agent::GetInstance()->GetVrfTable()->GetInet4UnicastRouteTable
+        (agent_->GetVrfTable()->GetInet4UnicastRouteTable
          (vrf_name));
 
     std::vector<ComponentNHData> comp_nh_list;
@@ -360,10 +354,10 @@ void AgentXmppChannel::AddEcmpRoute(string vrf_name, Ip4Address prefix_addr,
         }
 
         uint32_t label = item->entry.next_hops.next_hop[i].label;
-        if (Agent::GetInstance()->GetRouterId() == addr.to_v4()) {
+        if (agent_->GetRouterId() == addr.to_v4()) {
             //Get local list of interface and append to the list
             MplsLabel *mpls = 
-                Agent::GetInstance()->GetMplsTable()->FindMplsLabel(label);
+                agent_->GetMplsTable()->FindMplsLabel(label);
             if (mpls != NULL) {
                 DBEntryBase::KeyPtr key = mpls->nexthop()->GetDBRequestKey();
                 NextHopKey *nh_key = static_cast<NextHopKey *>(key.get());
@@ -374,8 +368,8 @@ void AgentXmppChannel::AddEcmpRoute(string vrf_name, Ip4Address prefix_addr,
         } else {
             TunnelType::TypeBmap encap = GetTypeBitmap
                 (item->entry.next_hops.next_hop[i].tunnel_encapsulation_list);
-            ComponentNHData nh_data(label, Agent::GetInstance()->GetDefaultVrf(),
-                                    Agent::GetInstance()->GetRouterId(), 
+            ComponentNHData nh_data(label, agent_->GetDefaultVrf(),
+                                    agent_->GetRouterId(), 
                                     addr.to_v4(), false, encap);
             comp_nh_list.push_back(nh_data);
         }
@@ -398,7 +392,7 @@ void AgentXmppChannel::AddRemoteEvpnRoute(string vrf_name,
     IpAddress addr = IpAddress::from_string(nexthop_addr, ec);
     Layer2AgentRouteTable *rt_table = 
         static_cast<Layer2AgentRouteTable *>
-        (Agent::GetInstance()->GetVrfTable()->GetLayer2RouteTable(vrf_name));
+        (agent_->GetVrfTable()->GetLayer2RouteTable(vrf_name));
 
     if (ec.value() != 0) {
         CONTROLLER_TRACE(Trace, bgp_peer_id_->GetName(), vrf_name,
@@ -420,7 +414,7 @@ void AgentXmppChannel::AddRemoteEvpnRoute(string vrf_name,
                          "Error parsing route address");
         return;
     }
-    if (Agent::GetInstance()->GetRouterId() != addr.to_v4()) {
+    if (agent_->GetRouterId() != addr.to_v4()) {
         CONTROLLER_TRACE(Trace, bgp_peer_id_->GetName(), nexthop_addr,
                          "add remote evpn route");
         rt_table->AddRemoteVmRouteReq(bgp_peer_id_, vrf_name, encap,
@@ -432,8 +426,8 @@ void AgentXmppChannel::AddRemoteEvpnRoute(string vrf_name,
     const NextHop *nh = NULL;
     if (encap == (1 << TunnelType::VXLAN)) {
         VrfEntry *vrf = 
-            Agent::GetInstance()->GetVrfTable()->FindVrfFromName(vrf_name);
-        Layer2RouteKey key(Agent::GetInstance()->local_vm_peer(), 
+            agent_->GetVrfTable()->FindVrfFromName(vrf_name);
+        Layer2RouteKey key(agent_->local_vm_peer(), 
                            vrf_name, mac);
         if (vrf != NULL) {
             Layer2RouteEntry *route = 
@@ -452,7 +446,7 @@ void AgentXmppChannel::AddRemoteEvpnRoute(string vrf_name,
         }
     } else {
         MplsLabel *mpls = 
-            Agent::GetInstance()->GetMplsTable()->FindMplsLabel(label);
+            agent_->GetMplsTable()->FindMplsLabel(label);
         if (mpls != NULL) {
             nh = mpls->nexthop();
         }
@@ -489,7 +483,7 @@ void AgentXmppChannel::AddRemoteRoute(string vrf_name, Ip4Address prefix_addr,
                                       uint32_t prefix_len, ItemType *item) {
     Inet4UnicastAgentRouteTable *rt_table = 
         static_cast<Inet4UnicastAgentRouteTable *>
-        (Agent::GetInstance()->GetVrfTable()->GetInet4UnicastRouteTable
+        (agent_->GetVrfTable()->GetInet4UnicastRouteTable
          (vrf_name));
 
     boost::system::error_code ec; 
@@ -510,7 +504,7 @@ void AgentXmppChannel::AddRemoteRoute(string vrf_name, Ip4Address prefix_addr,
                      addr.to_v4().to_string(), label, 
                      item->entry.virtual_network);
 
-    if (Agent::GetInstance()->GetRouterId() != addr.to_v4()) {
+    if (agent_->GetRouterId() != addr.to_v4()) {
         rt_table->AddRemoteVmRouteReq(bgp_peer_id_, vrf_name,
                                       prefix_addr, prefix_len, addr.to_v4(),
                                       encap, label, item->entry.virtual_network,
@@ -518,7 +512,7 @@ void AgentXmppChannel::AddRemoteRoute(string vrf_name, Ip4Address prefix_addr,
         return;
     }
 
-    MplsLabel *mpls = Agent::GetInstance()->GetMplsTable()->FindMplsLabel(label);
+    MplsLabel *mpls = agent_->GetMplsTable()->FindMplsLabel(label);
     if (mpls != NULL) {
         const NextHop *nh = mpls->nexthop();
         switch(nh->GetType()) {
@@ -621,7 +615,7 @@ void AgentXmppChannel::ReceiveUpdate(const XmppStanza::XmppMessage *msg) {
 
         VrfKey vrf_key(vrf_name);
         VrfEntry *vrf = 
-            static_cast<VrfEntry *>(Agent::GetInstance()->GetVrfTable ()->FindActiveEntry(&vrf_key));
+            static_cast<VrfEntry *>(agent_->GetVrfTable ()->FindActiveEntry(&vrf_key));
         if (!vrf) {
             CONTROLLER_TRACE (Trace, bgp_peer_id_->GetName (), vrf_name,
                     "VRF not found");
@@ -706,25 +700,26 @@ void AgentXmppChannel::WriteReadyCb(const boost::system::error_code &ec) {
 
 void AgentXmppChannel::BgpPeerDelDone() {
     if (GetBgpPeer()->is_disconnect_walk()) {
-        VNController::Cleanup();
+        agent()->controller()->Cleanup();
     }
 }
 
 void AgentXmppChannel::HandleXmppClientChannelEvent(AgentXmppChannel *peer,
                                                     xmps::PeerState state) {
-    bool headless = VNController::global_controller_data()->headless_agent();
+    Agent *agent = peer->agent();
+    bool headless = agent->headless_agent_mode();
     if (state == xmps::READY) {
         // Create a new BgpPeer every-time a channel is UP
         if (headless) {
             peer->CreateBgpPeer();
         }
 
-        Agent::GetInstance()->SetAgentXmppChannelSetupTime(UTCTimestampUsec(), 
+        agent->SetAgentXmppChannelSetupTime(UTCTimestampUsec(), 
                                             peer->GetXmppServerIdx());
         // Switch-over Config Control-node
-        if (Agent::GetInstance()->GetXmppCfgServer().empty()) {
+        if (agent->GetXmppCfgServer().empty()) {
             if (ControllerSendCfgSubscribe(peer)) {
-                Agent::GetInstance()->SetXmppCfgServer(peer->GetXmppServer(), 
+                agent->SetXmppCfgServer(peer->GetXmppServer(), 
                                         peer->GetXmppServerIdx() );
                 //Generate a new sequence number for the configuration
                 AgentIfMapXmppChannel::NewSeqNumber();
@@ -734,18 +729,17 @@ void AgentXmppChannel::HandleXmppClientChannelEvent(AgentXmppChannel *peer,
 
         if (headless) {
             //Start a timer to flush off all old configs
-            Agent::GetInstance()->GetIfMapAgentStaleCleaner()->
+            agent->GetIfMapAgentStaleCleaner()->
                 StaleCleanup(AgentIfMapXmppChannel::GetSeqNumber());
         }
 
         // Switch-over Multicast Tree Builder
         AgentXmppChannel *agent_mcast_builder = 
-            Agent::GetInstance()->GetControlNodeMulticastBuilder();
+            agent->GetControlNodeMulticastBuilder();
         if (agent_mcast_builder == NULL) {
-            Agent::GetInstance()->SetControlNodeMulticastBuilder(peer);
+            agent->SetControlNodeMulticastBuilder(peer);
             if (headless) {
-                MulticastHandler::RemoveStaleBgpPeer(
-                                  VNController::global_controller_data()->
+                MulticastHandler::RemoveStaleBgpPeer(agent->controller()->
                                   incr_multicast_peer_identifier());
             }
         } else if (agent_mcast_builder != peer) {
@@ -758,10 +752,9 @@ void AgentXmppChannel::HandleXmppClientChannelEvent(AgentXmppChannel *peer,
                 agent_mcast_builder->GetBgpPeer()->
                     PeerNotifyMulticastRoutes(false); 
                 // Reset Multicast Tree Builder
-                Agent::GetInstance()->SetControlNodeMulticastBuilder(peer);
+                agent->SetControlNodeMulticastBuilder(peer);
                 if (headless) {
-                    MulticastHandler::RemoveStaleBgpPeer(
-                                      VNController::global_controller_data()->
+                    MulticastHandler::RemoveStaleBgpPeer(agent->controller()->
                                       incr_multicast_peer_identifier());
                 } else {
                     MulticastHandler::HandlePeerDown();
@@ -778,13 +771,13 @@ void AgentXmppChannel::HandleXmppClientChannelEvent(AgentXmppChannel *peer,
         AgentStats::GetInstance()->incr_xmpp_reconnects(peer->GetXmppServerIdx());
 
         CONTROLLER_TRACE(Session, peer->GetXmppServer(), "READY",
-                         Agent::GetInstance()->GetControlNodeMulticastBuilder()->GetBgpPeer()->GetName(),
+                         agent->GetControlNodeMulticastBuilder()->GetBgpPeer()->GetName(),
                          "Peer elected Multicast Tree Builder"); 
 
     } else {
 
         AgentXmppChannel *agent_mcast_builder = 
-            Agent::GetInstance()->GetControlNodeMulticastBuilder();
+            agent->GetControlNodeMulticastBuilder();
         if (headless) {
             // Add BgpPeer to global decommissioned list
             peer->DeCommissionBgpPeer();
@@ -801,21 +794,21 @@ void AgentXmppChannel::HandleXmppClientChannelEvent(AgentXmppChannel *peer,
             boost::bind(&AgentXmppChannel::BgpPeerDelDone, peer));
         
         // Switch-over Config Control-node
-        if (Agent::GetInstance()->GetXmppCfgServer().compare(peer->GetXmppServer()) == 0) {
+        if (agent->GetXmppCfgServer().compare(peer->GetXmppServer()) == 0) {
             //send cfg subscribe to other peer if exists
-            uint8_t o_idx = ((Agent::GetInstance()->GetXmppCfgServerIdx() == 0) ? 1: 0);
-            Agent::GetInstance()->ResetXmppCfgServer();
+            uint8_t o_idx = ((agent->GetXmppCfgServerIdx() == 0) ? 1: 0);
+            agent->ResetXmppCfgServer();
             AgentXmppChannel *new_cfg_peer = 
-                Agent::GetInstance()->GetAgentXmppChannel(o_idx);
+                agent->GetAgentXmppChannel(o_idx);
             AgentIfMapXmppChannel::NewSeqNumber();
             if (new_cfg_peer && ControllerSendCfgSubscribe(new_cfg_peer)) {
-                Agent::GetInstance()->SetXmppCfgServer(new_cfg_peer->GetXmppServer(),
+                agent->SetXmppCfgServer(new_cfg_peer->GetXmppServer(),
                                         new_cfg_peer->GetXmppServerIdx());
                 AgentIfMapVmExport::NotifyAll(new_cfg_peer);
             }  
             if (!headless) {
                 //Start a timer to flush off all old configs
-                Agent::GetInstance()->GetIfMapAgentStaleCleaner()->
+                agent->GetIfMapAgentStaleCleaner()->
                     StaleCleanup(AgentIfMapXmppChannel::GetSeqNumber());
             }
         }
@@ -824,15 +817,13 @@ void AgentXmppChannel::HandleXmppClientChannelEvent(AgentXmppChannel *peer,
         if (agent_mcast_builder == peer) {
             uint8_t o_idx = ((agent_mcast_builder->GetXmppServerIdx() == 0) ? 1: 0);
             AgentXmppChannel *new_mcast_builder = 
-                Agent::GetInstance()->GetAgentXmppChannel(o_idx);
+                agent->GetAgentXmppChannel(o_idx);
             if (new_mcast_builder && 
                 new_mcast_builder->GetXmppChannel()->GetPeerState() == xmps::READY) {
 
-                Agent::GetInstance()->
-                    SetControlNodeMulticastBuilder(new_mcast_builder);
+                agent->SetControlNodeMulticastBuilder(new_mcast_builder);
                 if (headless) {
-                    MulticastHandler::RemoveStaleBgpPeer(
-                                      VNController::global_controller_data()->
+                    MulticastHandler::RemoveStaleBgpPeer(agent->controller()->
                                       incr_multicast_peer_identifier());
                 }
                 //Advertise subnet and all broadcast routes to
@@ -841,13 +832,13 @@ void AgentXmppChannel::HandleXmppClientChannelEvent(AgentXmppChannel *peer,
                     PeerNotifyMulticastRoutes(true); 
 
                 CONTROLLER_TRACE(Session, peer->GetXmppServer(), "NOT_READY",
-                                 Agent::GetInstance()->GetControlNodeMulticastBuilder()->GetBgpPeer()->GetName(),
+                                 agent->GetControlNodeMulticastBuilder()->GetBgpPeer()->GetName(),
                                  "Peer elected Multicast Tree Builder"); 
 
             } else {
-                Agent::GetInstance()->SetControlNodeMulticastBuilder(NULL);
+                agent->SetControlNodeMulticastBuilder(NULL);
                 if (headless) {
-                    Agent::GetInstance()->GetIfMapAgentStaleCleaner()->
+                    agent->GetIfMapAgentStaleCleaner()->
                         CancelCleanup();
                     MulticastHandler::CancelStaleBgpPeerTimer();
                 }
@@ -1009,7 +1000,7 @@ bool AgentXmppChannel::ControllerSendV4UnicastRoute(AgentXmppChannel *peer,
     rstr << route->ToString();
     item.entry.nlri.address = rstr.str();
 
-    string rtr(Agent::GetInstance()->GetRouterId().to_string());
+    string rtr(peer->agent()->GetRouterId().to_string());
 
     autogen::NextHopType nh;
     nh.af = BgpAf::IPv4;
@@ -1119,7 +1110,7 @@ bool AgentXmppChannel::ControllerSendEvpnRoute(AgentXmppChannel *peer,
     item.entry.nlri.address = rstr.str();
     assert(item.entry.nlri.address != "0.0.0.0");
 
-    string rtr(Agent::GetInstance()->GetRouterId().to_string());
+    string rtr(peer->agent()->GetRouterId().to_string());
 
     autogen::EnetNextHopType nh;
     nh.af = Address::INET;
@@ -1233,7 +1224,7 @@ bool AgentXmppChannel::ControllerSendMcastRoute(AgentXmppChannel *peer,
     size_t datalen_;
    
     if (!peer) return false;
-    if (add_route && (Agent::GetInstance()->GetControlNodeMulticastBuilder() != peer)) {
+    if (add_route && (peer->agent()->GetControlNodeMulticastBuilder() != peer)) {
         CONTROLLER_TRACE(Trace, peer->GetBgpPeer()->GetName(),
                          route->vrf()->GetName(),
                          "Peer not elected Multicast Tree Builder");
@@ -1255,7 +1246,7 @@ bool AgentXmppChannel::ControllerSendMcastRoute(AgentXmppChannel *peer,
 
     autogen::McastNextHopType item_nexthop;
     item_nexthop.af = BgpAf::IPv4;
-    string rtr(Agent::GetInstance()->GetRouterId().to_string());
+    string rtr(peer->agent()->GetRouterId().to_string());
     item_nexthop.address = rtr;
     item_nexthop.label = peer->GetMcastLabelRange();
     item_nexthop.tunnel_encapsulation_list.tunnel_encapsulation.push_back("gre");

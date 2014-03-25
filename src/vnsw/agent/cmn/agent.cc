@@ -37,6 +37,8 @@
 #include <uve/agent_uve.h>
 #include <vgw/vgw.h>
 #include <cmn/agent_factory.h>
+#include <controller/controller_init.h>
+
 #include <diag/diag.h>
 
 const std::string Agent::null_str_ = "";
@@ -257,6 +259,7 @@ void Agent::CreateModules() {
     if (init_->vgw_enable()) {
         vgw_ = std::auto_ptr<VirtualGateway>(new VirtualGateway(this));
     }
+    controller_ = std::auto_ptr<VNController>(new VNController(this));
 }
 
 void Agent::CreateDBTables() {
@@ -390,7 +393,7 @@ Agent::Agent() :
     ifmap_parser_(NULL), router_id_configured_(false),
     mirror_src_udp_port_(0), lifetime_manager_(NULL), 
     ksync_sync_mode_(true), mgmt_ip_(""),
-    vxlan_network_identifier_mode_(AUTOMATIC) {
+    vxlan_network_identifier_mode_(AUTOMATIC), headless_agent_mode_(true) {
 
     assert(singleton_ == NULL);
     singleton_ = this;

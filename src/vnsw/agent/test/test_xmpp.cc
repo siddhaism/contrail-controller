@@ -76,8 +76,8 @@ void RouterIdDepInit() {
 class AgentBgpXmppPeerTest : public AgentXmppChannel {
 public:
     AgentBgpXmppPeerTest(XmppChannel *channel, std::string xs, uint8_t xs_idx) :
-        AgentXmppChannel(channel, xs, "0", xs_idx), rx_count_(0),
-        rx_channel_event_queue_(
+        AgentXmppChannel(Agent::GetInstance(), channel, xs, "0", xs_idx), 
+        rx_count_(0), rx_channel_event_queue_(
             TaskScheduler::GetInstance()->GetTaskId("xmpp::StateMachine"), 0,
             boost::bind(&AgentBgpXmppPeerTest::ProcessChannelEvent, this, _1)) {
     }
@@ -160,7 +160,6 @@ protected:
     AgentXmppUnitTest() : thread_(&evm_), agent_(Agent::GetInstance())  {}
  
     virtual void SetUp() {
-        AgentIfMapVmExport::Init();
         xs = new XmppServer(&evm_, XmppInit::kControlNodeJID);
         xc = new XmppClient(&evm_);
 
@@ -177,7 +176,6 @@ protected:
         client->WaitForIdle();
         TcpServerManager::DeleteServer(xs);
         TcpServerManager::DeleteServer(xc);
-        AgentIfMapVmExport::Shutdown();
         evm_.Shutdown();
         thread_.Join();
         client->WaitForIdle();
@@ -786,28 +784,28 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown_DecomissionedPeers) {
     WAIT_FOR(100, 10000, (sconnection->GetStateMcState() == xmsm::ESTABLISHED));
     WAIT_FOR(100, 10000, (cchannel->GetPeerState() == xmps::READY));
 
-    ASSERT_TRUE(VNController::global_controller_data()->ControllerPeerListSize()
+    ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
                 == 0);
 
     //bring-down the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
     client->WaitForIdle();
 
-    ASSERT_TRUE(VNController::global_controller_data()->ControllerPeerListSize()
+    ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
                 == 1);
 
     //bring up the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::READY);
     client->WaitForIdle();
 
-    ASSERT_TRUE(VNController::global_controller_data()->ControllerPeerListSize()
+    ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
                 == 1);
 
     //bring-down the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
     client->WaitForIdle();
 
-    ASSERT_TRUE(VNController::global_controller_data()->ControllerPeerListSize()
+    ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
                 == 2);
 
     xc->ConfigUpdate(new XmppConfigData());
