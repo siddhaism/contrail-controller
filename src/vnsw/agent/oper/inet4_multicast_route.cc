@@ -15,6 +15,7 @@
 #include <oper/multicast.h>
 #include <controller/controller_export.h>
 #include <controller/controller_peer.h>
+#include <controller/controller_init.h>
 #include <oper/agent_sandesh.h>
 
 using namespace std;
@@ -174,7 +175,8 @@ bool Inet4MulticastRouteEntry::DBEntrySandesh(Sandesh *sresp, bool stale) const 
     MulticastGroupObject *mc_obj = MulticastHandler::GetInstance()->
         FindGroupObject(vrf()->GetName(), dest_ip_addr());
     if (!stale || (mc_obj->peer_identifier() != 
-                  AgentXmppChannel::GetGlobalMulticastIdentifier())) {
+                  Agent::GetInstance()->controller()->
+                  multicast_peer_identifier())) {
         GetActiveNextHop()->SetNHSandeshData(data.nh);
     }
 

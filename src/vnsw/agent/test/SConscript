@@ -132,8 +132,8 @@ if sys.platform != 'darwin':
     test_basic_scale = env.Program(target = 'test_basic_scale', source = ['test_basic_scale.cc'])
     env.Alias('controller/agent:test_basic_scale', test_basic_scale)
 
-    test_multicast_headless = env.Program(target = 'test_multicast_headless', source = ['test_multicast_headless.cc'])
-    env.Alias('controller/agent:test_multicast_headless', test_multicast_headless)
+    test_xmpp_hv = env.Program(target = 'test_xmpp_hv', source = ['test_xmpp_hv.cc'])
+    env.Alias('controller/agent:test_xmpp_hv', test_xmpp_hv)
 
     test_scale_walk = env.Program(target = 'test_scale_walk', source = ['test_scale_walk.cc'])
     env.Alias('controller/agent:test_scale_walk', test_scale_walk)

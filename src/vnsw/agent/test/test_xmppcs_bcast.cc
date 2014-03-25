@@ -60,8 +60,8 @@ class AgentBgpXmppPeerTest : public AgentXmppChannel {
 public:
     AgentBgpXmppPeerTest(XmppChannel *channel, std::string xs, 
                          std::string lr, uint8_t xs_idx) :
-        AgentXmppChannel(channel, xs, lr, xs_idx), rx_count_(0),
-        rx_channel_event_queue_ (
+        AgentXmppChannel(Agent::GetInstance(), channel, xs, lr, xs_idx), 
+        rx_count_(0), rx_channel_event_queue_ (
             TaskScheduler::GetInstance()->GetTaskId("xmpp::StateMachine"), 0,
             boost::bind(&AgentBgpXmppPeerTest::ProcessChannelEvent, this, _1)) {
     }
@@ -72,8 +72,7 @@ public:
     }
 
     bool ProcessChannelEvent(xmps::PeerState state) { 
-        AgentXmppChannel::HandleXmppClientChannelEvent(
-            static_cast<AgentXmppChannel *>(this), state);
+        AgentXmppChannel::HandleXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
         return true;
     }
 
@@ -137,7 +136,6 @@ protected:
     AgentXmppUnitTest() : thread_(&evm_) {}
  
     virtual void SetUp() {
-        AgentIfMapVmExport::Init();
         xs_p = new XmppServer(&evm_, XmppInit::kControlNodeJID);
         xs_s = new XmppServer(&evm_, XmppInit::kControlNodeJID);
         xc_p = new XmppClient(&evm_);
@@ -166,7 +164,6 @@ protected:
         mock_peer.reset();
         mock_peer_s.reset();
 
-        AgentIfMapVmExport::Shutdown();
 
         TcpServerManager::DeleteServer(xs_p);
         TcpServerManager::DeleteServer(xs_s);

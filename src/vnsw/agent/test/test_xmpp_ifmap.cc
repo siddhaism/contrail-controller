@@ -46,7 +46,7 @@ using namespace pugi;
 void RouterIdDepInit() {
 
     // Parse config and then connect
-    VNController::Connect();
+    Agent::GetInstance()->controller()->Connect();
 }
 
 
@@ -98,7 +98,7 @@ protected:
     virtual void TearDown() {
         xs->Shutdown();
         client->WaitForIdle();
-        VNController::DisConnect();
+        Agent::GetInstance()->controller()->DisConnect();
         client->WaitForIdle();
         Agent::GetInstance()->GetEventManager()->Shutdown();
         client->WaitForIdle();

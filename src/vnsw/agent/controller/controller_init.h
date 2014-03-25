@@ -7,35 +7,47 @@
 
 #include <sandesh/sandesh_trace.h>
 #include <discovery_client.h>
-#include <controller/controller_global.h>
+#include <boost/scoped_ptr.hpp>
 
 class AgentXmppChannel;
 class AgentDnsXmppChannel;
+class AgentIfMapVmExport;
 
 class VNController {
-    public:
-        static void Connect();
-        static void DisConnect();
+public:
+    static const uint64_t kInvalidPeerIdentifier = 0xFFFFFFFFFFFFFFFF;
+    VNController(Agent *agent);
+    ~VNController();
+    void Connect();
+    void DisConnect();
 
-        static void Cleanup();
+    void Cleanup();
 
-        static void XmppServerConnect();
-        static void DnsXmppServerConnect();
+    void XmppServerConnect();
+    void DnsXmppServerConnect();
 
-        static void XmppServerDisConnect();
-        static void DnsXmppServerDisConnect();
+    void XmppServerDisConnect();
+    void DnsXmppServerDisConnect();
 
-        static AgentXmppChannel *FindAgentXmppChannel(std::string server_ip);
-        static void ApplyDiscoveryXmppServices(std::vector<DSResponse> resp); 
+    void ApplyDiscoveryXmppServices(std::vector<DSResponse> resp); 
+    void ApplyDiscoveryDnsXmppServices(std::vector<DSResponse> resp); 
 
-        static AgentDnsXmppChannel *FindAgentDnsXmppChannel(std::string server_ip);
-        static void ApplyDiscoveryDnsXmppServices(std::vector<DSResponse> resp); 
+    Agent *agent() {return agent_;}
+    uint64_t incr_multicast_peer_identifier() {
+        return multicast_peer_identifier_++;}
+    uint64_t multicast_peer_identifier() {return multicast_peer_identifier_;}
+    uint32_t ControllerPeerListSize() const {return controller_peer_list_.size();}
+    void AddToControllerPeerList(Peer *peer);
+    AgentIfMapVmExport *agent_ifmap_vm_export() const {return agent_ifmap_vm_export_.get();}
 
-        static Agent *agent() {return global_controller_data_->agent();}
-        static void CreateGlobalControllerData();
-        static AgentControllerGlobalData *global_controller_data();
+private:
+    AgentXmppChannel *FindAgentXmppChannel(std::string server_ip);
+    AgentDnsXmppChannel *FindAgentDnsXmppChannel(std::string server_ip);
 
-        static AgentControllerGlobalData *global_controller_data_;
+    Agent *agent_;
+    uint64_t multicast_peer_identifier_;
+    std::list<Peer *> controller_peer_list_;
+    boost::scoped_ptr<AgentIfMapVmExport> agent_ifmap_vm_export_;
 };
 
 extern SandeshTraceBufferPtr ControllerTraceBuf;

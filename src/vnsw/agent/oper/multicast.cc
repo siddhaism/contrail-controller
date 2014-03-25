@@ -15,7 +15,7 @@
 #include <oper/agent_sandesh.h>
 #include <oper/multicast.h>
 #include <oper/mirror_table.h>
-#include <controller/controller_global.h>
+#include <controller/controller_init.h>
 
 #include <sandesh/sandesh_types.h>
 #include <sandesh/sandesh_constants.h>
@@ -24,7 +24,7 @@
 #include <tbb/mutex.h>
 
 using namespace std;
-#define INVALID_PEER_IDENTIFIER AgentControllerGlobalData::kInvalidPeerIdentifier 
+#define INVALID_PEER_IDENTIFIER VNController::kInvalidPeerIdentifier 
 
 MulticastHandler *MulticastHandler::obj_;
 SandeshTraceBufferPtr MulticastTraceBuf(SandeshTraceBufferCreate("Multicast",

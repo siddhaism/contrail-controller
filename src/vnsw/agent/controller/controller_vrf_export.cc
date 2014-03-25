@@ -51,7 +51,7 @@ void VrfExport::Notify(AgentXmppChannel *bgp_xmpp_peer,
             return;
         }
 
-        if (vrf->GetName().compare(Agent::GetInstance()->GetDefaultVrf()) != 0) {
+        if (vrf->GetName().compare(bgp_xmpp_peer->agent()->GetDefaultVrf()) != 0) {
             for (table_type = 0; table_type < Agent::ROUTE_TABLE_MAX;
                  table_type++) {
                 state->rt_export_[table_type]->Unregister();
@@ -81,7 +81,7 @@ void VrfExport::Notify(AgentXmppChannel *bgp_xmpp_peer,
         state->force_chg_ = true;
         vrf->SetState(partition->parent(), id, state);
 
-        if (vrf->GetName().compare(Agent::GetInstance()->GetDefaultVrf()) != 0) {
+        if (vrf->GetName().compare(bgp_xmpp_peer->agent()->GetDefaultVrf()) != 0) {
             // Dont export routes belonging to Fabric VRF table
             for (table_type = 0; table_type < Agent::ROUTE_TABLE_MAX;
                  table_type++)
@@ -103,7 +103,8 @@ void VrfExport::Notify(AgentXmppChannel *bgp_xmpp_peer,
 
             state->exported_ = true; 
             if (state->force_chg_ == true) {
-                if (vrf->GetName().compare(Agent::GetInstance()->GetDefaultVrf()) != 0) {
+                if (vrf->GetName().compare(bgp_xmpp_peer->agent()->
+                                           GetDefaultVrf()) != 0) {
                     bgp_peer->route_walker()->StartRouteWalk(vrf);
                 }
             }
