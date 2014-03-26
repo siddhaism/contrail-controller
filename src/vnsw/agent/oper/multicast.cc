@@ -916,7 +916,7 @@ MulticastHandler::MulticastHandler(Agent *agent) : agent_(agent) {
                                                GetEventManager()->io_service()),
                                              "MulticastOldPeerFlushTimer",
                                              TaskScheduler::GetInstance()->
-                                             GetTaskId("xmpp::StateMachine"), 0);
+                                             GetTaskId("db::DBTable"), 0);
     obj_ = this; 
 }
 

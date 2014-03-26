@@ -862,7 +862,7 @@ public:
 
 class TestNhPeer : public Peer {
 public:
-    TestNhPeer() : Peer(BGP_PEER, "TestNH"), dummy_(0) { };
+    TestNhPeer() : Peer(Agent::GetInstance(), BGP_PEER, "TestNH"), dummy_(0) { };
     int dummy_;
 };
 

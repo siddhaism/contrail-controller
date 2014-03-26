@@ -926,13 +926,13 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
     //ensure route learnt via control-node, path is updated 
     Ip4Address addr = Ip4Address::from_string("1.1.1.1");
     Inet4UnicastRouteEntry *rt = RouteGet("vrf1", addr, 32);
-    WAIT_FOR(100, 10000, (rt->FindPath(ch->GetBgpPeer()) == NULL));
+    WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id()) == NULL));
 	client->WaitForIdle();
 
     //ensure route learnt via control-node, path is updated 
     addr = Ip4Address::from_string("1.1.1.2");
     rt = RouteGet("vrf1", addr, 32);
-    WAIT_FOR(100, 10000, (rt->FindPath(ch->GetBgpPeer()) == NULL));
+    WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id()) == NULL));
     WAIT_FOR(100, 10000, (client->CompositeNHCount() == 6)); 
     client->CompositeNHWait(11);
 

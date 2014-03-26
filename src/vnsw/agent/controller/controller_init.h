@@ -8,14 +8,18 @@
 #include <sandesh/sandesh_trace.h>
 #include <discovery_client.h>
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 class AgentXmppChannel;
 class AgentDnsXmppChannel;
 class AgentIfMapVmExport;
+class Peer;
 
 class VNController {
 public:
     static const uint64_t kInvalidPeerIdentifier = 0xFFFFFFFFFFFFFFFF;
+    static const uint32_t kUnicastStaleTimer = (2 * 60 * 1000); 
+    static const uint32_t kMulticastStaleTimer = (5 * 60 * 1000); 
     VNController(Agent *agent);
     ~VNController();
     void Connect();
@@ -32,13 +36,21 @@ public:
     void ApplyDiscoveryXmppServices(std::vector<DSResponse> resp); 
     void ApplyDiscoveryDnsXmppServices(std::vector<DSResponse> resp); 
 
-    Agent *agent() {return agent_;}
-    uint64_t incr_multicast_peer_identifier() {
+    //Multicast peer identifier
+    uint64_t incr_and_get_multicast_peer_identifier() {
         return multicast_peer_identifier_++;}
     uint64_t multicast_peer_identifier() {return multicast_peer_identifier_;}
+
+    //Peer maintenace 
+    uint8_t GetActiveXmppConnections();
     uint32_t ControllerPeerListSize() const {return controller_peer_list_.size();}
-    void AddToControllerPeerList(Peer *peer);
+    void AddToControllerPeerList(boost::shared_ptr<Peer> peer);
+    void ControllerPeerHeadlessAgentDelDone(Peer *peer);
+    void ControllerPeerStartCleanupTimer();
+    bool ControllerPeerCleanupTimerExpired();
+
     AgentIfMapVmExport *agent_ifmap_vm_export() const {return agent_ifmap_vm_export_.get();}
+    Agent *agent() {return agent_;}
 
 private:
     AgentXmppChannel *FindAgentXmppChannel(std::string server_ip);
@@ -46,8 +58,9 @@ private:
 
     Agent *agent_;
     uint64_t multicast_peer_identifier_;
-    std::list<Peer *> controller_peer_list_;
+    std::list<boost::shared_ptr<Peer> > controller_peer_list_;
     boost::scoped_ptr<AgentIfMapVmExport> agent_ifmap_vm_export_;
+    Timer *cleanup_timer_;
 };
 
 extern SandeshTraceBufferPtr ControllerTraceBuf;

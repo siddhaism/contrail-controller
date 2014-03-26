@@ -3,6 +3,7 @@
  */
 
 #include "base/logging.h"
+#include "base/timer.h"
 #include "base/contrail_ports.h"
 #include <sandesh/sandesh.h>
 #include <sandesh/sandesh_types.h>
@@ -26,6 +27,11 @@ SandeshTraceBufferPtr ControllerTraceBuf(SandeshTraceBufferCreate(
 
 VNController::VNController(Agent *agent) : agent_(agent), multicast_peer_identifier_(0) {
     controller_peer_list_.clear();
+    cleanup_timer_ = TimerManager::CreateTimer(*(agent->GetEventManager()->
+                                                io_service()),
+                                               "Agent Stale cleanup timer",
+                                               TaskScheduler::GetInstance()->
+                                               GetTaskId("db::DBTable"), 0);
 }
 
 VNController::~VNController() {
@@ -75,9 +81,15 @@ void VNController::XmppServerConnect() {
                                              agent_->GetXmppServer(count), 
                                              agent_->GetAgentMcastLabelRange(count),
                                              count);
-            client->RegisterConnectionEvent(xmps::BGP,
-                boost::bind(&AgentXmppChannel::HandleXmppClientChannelEvent, 
-                            bgp_peer, _2));
+            if (agent_->headless_agent_mode()) {
+                client->RegisterConnectionEvent(xmps::BGP,
+                        boost::bind(&AgentXmppChannel::HandleHeadlessAgentXmppClientChannelEvent,
+                                    bgp_peer, _2));
+            } else {
+                client->RegisterConnectionEvent(xmps::BGP,
+                        boost::bind(&AgentXmppChannel::HandleXmppClientChannelEvent, 
+                                    bgp_peer, _2));
+            }
 
             // create ifmap peer
             AgentIfMapXmppChannel *ifmap_peer = 
@@ -160,10 +172,11 @@ void VNController::XmppServerDisConnect() {
     uint8_t count = 0;
     while (count < MAX_XMPP_SERVERS) {
         if ((cl = agent_->GetAgentXmppClient(count)) != NULL) {
-            Peer *peer = agent_->GetAgentXmppChannel(count)->GetBgpPeer();
+            Peer *peer = agent_->GetAgentXmppChannel(count)->bgp_peer_id();
             // Sets the context of walk to decide on callback when walks are
             // done
-            peer->set_is_disconnect_walk(true);
+            if (peer)
+                peer->set_is_disconnect_walk(true);
             //shutdown triggers cleanup of routes learnt from
             //the control-node. 
             cl->Shutdown();
@@ -410,6 +423,56 @@ void VNController::ApplyDiscoveryDnsXmppServices(std::vector<DSResponse> resp) {
     DnsXmppServerConnect();
 }
 
-void VNController::AddToControllerPeerList(Peer *peer) {
+uint8_t VNController::GetActiveXmppConnections() {
+    uint8_t active_xmpps = 0;
+    uint8_t count = 0;
+    while (count < MAX_XMPP_SERVERS) {
+       AgentXmppChannel *xc = agent_->GetAgentXmppChannel(count);
+       if (xc) {
+           if (xc->GetState() == AgentXmppChannel::UP)
+               active_xmpps++;
+       }
+    }
+
+    return active_xmpps;
+}
+
+void VNController::AddToControllerPeerList(boost::shared_ptr<Peer> peer) {
     controller_peer_list_.push_back(peer);
+}
+
+void VNController::ControllerPeerHeadlessAgentDelDone(Peer *bgp_peer) {
+    for (std::list<boost::shared_ptr<Peer> >::iterator it  = 
+         controller_peer_list_.begin(); it != controller_peer_list_.end(); 
+         ++it) {
+        Peer *peer = static_cast<Peer *>((*it).get());
+        if (peer == bgp_peer) {
+            controller_peer_list_.remove(*it);
+            return;
+        }
+    }
+}
+
+bool VNController::ControllerPeerCleanupTimerExpired() {
+    for (std::list<boost::shared_ptr<Peer> >::iterator it  = 
+         controller_peer_list_.begin(); it != controller_peer_list_.end(); 
+         ++it) {
+        BgpPeer *bgp_peer = static_cast<BgpPeer *>((*it).get());
+        bgp_peer->DelPeerRoutes(
+            boost::bind(&VNController::ControllerPeerHeadlessAgentDelDone, this, bgp_peer));
+    }
+
+    return true;
+}
+
+void VNController::ControllerPeerStartCleanupTimer() {
+    if (cleanup_timer_ == NULL) {
+        return;
+    }
+
+    if (cleanup_timer_->running()) {
+        cleanup_timer_->Cancel();
+    }
+    cleanup_timer_->Start(kUnicastStaleTimer,
+        boost::bind(&VNController::ControllerPeerCleanupTimerExpired, this));
 }
