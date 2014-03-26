@@ -6,8 +6,9 @@
 #include <oper/peer.h>
 #include <oper/vrf.h>
 
-Peer::Peer(Type type, const std::string &name) : type_(type), name_(name),
-    route_walker_(new ControllerRouteWalker(Agent::GetInstance(), this)) {
+Peer::Peer(Agent *agent, Type type, const std::string &name) : 
+    type_(type), name_(name), agent_(agent), 
+    route_walker_(new ControllerRouteWalker(agent, this)) {
         is_disconnect_walk_ = false;
 }
 
@@ -29,4 +30,8 @@ void Peer::PeerNotifyMulticastRoutes(bool associate) {
 
 void Peer::StalePeerRoutes() {
     route_walker_->Start(ControllerRouteWalker::STALE, true, NULL);
+}
+
+BgpPeer::~BgpPeer() {
+    agent()->GetVrfTable()->Unregister(id_);
 }

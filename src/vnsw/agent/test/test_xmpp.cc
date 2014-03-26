@@ -701,14 +701,14 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown) {
     EXPECT_TRUE(l2_rt->GetActivePath()->peer()->GetType() == Peer::BGP_PEER);
 
     AgentXmppChannel *ch = static_cast<AgentXmppChannel *>(bgp_peer.get());
-    EXPECT_TRUE(rt->FindPath(ch->GetBgpPeer()) != NULL);
+    EXPECT_TRUE(rt->FindPath(ch->bgp_peer_id()) != NULL);
 
     //bring-down the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
     client->WaitForIdle();
 
     //ensure route learnt via control-node is deleted
-    WAIT_FOR(100, 10000, (rt->FindPath(ch->GetBgpPeer()) == NULL));
+    WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id()) == NULL));
 
     //Mock Sandesh request
     xmpp_req = new AgentXmppConnectionStatusReq();

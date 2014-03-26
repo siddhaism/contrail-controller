@@ -426,7 +426,7 @@ TEST_F(AgentXmppUnitTest, Connection) {
     WAIT_FOR(100, 10000, rt2->dest_vn_name().size() > 0);
     EXPECT_STREQ(rt2->dest_vn_name().c_str(), "vn1");
     //check paths
-    ASSERT_TRUE(rt2->FindPath(bgp_peer->GetBgpPeer()) != NULL);
+    ASSERT_TRUE(rt2->FindPath(bgp_peer->bgp_peer_id()) != NULL);
 
 
     // Send route-reflect, back to vrf1 from secondary control-node
@@ -443,7 +443,7 @@ TEST_F(AgentXmppUnitTest, Connection) {
 
     client->WaitForIdle();
     // Route leaked to vrf2, check entry in route-table, check paths
-    ASSERT_TRUE(rt2->FindPath(bgp_peer_s->GetBgpPeer()) != NULL);
+    ASSERT_TRUE(rt2->FindPath(bgp_peer_s->bgp_peer_id()) != NULL);
     
     //ensure active path is local-vm
     EXPECT_TRUE(rt->GetActivePath()->peer()->GetType() 
@@ -474,7 +474,7 @@ TEST_F(AgentXmppUnitTest, Connection) {
     Inet4UnicastRouteEntry *rt4 = RouteGet("vrf1", addr, 32);
     EXPECT_STREQ(rt4->dest_vn_name().c_str(), "vn1");
     //check paths
-    ASSERT_TRUE(rt4->FindPath(bgp_peer->GetBgpPeer()) == NULL);
+    ASSERT_TRUE(rt4->FindPath(bgp_peer->bgp_peer_id()) == NULL);
 
     //Send route-reflect delete from seconday control-node
     SendRouteDeleteMessage(mock_peer_s.get(), "vrf1");

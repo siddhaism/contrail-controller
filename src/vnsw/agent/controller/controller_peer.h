@@ -10,6 +10,8 @@
 
 #include <boost/function.hpp>
 #include <boost/system/error_code.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 #include "xmpp/xmpp_channel.h"
 #include "xmpp_enet_types.h"
 #include "xmpp_unicast_types.h"
@@ -36,6 +38,8 @@ public:
     virtual void ReceiveEvpnUpdate(XmlPugi *pugi);
     virtual void ReceiveMulticastUpdate(XmlPugi *pugi);
     XmppChannel *GetXmppChannel() { return channel_; }
+    static void HandleHeadlessAgentXmppClientChannelEvent(AgentXmppChannel *peer,
+                                                          xmps::PeerState state);
     static void HandleXmppClientChannelEvent(AgentXmppChannel *peer,
                                              xmps::PeerState state);
     static bool ControllerSendCfgSubscribe(AgentXmppChannel *peer);
@@ -68,7 +72,6 @@ public:
                                         bool add_route);
     void CreateBgpPeer();
     void DeCommissionBgpPeer();
-    Peer *GetBgpPeer() { return bgp_peer_id_; }
     std::string GetXmppServer() { return xmpp_server_; }
     uint8_t GetXmppServerIdx() { return xs_idx_; }
     std::string GetMcastLabelRange() { return label_range_; }
@@ -76,6 +79,7 @@ public:
     void SetState(AgentXmppChannelState state) { state_ = state; }
     AgentXmppChannelState GetState() { return state_; }
     Agent *agent() const {return agent_;}
+    Peer *bgp_peer_id() const {return bgp_peer_id_.get();}
    
 protected:
     virtual void WriteReadyCb(const boost::system::error_code &ec);
@@ -97,7 +101,8 @@ private:
     std::string xmpp_server_;
     std::string label_range_;
     uint8_t xs_idx_;
-    Peer *bgp_peer_id_;
+    //Peer *bgp_peer_id_;
+    boost::shared_ptr<Peer> bgp_peer_id_;
     AgentXmppChannelState state_;
     Agent *agent_;
 };

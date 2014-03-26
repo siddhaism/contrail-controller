@@ -616,7 +616,9 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_FailOver) {
     ASSERT_TRUE(cnh->ComponentNHCount() == 3);
 
     //Verify label deallocated from Mpls Table
-    EXPECT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    EXPECT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 4);
+    // headless
+    //EXPECT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 4);
 
     //expect subnet and all braodcast routes to newly elected
     //multicast builder

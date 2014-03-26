@@ -20,6 +20,7 @@
 
 class AgentXmppChannel;
 class ControllerRouteWalker;
+class VrfTable;
 
 class Peer {
 public:
@@ -36,7 +37,7 @@ public:
         NOVA_PEER
     };
 
-    Peer(Type type, const std::string &name);
+    Peer(Agent *agent, Type type, const std::string &name);
     virtual ~Peer();
 
     // Table Walkers
@@ -62,10 +63,12 @@ public:
     void set_is_disconnect_walk(bool is_disconnect_walk) {
         is_disconnect_walk_ = is_disconnect_walk;
     }
+    Agent *agent() const {return agent_;}
 
 private:
     Type type_;
     std::string name_;
+    Agent *agent_;
     boost::scoped_ptr<ControllerRouteWalker> route_walker_;
     tbb::atomic<bool> is_disconnect_walk_;
     DISALLOW_COPY_AND_ASSIGN(Peer);
@@ -74,13 +77,12 @@ private:
 // Peer used for BGP paths
 class BgpPeer : public Peer {
 public:
-    BgpPeer(const Ip4Address &server_ip, const std::string &name,
+    BgpPeer(Agent *agent, const Ip4Address &server_ip, const std::string &name,
             AgentXmppChannel *bgp_xmpp_peer, DBTableBase::ListenerId id) : 
-        Peer(Peer::BGP_PEER, name), server_ip_(server_ip), id_(id),
+        Peer(agent, Peer::BGP_PEER, name), server_ip_(server_ip), id_(id),
         bgp_xmpp_peer_(bgp_xmpp_peer) {
     }
-
-    virtual ~BgpPeer() { }
+    virtual ~BgpPeer();
 
     bool Compare(const Peer *rhs) const {
         const BgpPeer *bgp = static_cast<const BgpPeer *>(rhs);
@@ -103,7 +105,7 @@ private:
 class LocalVmPortPeer : public Peer {
 public:
     LocalVmPortPeer(const std::string &name, uint64_t handle) :
-        Peer(Peer::LOCAL_VM_PORT_PEER, name), handle_(handle) {
+        Peer(Agent::GetInstance(), Peer::LOCAL_VM_PORT_PEER, name), handle_(handle) {
     }
 
     virtual ~LocalVmPortPeer() { }
@@ -122,7 +124,7 @@ private:
 // ECMP peer
 class EcmpPeer : public Peer {
 public:
-    EcmpPeer() : Peer(Peer::ECMP_PEER, "ECMP") { }
+    EcmpPeer() : Peer(Agent::GetInstance(), Peer::ECMP_PEER, "ECMP") { }
     virtual ~EcmpPeer() { }
 
     bool Compare(const Peer *rhs) const { return false; }
