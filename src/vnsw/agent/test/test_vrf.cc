@@ -67,7 +67,7 @@ protected:
         Agent::GetInstance()->SetXmppPort(bgp_peer1->GetServerPort(), 0);
         Agent::GetInstance()->SetDnsXmppServer("", 0);
         Agent::GetInstance()->SetDnsXmppPort(bgp_peer1->GetServerPort(), 0);
-        Agent::GetInstance()->set_headless_agent_mode(false);
+        Agent::GetInstance()->set_headless_agent_mode(headless_init);
         RouterIdDepInit();
         thread_->Start();
         WAIT_FOR(100, 10000, (bgp_peer1->IsEstablished() == true));

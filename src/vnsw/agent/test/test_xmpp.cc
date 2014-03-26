@@ -775,6 +775,8 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown) {
 }
 
 TEST_F(AgentXmppUnitTest, ConnectionUpDown_DecomissionedPeers) {
+    if (!Agent::GetInstance()->headless_agent_mode())
+        return;
 
     client->Reset();
     client->WaitForIdle();
@@ -1185,6 +1187,7 @@ int main(int argc, char **argv) {
     GETUSERARGS();
     client = TestInit(init_file, ksync_init);
     Agent::GetInstance()->SetXmppServer("127.0.0.1", 0);
+    Agent::GetInstance()->set_headless_agent_mode(headless_init);
 
     int ret = RUN_ALL_TESTS();
     Agent::GetInstance()->GetEventManager()->Shutdown();
