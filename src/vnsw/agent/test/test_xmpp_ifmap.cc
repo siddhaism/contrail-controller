@@ -355,6 +355,8 @@ int main(int argc, char **argv) {
     GETUSERARGS();
     client = TestInit(init_file, ksync_init);
     Agent::GetInstance()->SetXmppServer("127.0.0.1", 0);
+    Agent::GetInstance()->set_headless_agent_mode(headless_init);
+
     return RUN_ALL_TESTS();
 }
 

@@ -679,15 +679,14 @@ protected:
     }
 
 
-    void XmppSubnetTearDown() {
-
+    void XmppSubnetTearDown(int cnh_del_cnt) {
         client->Reset();
         DelIPAM("vn1");
         client->WaitForIdle();
         client->Reset();
         DeleteVmportEnv(input, 2, 1, 0);
         client->WaitForIdle();
-        WAIT_FOR(100, 1000, (client->CompositeNHDelWait(6) == true));
+        WAIT_FOR(100, 1000, (client->CompositeNHDelWait(cnh_del_cnt) == true));
         WAIT_FOR(100, 10000, (client->CompositeNHCount() == 0));
         WAIT_FOR(100, 1000, 
                  (Agent::GetInstance()->GetMplsTable()->Size() == 0));
@@ -695,6 +694,10 @@ protected:
         WAIT_FOR(100, 1000, (VrfFind("vrf2") == false)); 
         client->NextHopReset();
         client->MplsReset();
+    }
+
+    void XmppSubnetTearDown() {
+        XmppSubnetTearDown(6);
     }
 
     EventManager evm_;
@@ -825,7 +828,11 @@ TEST_F(AgentXmppUnitTest, L2OnlyBcast_Test_SessionDownUp) {
     client->WaitForIdle();
     //Channel going down should not flush olist and mpls label and keep them as
     //stale entries until next peer comes up.
-    ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 3);
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 3);
+    } else {
+        ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 2);
+    }
 
     EXPECT_TRUE(Agent::GetInstance()->GetControlNodeMulticastBuilder() == NULL);
     struct ether_addr *mac_1;
@@ -881,9 +888,16 @@ TEST_F(AgentXmppUnitTest, L2OnlyBcast_Test_SessionDownUp) {
                           "127.0.0.1", alloc_label+10);
     // Bcast Route with updated olist
     WAIT_FOR(100, 10000, (bgp_peer.get()->Count() == 6));
-    client->CompositeNHWait(9);
-    WAIT_FOR(100, 10000, (client->CompositeNHCount() == 3));
-    client->WaitForIdle();
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        client->CompositeNHWait(9);
+        WAIT_FOR(100, 10000, (client->CompositeNHCount() == 3));
+        client->WaitForIdle();
+    } else {
+        client->CompositeNHWait(11);
+        WAIT_FOR(100, 10000, (client->CompositeNHCount() == 3));
+        client->MplsWait(5);
+        client->WaitForIdle();
+    }
 
     //Verify mpls table
     MplsLabel *mpls = 
@@ -920,6 +934,9 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
     AgentXmppChannel *ch = static_cast<AgentXmppChannel *>(bgp_peer.get());
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
     client->WaitForIdle();
+    if (!Agent::GetInstance()->headless_agent_mode()) {
+        client->MplsDelWait(2);
+    }
 
     EXPECT_TRUE(Agent::GetInstance()->GetControlNodeMulticastBuilder() == NULL);
 
@@ -933,8 +950,13 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
     addr = Ip4Address::from_string("1.1.1.2");
     rt = RouteGet("vrf1", addr, 32);
     WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id()) == NULL));
-    WAIT_FOR(100, 10000, (client->CompositeNHCount() == 6)); 
-    client->CompositeNHWait(11);
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        WAIT_FOR(100, 10000, (client->CompositeNHCount() == 6)); 
+        client->CompositeNHWait(11);
+    } else {
+        WAIT_FOR(100, 10000, (client->CompositeNHCount() == 5)); 
+        client->CompositeNHWait(17);
+    }
 
     //ensure route learnt via control-node is updated
     addr = Ip4Address::from_string("1.1.1.255");
@@ -957,7 +979,11 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
     ASSERT_TRUE(cnh->ComponentNHCount() == 3);
 
     //Label is not deallocated and retained as stale
-    EXPECT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        EXPECT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    } else {
+        EXPECT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 4);
+    }
 
     //bring-up the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::READY);
@@ -994,9 +1020,15 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
                           "127.0.0.1", alloc_label+10);
     // Bcast Route with updated olist 
     WAIT_FOR(100, 10000, (bgp_peer.get()->Count() == 7));
-    WAIT_FOR(100, 10000, (client->CompositeNHCount() == 6));
-    client->CompositeNHWait(13);
-    client->MplsWait(6);
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        WAIT_FOR(100, 10000, (client->CompositeNHCount() == 6));
+        client->CompositeNHWait(13);
+        client->MplsWait(6);
+    } else {
+        WAIT_FOR(100, 10000, (client->CompositeNHCount() == 5));
+        client->CompositeNHWait(19);
+        client->MplsWait(9);
+    }
 
     addr = Ip4Address::from_string("1.1.1.255");
     ASSERT_TRUE(RouteFind("vrf1", addr, 32));
@@ -1015,7 +1047,11 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
     MplsLabel *mpls = 
 	Agent::GetInstance()->GetMplsTable()->FindMplsLabel(alloc_label);
     ASSERT_TRUE(mpls == NULL);
-    ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    } else {
+        ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 5);
+    }
 
     //Send All bcast route
     SendBcastRouteMessage(mock_peer.get(), "vrf1",
@@ -1024,8 +1060,13 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
     // Bcast Route with updated olist
     WAIT_FOR(100, 10000, (bgp_peer.get()->Count() == 8));
     WAIT_FOR(100, 10000, (client->CompositeNHCount() == 6));
-    client->CompositeNHWait(16);
-    client->MplsWait(6);
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        client->CompositeNHWait(16);
+        client->MplsWait(6);
+    } else {
+        client->CompositeNHWait(23);
+        client->MplsWait(10);
+    }
 
     //ensure route learnt via control-node is updated 
     addr = Ip4Address::from_string("255.255.255.255");
@@ -1045,7 +1086,11 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
     //Verify mpls table size
     ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
 
-    XmppSubnetTearDown();
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        XmppSubnetTearDown();
+    } else {
+        XmppSubnetTearDown(7);
+    }
 
     IntfCfgDel(input, 0);
     IntfCfgDel(input, 1);
@@ -1700,6 +1745,7 @@ int main(int argc, char **argv) {
     client = TestInit(init_file, ksync_init);
     Agent::GetInstance()->SetXmppServer("127.0.0.1", 0);
     Agent::GetInstance()->SetAgentMcastLabelRange(0);
+    Agent::GetInstance()->set_headless_agent_mode(headless_init);
 
     int ret = RUN_ALL_TESTS();
     Agent::GetInstance()->GetEventManager()->Shutdown();

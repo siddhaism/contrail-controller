@@ -718,7 +718,8 @@ int main(int argc, char **argv) {
     Agent::GetInstance()->SetXmppServer("127.0.0.1", 1);
     Agent::GetInstance()->SetAgentMcastLabelRange(0);
     Agent::GetInstance()->SetAgentMcastLabelRange(1);
-    
+    Agent::GetInstance()->set_headless_agent_mode(headless_init);
+
     int ret = RUN_ALL_TESTS();
     Agent::GetInstance()->GetEventManager()->Shutdown();
     AsioStop();
