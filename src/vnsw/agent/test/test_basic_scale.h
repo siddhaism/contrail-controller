@@ -152,7 +152,11 @@ public:
     }
 
     bool ProcessChannelEvent(xmps::PeerState state) {
-        AgentXmppChannel::HandleXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
+        if (Agent::GetInstance()->headless_agent_mode()) {
+            AgentXmppChannel::HandleHeadlessAgentXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
+        } else {
+            AgentXmppChannel::HandleXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
+        }
         return true;
     }
 
@@ -535,6 +539,11 @@ protected:
     }
 
     virtual void TearDown() {
+        if (Agent::GetInstance()->headless_agent_mode()) {
+            Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+            client->WaitForIdle();
+        }
+
         for (int i = 0; i < num_ctrl_peers; i++) {
             xc[i]->ConfigUpdate(new XmppConfigData());
             client->WaitForIdle(5);
@@ -546,6 +555,9 @@ protected:
             TcpServerManager::DeleteServer(xs[i]);
             TcpServerManager::DeleteServer(xc[i]);
         }
+        Agent::GetInstance()->controller()->Cleanup();
+        client->WaitForIdle();
+        WAIT_FOR(1000, 1000, (Agent::GetInstance()->controller()->ControllerPeerListSize() == 0));
         evm_.Shutdown();
         thread_.Join();
         client->WaitForIdle();
@@ -761,6 +773,7 @@ protected:
 };
 
 #define GETSCALEARGS()                          \
+    bool headless_init = false;                 \
     bool ksync_init = false;                    \
     char init_file[1024];                       \
     memset(init_file, '\0', sizeof(init_file)); \
@@ -776,6 +789,7 @@ protected:
         ("vm", opt::value<int>(), "Number of VM per VN")            \
         ("control", opt::value<int>(), "Number of control peer")     \
         ("remote", opt::value<int>(), "Number of remote routes")     \
+        ("headless", opt::value<int>(), "headless agent mode") \
         ("wait_usecs", opt::value<int>(), "Walker Wait in msecs") \
         ("yield", opt::value<int>(), "Walker yield (default 1)");\
     opt::store(opt::parse_command_line(argc, argv, desc), vm); \
@@ -796,8 +810,11 @@ protected:
     if (vm.count("control")) {                      \
         num_ctrl_peers = vm["control"].as<int>();   \
     }                                           \
-    if (vm.count("remote")) {                      \
-        num_remote = vm["remote"].as<int>();   \
+    if (vm.count("remote")) {                   \
+        num_remote = vm["remote"].as<int>();    \
+    }                                           \
+    if (vm.count("headless")) {                 \
+        headless_init = true;                   \
     }                                           \
     if (vm.count("wait_usecs")) {                      \
         walker_wait_usecs = vm["wait_usecs"].as<int>();   \

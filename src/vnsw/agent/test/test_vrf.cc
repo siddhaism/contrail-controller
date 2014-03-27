@@ -75,6 +75,12 @@ protected:
     virtual void TearDown() {
         Agent::GetInstance()->controller()->DisConnect();
         client->WaitForIdle();
+        if (Agent::GetInstance()->headless_agent_mode()) {
+            Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+            client->WaitForIdle();
+            Agent::GetInstance()->controller()->Cleanup();
+            client->WaitForIdle();
+        }
 
         bgp_peer1->Shutdown();
         client->WaitForIdle();
