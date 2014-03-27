@@ -27,7 +27,7 @@ public:
     InetInterface(const std::string &name);
     InetInterface(const std::string &name, SubType sub_type, VrfEntry *vrf,
                   const Ip4Address &ip_addr, int plen, const Ip4Address &gw,
-                  const std::string &vn_name);
+                  Interface *xconnect, const std::string &vn_name);
     virtual ~InetInterface() { }
 
     // DBTable virtual functions
@@ -37,6 +37,7 @@ public:
     // The interfaces are keyed by name. No UUID is allocated for them
     virtual bool CmpInterface(const DBEntry &rhs) const;
     SubType sub_type() const { return sub_type_; }
+    Interface *xconnect() const { return xconnect_.get(); }
 
     void PostAdd();
     bool OnChange(InetInterfaceData *data);
@@ -53,13 +54,15 @@ public:
     static void CreateReq(InterfaceTable *table, const std::string &ifname,
                           SubType sub_type, const std::string &vrf_name,
                           const Ip4Address &addr, int plen,
-                          const Ip4Address &gw, const std::string &vn_name);
+                          const Ip4Address &gw, 
+                          const std::string &xconnect,const std::string &vn_name);
     static void DeleteReq(InterfaceTable *table, const std::string &ifname);
 private:
     SubType sub_type_;
     Ip4Address ip_addr_;
     int plen_;
     Ip4Address gw_;
+    InterfaceRef xconnect_;   // Physical interface for VHOST
     std::string vn_name_;
     DISALLOW_COPY_AND_ASSIGN(InetInterface);
 };
@@ -78,13 +81,14 @@ struct InetInterfaceData : public InterfaceData {
     InetInterfaceData(InetInterface::SubType sub_type, 
                       const std::string &vrf_name, const Ip4Address &addr,
                       int plen, const Ip4Address &gw,
-                      const std::string vn_name);
+                      const std::string &xconnect, const std::string vn_name);
     virtual ~InetInterfaceData() { }
 
     InetInterface::SubType sub_type_;
     Ip4Address ip_addr_;
     int plen_;
     Ip4Address gw_;
+    std::string xconnect_;
     std::string vn_name_;
 };
 

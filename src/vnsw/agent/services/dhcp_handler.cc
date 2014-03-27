@@ -690,8 +690,29 @@ void DhcpHandler::SendDhcpResponse() {
     UdpHdr(len, src_ip, DHCP_SERVER_PORT, dest_ip, DHCP_CLIENT_PORT);
     len += sizeof(iphdr);
     IpHdr(len, src_ip, dest_ip, IPPROTO_UDP);
-    EthHdr(agent()->pkt()->pkt_handler()->mac_address(), dest_mac, 0x800);
+    EthHdr(agent()->pkt()->pkt_handler()->mac_address(), dest_mac,
+						pkt_info_->ether_type);
     len += sizeof(ethhdr);
+
+    if (pkt_info_->ether_type == VLAN_PROTOCOL)
+        len += 4;
+
+    // TODO: temporary patch to send pkt with vlan; needs fix
+    if (vm_itf_->vlan_id() != VmInterface::kInvalidVlanId &&
+        pkt_info_->ether_type != VLAN_PROTOCOL) {
+        uint8_t *new_pkt = new uint8_t[1024];
+        memcpy(new_pkt, pkt_info_->pkt, IPC_HDR_LEN + 12);
+        vlanhdr *vlan = reinterpret_cast<vlanhdr *>(new_pkt + IPC_HDR_LEN + 12);
+        vlan->tpid = htons(0x8100);
+        vlan->tci = htons(vm_itf_->vlan_id());  // cfi and priority are zero
+        vlan += 1;
+        vlan->tpid = htons(pkt_info_->ether_type);
+        memcpy(new_pkt + IPC_HDR_LEN + 18, pkt_info_->pkt + IPC_HDR_LEN + 14, len - 14);
+        len += 4;
+        delete [] pkt_info_->pkt;
+        pkt_info_->pkt = new_pkt;
+    }
+
 
     Send(len, GetIntf(), pkt_info_->vrf, AGENT_CMD_SWITCH, PktHandler::DHCP);
 }

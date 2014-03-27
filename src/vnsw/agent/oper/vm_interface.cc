@@ -947,6 +947,11 @@ bool VmInterface::IsActive() {
         return false;
     }
 
+    if (vlan_id_ != VmInterface::kInvalidVlanId) {
+       return true;
+    }
+
+
     if (os_index_ == kInvalidIndex)
         return false;
 

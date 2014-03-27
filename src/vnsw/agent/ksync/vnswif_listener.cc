@@ -250,6 +250,7 @@ void VnswInterfaceListener::CreateVhostRoutes(Ip4Address &host_ip,
                              agent_->vhost_interface_name(),
                              InetInterface::VHOST, agent_->GetDefaultVrf(),
                              host_ip, plen, agent_->GetGatewayId(),
+                             agent_->GetIpFabricItfName(),
                              agent_->GetDefaultVrf());
 }
 
