@@ -88,7 +88,11 @@ public:
     }
 
     bool ProcessChannelEvent(xmps::PeerState state) {
-        AgentXmppChannel::HandleXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
+        if (Agent::GetInstance()->headless_agent_mode()) {
+            AgentXmppChannel::HandleHeadlessAgentXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
+        } else {
+            AgentXmppChannel::HandleXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
+        }
         return true;
     }
 
@@ -174,6 +178,14 @@ protected:
         client->WaitForIdle();
         xc->Shutdown();
         client->WaitForIdle();
+
+        if (Agent::GetInstance()->headless_agent_mode()) {
+            Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+            client->WaitForIdle();
+            Agent::GetInstance()->controller()->Cleanup();
+            client->WaitForIdle();
+        }
+
         TcpServerManager::DeleteServer(xs);
         TcpServerManager::DeleteServer(xc);
         evm_.Shutdown();
@@ -702,13 +714,18 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown) {
 
     AgentXmppChannel *ch = static_cast<AgentXmppChannel *>(bgp_peer.get());
     EXPECT_TRUE(rt->FindPath(ch->bgp_peer_id()) != NULL);
+        WAIT_FOR(100, 10000, !(rt->FindPath(ch->bgp_peer_id())->is_stale()));
 
     //bring-down the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
     client->WaitForIdle();
 
     //ensure route learnt via control-node is deleted
-    WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id()) == NULL));
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id())->is_stale()));
+    } else {
+        WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id()) == NULL));
+    }
 
     //Mock Sandesh request
     xmpp_req = new AgentXmppConnectionStatusReq();
@@ -1078,6 +1095,8 @@ TEST_F(AgentXmppUnitTest, vxlan_peer_l2route_add) {
 
     //Delete vm-port and route entry in vrf1
     DeleteVmportEnv(input, 1, true);
+    WAIT_FOR(1000, 1000, !RouteFind("vrf1", addr, 32));
+    WAIT_FOR(1000, 1000, (VmPortFind(input, 0) == false));
     client->WaitForIdle();
     DelEncapList();
     client->WaitForIdle();

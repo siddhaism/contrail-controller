@@ -38,7 +38,7 @@ public:
 
     //Multicast peer identifier
     uint64_t incr_and_get_multicast_peer_identifier() {
-        return multicast_peer_identifier_++;}
+        return ++multicast_peer_identifier_;}
     uint64_t multicast_peer_identifier() {return multicast_peer_identifier_;}
 
     //Peer maintenace 
@@ -51,6 +51,7 @@ public:
 
     AgentIfMapVmExport *agent_ifmap_vm_export() const {return agent_ifmap_vm_export_.get();}
     Agent *agent() {return agent_;}
+    Timer *cleanup_timer() const {return cleanup_timer_;}
 
 private:
     AgentXmppChannel *FindAgentXmppChannel(std::string server_ip);

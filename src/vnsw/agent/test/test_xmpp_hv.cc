@@ -181,9 +181,9 @@ TEST_F(AgentBasicScaleTest, one_channel_down_up_skip_route_from_peer) {
     mcobj = MulticastHandler::GetInstance()->FindGroupObject("vrf1", mc_addr);
     EXPECT_TRUE(MCRouteFind("vrf1", mc_addr));
     EXPECT_TRUE(mcobj->GetSourceMPLSLabel() != 0);
-    WAIT_FOR(1000, 1000, (mcobj->GetSourceMPLSLabel() != source_flood_label));
-    EXPECT_TRUE(mcobj->peer_identifier() == 
-                Agent::GetInstance()->controller()->multicast_peer_identifier());
+    WAIT_FOR(1000, 1000, (mcobj->peer_identifier() == 
+                Agent::GetInstance()->controller()->multicast_peer_identifier()));
+    EXPECT_TRUE(mcobj->GetSourceMPLSLabel() != source_flood_label);
     EXPECT_TRUE(old_multicast_identifier != 
                 Agent::GetInstance()->controller()->multicast_peer_identifier());
     EXPECT_TRUE(MulticastHandler::GetInstance()->stale_timer()->running());
@@ -213,6 +213,7 @@ int main(int argc, char **argv) {
     }
 
     client = TestInit(init_file, ksync_init);
+    Agent::GetInstance()->set_headless_agent_mode(true);
     InitXmppServers();
 
     int ret = RUN_ALL_TESTS();

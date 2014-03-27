@@ -245,6 +245,7 @@ void VNController::Cleanup() {
     }
 
     agent_->SetControlNodeMulticastBuilder(NULL);
+    controller_peer_list_.clear();
     agent_ifmap_vm_export_.reset();
 }
 
@@ -425,9 +426,8 @@ void VNController::ApplyDiscoveryDnsXmppServices(std::vector<DSResponse> resp) {
 
 uint8_t VNController::GetActiveXmppConnections() {
     uint8_t active_xmpps = 0;
-    uint8_t count = 0;
-    while (count < MAX_XMPP_SERVERS) {
-       AgentXmppChannel *xc = agent_->GetAgentXmppChannel(count);
+    for (uint8_t count = 0; count < MAX_XMPP_SERVERS; count++) {
+        AgentXmppChannel *xc = agent_->GetAgentXmppChannel(count);
        if (xc) {
            if (xc->GetState() == AgentXmppChannel::UP)
                active_xmpps++;
