@@ -25,10 +25,10 @@ public:
     typedef std::map<std::string, Peer *> PeerMap;
     typedef std::pair<std::string, Peer *> PeerPair;
     enum Type {
-        ECMP_PEER,
         BGP_PEER,
-        LOCAL_PEER,  // higher priority for local peer
+        ECMP_PEER,
         LOCAL_VM_PEER,
+        LOCAL_PEER,
         LOCAL_VM_PORT_PEER,
         LINKLOCAL_PEER,
         NOVA_PEER
