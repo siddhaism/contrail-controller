@@ -52,7 +52,7 @@ const string VM_TABLE               = "ObjectVMTable"
 const string SI_TABLE               = "ObjectSITable"
 const string VROUTER_TABLE          = "ObjectVRouter"
 const string BGP_PEER_TABLE         = "ObjectBgpPeer"
-const string BGP_ROUTER_TABLE       = "ObjectBgpRouter"
+const string CONTROL_NODE_TABLE     = "ObjectControlNode"
 const string XMPP_PEER_INFO_TABLE   = "ObjectXmppPeerInfo"
 const string ROUTING_INSTANCE_TABLE = "ObjectRoutingInstance"
 const string XMPP_CONNECTION_TABLE  = "ObjectXmppConnection"
@@ -72,7 +72,7 @@ const string SI_DISPLAY_NAME        = "Service Instance"
 const string VROUTER_DISPLAY_NAME   = "VRouter"
 const string BGP_PEER_DISPLAY_NAME  = "BGP Peer"
 const string ROUTING_INSTANCE_DISPLAY_NAME = "Routing Instance"
-const string BGP_ROUTER_DISPLAY_NAME       = "BGP Router"
+const string CONTROL_NODE_DISPLAY_NAME       = "Control Node"
 const string XMPP_PEER_INFO_DISPLAY_NAME   = "XMPP Peer Info"
 const string XMPP_CONNECTION_DISPLAY_NAME  = "XMPP Connection"
 const string COLLECTOR_INFO_DISPLAY_NAME   = "Collector Info"
@@ -201,7 +201,7 @@ const map<string, string> UVE_MAP = {
     "virtual-machine" : VM_TABLE,
     "service-instance" : SI_TABLE,
     "vrouter" : VROUTER_TABLE,
-    "bgp-router" : BGP_ROUTER_TABLE,
+    "control-node" : CONTROL_NODE_TABLE,
     "bgp-peer" : BGP_PEER_TABLE,
     "xmpp-peer" : XMPP_PEER_INFO_TABLE,
     "collector" : COLLECTOR_INFO_TABLE,
@@ -235,8 +235,8 @@ const map<string, objtable_info> _OBJECT_TABLES = {
     BGP_PEER_TABLE         : {
         'objtable_display_name' : BGP_PEER_DISPLAY_NAME
     }
-    BGP_ROUTER_TABLE       : {
-        'objtable_display_name' : BGP_ROUTER_DISPLAY_NAME
+    CONTROL_NODE_TABLE       : {
+        'objtable_display_name' : CONTROL_NODE_DISPLAY_NAME
     }
     ROUTING_INSTANCE_TABLE : {
         'objtable_display_name' : ROUTING_INSTANCE_DISPLAY_NAME
@@ -342,7 +342,7 @@ const list<stat_table> _STAT_TABLES  = [
       'display_name' : 'Control CPU Information',
       'stat_type' : 'ControlCpuState',
       'stat_attr' : 'cpu_info',
-      'obj_table' : BGP_ROUTER_TABLE,
+      'obj_table' : CONTROL_NODE_TABLE,
       'attributes': [
           { 'name' : 'cpu_info.mem_virt',  'datatype' : 'int',    'index' : true},
           { 'name' : 'cpu_info.cpu_share', 'datatype' : 'double', 'index' : true},

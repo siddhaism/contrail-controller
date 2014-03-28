@@ -226,8 +226,8 @@ bool ControlNodeInfoLogger(BgpSandeshContext &ctx) {
 
     LogControlNodePeerStats(server, xmpp_channel_mgr);
 
-    BgpRouterState state;
-    static BgpRouterState prev_state;
+    ControlNodeState state;
+    static ControlNodeState prev_state;
     static bool first = true, build_info_set = false;
     bool change = false;
 
@@ -238,7 +238,7 @@ bool ControlNodeInfoLogger(BgpSandeshContext &ctx) {
         state.set_uptime(start_time);
         vector<string> ip_list;
         ip_list.push_back(ControlNode::GetSelfIp());
-        state.set_bgp_router_ip_list(ip_list);
+        state.set_ip_list(ip_list);
         vector<string> list;
         MiscUtils::GetCoreFileList(ControlNode::GetProgramName(), list);
         if (list.size()) {
@@ -341,7 +341,7 @@ bool ControlNodeInfoLogger(BgpSandeshContext &ctx) {
     }
 
     if (change)
-        BGPRouterInfo::Send(state);
+        ControlNodeInfo::Send(state);
 
     if (first) first = false;
 
