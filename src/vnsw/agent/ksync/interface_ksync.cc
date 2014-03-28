@@ -152,16 +152,16 @@ bool InterfaceKSyncEntry::Sync(DBEntry *e) {
             layer2_forwarding_ = vm_port->layer2_forwarding();
             ret = true;
         }
-    }
 
-    KSyncEntryPtr parent = NULL;
-    if (vm_port->parent()) {
-        InterfaceKSyncEntry tmp(ksync_obj_, vm_port->parent());
-        parent = ksync_obj_->GetReference(&tmp);
-    }
-    if (parent_ != parent) {
-        parent_ = parent;
-        ret = true;
+        KSyncEntryPtr parent = NULL;
+        if (vm_port->parent()) {
+            InterfaceKSyncEntry tmp(ksync_obj_, vm_port->parent());
+            parent = ksync_obj_->GetReference(&tmp);
+        }
+        if (parent_ != parent) {
+            parent_ = parent;
+            ret = true;
+        }
     }
 
 
@@ -438,7 +438,7 @@ int InterfaceKSyncEntry::ChangeMsg(char *buf, int buf_len) {
 }
 
 InterfaceKSyncObject::InterfaceKSyncObject(KSync *ksync) :
-    KSyncDBObject(kInterfaceCount), ksync_(ksync), 
+    KSyncDBObject(), ksync_(ksync), 
     physical_interface_mac_(), test_mode(false) {
 }
 

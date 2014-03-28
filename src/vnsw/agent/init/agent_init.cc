@@ -154,7 +154,7 @@ void AgentInit::InitXenLinkLocalIntf() {
                              params_->xen_ll_name(), InetInterface::LINK_LOCAL,
                              agent_->GetLinkLocalVrfName(),
                              params_->xen_ll_addr(), params_->xen_ll_plen(),
-                             params_->xen_ll_gw(),
+                             params_->xen_ll_gw(), Agent::NullString(),
                              agent_->GetLinkLocalVrfName());
 }
 
@@ -229,7 +229,8 @@ void AgentInit::CreateInterfaces(DB *db) {
                              params_->vhost_name(), InetInterface::VHOST,
                              agent_->GetDefaultVrf(),
                              params_->vhost_addr(), params_->vhost_plen(), 
-                             params_->vhost_gw(), agent_->GetDefaultVrf());
+                             params_->vhost_gw(), params_->eth_port(),
+                             agent_->GetDefaultVrf());
     PhysicalInterface::CreateReq(agent_->GetInterfaceTable(),
                                  params_->eth_port(), agent_->GetDefaultVrf());
     InitXenLinkLocalIntf();

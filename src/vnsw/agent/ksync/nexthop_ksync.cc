@@ -522,7 +522,7 @@ int NHKSyncEntry::Encode(sandesh_op::type op, char *buf, int buf_len) {
                 intf_id = if_ksync->interface_id();
             }
             encoder.set_nhr_encap_oif_id(intf_id);
-            SetEncap(encap);
+            SetEncap(NULL,encap);
             encoder.set_nhr_encap(encap);
             flags |= NH_FLAG_TUNNEL_UDP;
             break;

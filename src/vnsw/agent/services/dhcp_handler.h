@@ -89,7 +89,7 @@ struct dhcphdr {
 struct vlanhdr {
     uint16_t tpid;
     uint16_t tci;
-}
+};
 
 
 struct ConfigRecord {
