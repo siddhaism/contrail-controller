@@ -6,7 +6,7 @@ include "base/sandesh/cpuinfo.sandesh"
 include "ifmap/ifmap_server_show.sandesh"
 
 struct ControlNodeState {
-    1: string name (key="ObjectBgpRouter")
+    1: string name (key="ObjectControlNode")
     2: optional bool deleted
     7: optional u64 uptime;
     3: optional cpuinfo.CpuLoadInfo cpu_info;
@@ -36,7 +36,7 @@ request sandesh ShutdownControlNode {
 }
 
 struct ControlCpuState {
-    1: string                                 name (key="ObjectBgpRouter")
+    1: string                                 name (key="ObjectControlNode")
     2: optional bool                          deleted
     3: optional list<cpuinfo.ProcessCpuInfo>  cpu_info (tags=".module_id,.mem_virt,.cpu_share")
 }
