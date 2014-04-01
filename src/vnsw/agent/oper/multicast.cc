@@ -559,7 +559,7 @@ void MulticastHandler::DeleteVmInterface(const Interface *intf)
 //Delete multicast object for vrf/G
 void MulticastHandler::DeleteMulticastObject(const std::string &vrf_name,
                                              const Ip4Address &grp_addr) {
-    tbb::mutex::scoped_lock lock(mutex_);
+    //tbb::mutex::scoped_lock lock(mutex_);
     MCTRACE(Log, "delete obj  vrf/grp/size ", vrf_name, grp_addr.to_string(),
         this->GetMulticastObjList().size());
     for(std::set<MulticastGroupObject *>::iterator it =
@@ -843,9 +843,9 @@ bool MulticastGroupObject::ModifyFabricMembers(const TunnelOlist &olist,
     NextHopKey *key; 
     TunnelNHData *tnh_data;
 
-    tbb::mutex::scoped_lock lock(mutex_);
+    //tbb::mutex::scoped_lock lock(mutex_);
     //Ignore any modification operation for lesser value as obj is updated 
-    if (peer_identifier < peer_identifier_) {
+    if (peer_identifier_ > peer_identifier) {
         return true;
     }
     tunnel_olist_.clear();
@@ -934,7 +934,12 @@ void MulticastHandler::RemoveStaleBgpPeer(uint64_t peer_sequence) {
     if (timer->running()) {
         timer->Cancel();
     }
-    timer->Start(kMulticastTimeout, 
+
+    uint32_t cleanup_timer = kMulticastTimeout;
+    if (!(Agent::GetInstance()->headless_agent_mode())) {
+        cleanup_timer = 0;
+    }
+    timer->Start(cleanup_timer, 
                  boost::bind(&MulticastHandler::FlushPeerInfo,
                              MulticastHandler::GetInstance(), peer_sequence));
 }
@@ -947,7 +952,7 @@ void MulticastHandler::CancelStaleBgpPeerTimer() {
 }
 
 bool MulticastHandler::FlushPeerInfo(uint64_t peer_sequence) {
-    tbb::mutex::scoped_lock lock(mutex_);
+    //tbb::mutex::scoped_lock lock(mutex_);
     for (std::set<MulticastGroupObject *>::iterator it = 
          GetMulticastObjList().begin(); it != GetMulticastObjList().end(); 
          it++) {
@@ -960,7 +965,7 @@ bool MulticastHandler::FlushPeerInfo(uint64_t peer_sequence) {
             MulticastHandler::GetInstance()->TriggerCompositeNHChange(*it);
         }
     }
-    return true;
+    return false;
 }
 
 /*

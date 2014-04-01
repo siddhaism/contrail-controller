@@ -26,6 +26,7 @@
 #include "ifmap/ifmap_agent_table.h"
 #include "controller/controller_types.h"
 #include "net/tunnel_encap_type.h"
+#include <assert.h>
 
 using namespace boost::asio;
 using namespace autogen;
@@ -47,10 +48,10 @@ AgentXmppChannel::~AgentXmppChannel() {
 
 void AgentXmppChannel::CreateBgpPeer() {
 
-    SetState(AgentXmppChannel::UP);
-
-    if (bgp_peer_id_.get())
+    if ((state_ == AgentXmppChannel::UP) && (bgp_peer_id_.get() != NULL))
         return;
+
+    SetState(AgentXmppChannel::UP);
 
     //Ensure older bgp_peer_id in decommisioned list
     DBTableBase::ListenerId id = 
@@ -64,12 +65,23 @@ void AgentXmppChannel::CreateBgpPeer() {
 }
 
 void AgentXmppChannel::DeCommissionBgpPeer() {
+    if (state_ == AgentXmppChannel::DOWN)
+        return;
 
     SetState(AgentXmppChannel::DOWN);
 
-//    BgpPeer *bgp_peer = static_cast<BgpPeer *>(bgp_peer_id());
-//    DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
-//    agent_->GetVrfTable()->Unregister(id);
+    //TODO - Unregister is moved to destructor of peer. Unregister shud happen
+    //after dbstate for the id has happened w.r.t. this peer. If unresgiter is 
+    //done here, then there may be a chance that it is reused and before state
+    //is removed it is overwritten. Also it may happen that state delete may be
+    //of somebody else.
+    //Disadvantage is unnecessary notifications.
+    //Another solution is to walk vrf table and delete state and then
+    //unregister. Say decommissioning walk.
+
+    //BgpPeer *bgp_peer = static_cast<BgpPeer *>(bgp_peer_id());
+    //DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
+    //agent_->GetVrfTable()->Unregister(id);
 
     // Add the peer to global decommisioned list
     agent_->controller()->AddToControllerPeerList(bgp_peer_id_);
@@ -251,9 +263,10 @@ void AgentXmppChannel::ReceiveMulticastUpdate(XmlPugi *pugi) {
                     return;
                 }
 
+                //Retract with invalid identifier
                 MulticastHandler::ModifyFabricMembers(vrf, g_addr.to_v4(),
-                        s_addr.to_v4(), 0, olist,
-                        agent_->controller()->multicast_peer_identifier());
+                        s_addr.to_v4(), 0, olist, 
+                        VNController::kInvalidPeerIdentifier);
             }
         }
         return;
@@ -263,9 +276,8 @@ void AgentXmppChannel::ReceiveMulticastUpdate(XmlPugi *pugi) {
     if (!pugi->IsNull(items_node)) {
         pugi->ReadNode("item"); //sets the context
         std::string item_id = pugi->ReadAttrib("id");
-        if (bgp_peer_id() !=
-            agent_->GetControlNodeMulticastBuilder()->
-            bgp_peer_id()) {
+        if (!(agent_->GetControlNodeMulticastBuilder()) || (bgp_peer_id() !=
+            agent_->GetControlNodeMulticastBuilder()->bgp_peer_id())) {
             CONTROLLER_TRACE(Trace, bgp_peer_id()->GetName(), vrf_name,
                              "Ignore request from non multicast tree "
                              "builder peer; Multicast Delete Node:" + item_id);
@@ -708,6 +720,177 @@ void AgentXmppChannel::BgpPeerDelDone() {
     }
 }
 
+void AgentXmppChannel::CleanStale(AgentXmppChannel *peer, bool config, 
+                                  bool unicast, bool multicast) {
+    Agent *agent = peer->agent();
+    if (config) {
+       //Start a timer to flush off all old configs
+       agent->GetIfMapAgentStaleCleaner()->
+           StaleCleanup(AgentIfMapXmppChannel::GetSeqNumber());
+    }
+
+    if (unicast) {
+       // Start Cleanup Timers on stale bgp-peer's
+       agent->controller()->ControllerPeerStartCleanupTimer(); 
+    }
+
+    if (multicast) {
+        MulticastHandler::RemoveStaleBgpPeer(agent->controller()->
+                                             multicast_peer_identifier());
+    }
+}
+
+void AgentXmppChannel::UnicastPeerDown(AgentXmppChannel *peer, 
+                                          bool all_peer_gone) {
+    if (peer->agent()->headless_agent_mode() && all_peer_gone) {
+        //Enqueue stale marking of unicast & l2 routes
+        peer->agent()->controller()->ControllerPeerCancelCleanupTimer();
+        peer->bgp_peer_id()->StalePeerRoutes();
+        return;
+    }
+
+    //Enqueue delete of unicast routes
+    peer->bgp_peer_id()->DelPeerRoutes(boost::bind(
+                         &VNController::ControllerPeerHeadlessAgentDelDone, 
+                         peer->agent()->controller(), peer->bgp_peer_id()));
+}
+
+void AgentXmppChannel::MulticastPeerDown(AgentXmppChannel *peer, 
+                                         bool all_peer_gone) {
+    if (all_peer_gone) {
+        peer->agent()->SetControlNodeMulticastBuilder(NULL);
+        if (peer->agent()->headless_agent_mode()) {
+            MulticastHandler::CancelStaleBgpPeerTimer();
+            peer->agent()->GetIfMapAgentStaleCleaner()->CancelCleanup();
+            return;
+        }
+    }
+
+    AgentXmppChannel::CleanStale(peer, false, false, true);
+}
+
+void AgentXmppChannel::HandleAgentXmppClientChannelEvent(AgentXmppChannel *peer,
+                                                         xmps::PeerState state) {
+    Agent *agent = peer->agent();
+    if (state == xmps::READY) {
+        // Create a new BgpPeer every-time a channel is UP
+       peer->CreateBgpPeer();
+       agent->SetAgentXmppChannelSetupTime(UTCTimestampUsec(), peer->
+                                           GetXmppServerIdx());
+       // Switch-over Config Control-node
+       if (agent->GetXmppCfgServer().empty()) {
+           if (ControllerSendCfgSubscribe(peer)) {
+               agent->SetXmppCfgServer(peer->GetXmppServer(), peer->
+                                       GetXmppServerIdx());
+               //Generate a new sequence number for the configuration
+               AgentIfMapXmppChannel::NewSeqNumber();
+               AgentIfMapVmExport::NotifyAll(peer);
+           } 
+       }
+
+       
+       // Switch-over Multicast Tree Builder
+       AgentXmppChannel *agent_mcast_builder = 
+           agent->GetControlNodeMulticastBuilder();
+       bool multicast_builder_changed = false;
+
+       if (agent_mcast_builder == NULL) {
+           agent->SetControlNodeMulticastBuilder(peer);
+           multicast_builder_changed = true;
+       } else if (agent_mcast_builder != peer) {
+           boost::system::error_code ec;
+           IpAddress ip1 = ip::address::from_string(peer->GetXmppServer(),ec);
+           IpAddress ip2 = ip::address::from_string(agent_mcast_builder->
+                                                    GetXmppServer(),ec);
+           if (ip1.to_v4().to_ulong() < ip2.to_v4().to_ulong()) {
+               // Walk route-tables and send dissociate to older peer
+               // for subnet and broadcast routes
+               agent_mcast_builder->bgp_peer_id()->
+                   PeerNotifyMulticastRoutes(false); 
+               // Reset Multicast Tree Builder
+               agent->SetControlNodeMulticastBuilder(peer);
+               multicast_builder_changed = true;
+           }
+       } else {
+           //same peer
+           return;
+       }
+
+       // Walk route-tables and notify unicast routes
+       // and notify subnet and broadcast if TreeBuilder  
+       peer->bgp_peer_id()->PeerNotifyRoutes();
+
+       //Cleanup stales if any
+       AgentXmppChannel::CleanStale(peer, agent->headless_agent_mode(), 
+                                    agent->headless_agent_mode(), 
+                                    multicast_builder_changed);
+
+       agent->stats()->incr_xmpp_reconnects(peer->GetXmppServerIdx());
+       CONTROLLER_TRACE(Session, peer->GetXmppServer(), "READY", 
+                        agent->GetControlNodeMulticastBuilder()->bgp_peer_id()->GetName(),
+                        "Peer elected Multicast Tree Builder"); 
+    } else {
+        // Add BgpPeer to global decommissioned list
+        peer->DeCommissionBgpPeer();
+        if (agent->controller()->GetActiveXmppConnections() >= 1) {
+            AgentXmppChannel::UnicastPeerDown(peer, false);
+        } else {
+            AgentXmppChannel::UnicastPeerDown(peer, true);
+        }
+
+        // Switch-over Config Control-node
+        if (agent->GetXmppCfgServer().compare(peer->GetXmppServer()) == 0) {
+            //send cfg subscribe to other peer if exists
+            uint8_t o_idx = ((agent->GetXmppCfgServerIdx() == 0) ? 1: 0);
+            agent->ResetXmppCfgServer();
+            AgentXmppChannel *new_cfg_peer = agent->GetAgentXmppChannel(o_idx);
+            AgentIfMapXmppChannel::NewSeqNumber();
+            if (new_cfg_peer && ControllerSendCfgSubscribe(new_cfg_peer)) {
+                agent->SetXmppCfgServer(new_cfg_peer->GetXmppServer(),
+                                         new_cfg_peer->GetXmppServerIdx());
+                AgentIfMapVmExport::NotifyAll(new_cfg_peer);
+            }  
+            if (!agent->headless_agent_mode())
+                AgentXmppChannel::CleanStale(peer, true, false, false);
+        }
+
+        // Switch-over Multicast Tree Builder
+        AgentXmppChannel *agent_mcast_builder = 
+            agent->GetControlNodeMulticastBuilder();
+        if (agent_mcast_builder == peer) {
+            uint8_t o_idx = ((agent_mcast_builder->GetXmppServerIdx() == 0) 
+                             ? 1: 0);
+            AgentXmppChannel *new_mcast_builder = 
+                agent->GetAgentXmppChannel(o_idx);
+
+            if (new_mcast_builder && new_mcast_builder->GetXmppChannel()->
+                GetPeerState() == xmps::READY) {
+                agent->SetControlNodeMulticastBuilder(new_mcast_builder);
+                AgentXmppChannel::MulticastPeerDown(peer, false);
+                //if (agent->headless_agent_mode())
+                //    AgentXmppChannel::CleanStale(peer, false, false, true);
+
+                //Advertise subnet and all broadcast routes to
+                //the new multicast tree builder
+                new_mcast_builder->bgp_peer_id()->PeerNotifyMulticastRoutes(true); 
+
+                CONTROLLER_TRACE(Session, peer->GetXmppServer(), "NOT_READY",
+                                 agent->GetControlNodeMulticastBuilder()->
+                                 bgp_peer_id()->GetName(), 
+                                 "Peer elected Multicast Tree Builder"); 
+            } else {
+                // Artificially increment peer identifier so that entries can 
+                // be deleted
+                agent->controller()->increment_multicast_peer_identifier();
+                AgentXmppChannel::MulticastPeerDown(peer, true);
+                CONTROLLER_TRACE(Session, peer->GetXmppServer(), "NOT_READY", 
+                                 "NULL", "No elected Multicast Tree Builder"); 
+            }
+        } 
+    }
+}
+
+#if 0
 void AgentXmppChannel::HandleHeadlessAgentXmppClientChannelEvent(AgentXmppChannel *peer,
                                                                  xmps::PeerState state) {
     Agent *agent = peer->agent();
@@ -781,6 +964,7 @@ void AgentXmppChannel::HandleHeadlessAgentXmppClientChannelEvent(AgentXmppChanne
                                 agent->controller(), peer->bgp_peer_id()));
         } else {
             //Enqueue stale marking of unicast & l2 routes
+            agent->controller()->ControllerPeerCancelCleanupTimer();
             peer->bgp_peer_id()->StalePeerRoutes();
         }
 
@@ -824,6 +1008,7 @@ void AgentXmppChannel::HandleHeadlessAgentXmppClientChannelEvent(AgentXmppChanne
             } else {
                 agent->SetControlNodeMulticastBuilder(NULL);
                 MulticastHandler::CancelStaleBgpPeerTimer();
+                agent->GetIfMapAgentStaleCleaner()->CancelCleanup();
                 CONTROLLER_TRACE(Session, peer->GetXmppServer(), "NOT_READY", 
                                  "NULL", "No elected Multicast Tree Builder"); 
             }
@@ -945,6 +1130,7 @@ void AgentXmppChannel::HandleXmppClientChannelEvent(AgentXmppChannel *peer,
         } 
     }
 }
+#endif
 
 bool AgentXmppChannel::ControllerSendVmCfgSubscribe(AgentXmppChannel *peer, 
                          const boost::uuids::uuid &vm_id, 

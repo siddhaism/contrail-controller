@@ -260,9 +260,7 @@ public:
     AgentXmppChannel* GetControlNodeMulticastBuilder() {
         return cn_mcast_builder_;
     };
-    void SetControlNodeMulticastBuilder(AgentXmppChannel *peer) { 
-        cn_mcast_builder_ =  peer;
-    };
+    void SetControlNodeMulticastBuilder(AgentXmppChannel *peer);
 
     const std::string &GetFabricVnName() {return fabric_vn_name_;};
     const std::string &GetDefaultVrf() {return fabric_vrf_name_;};

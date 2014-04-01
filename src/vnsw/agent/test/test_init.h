@@ -70,7 +70,6 @@ using namespace std;
 
 #define GETUSERARGS()                           \
     bool ksync_init = false;                    \
-    bool headless_init = false;                 \
     char init_file[1024];                       \
     memset(init_file, '\0', sizeof(init_file)); \
     ::testing::InitGoogleTest(&argc, argv);     \
@@ -91,14 +90,13 @@ using namespace std;
     if (vm.count("kernel")) {                   \
         ksync_init = true;                      \
     }                                           \
-    if (vm.count("headless")) {                 \
-        headless_init = true;                   \
-    }                                           \
     if (vm.count("config")) {                   \
         strncpy(init_file, vm["config"].as<string>().c_str(), (sizeof(init_file) - 1) ); \
     } else {                                    \
         strcpy(init_file, DEFAULT_VNSW_CONFIG_FILE); \
     }                                           \
+
+#define HEADLESS_MODE vm.count("headless")
 
 struct PortInfo {
     char name[32];

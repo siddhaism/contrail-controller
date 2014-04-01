@@ -81,6 +81,10 @@ void VNController::XmppServerConnect() {
                                              agent_->GetXmppServer(count), 
                                              agent_->GetAgentMcastLabelRange(count),
                                              count);
+            client->RegisterConnectionEvent(xmps::BGP,
+                    boost::bind(&AgentXmppChannel::HandleAgentXmppClientChannelEvent,
+                                bgp_peer, _2));
+#if 0
             if (agent_->headless_agent_mode()) {
                 client->RegisterConnectionEvent(xmps::BGP,
                         boost::bind(&AgentXmppChannel::HandleHeadlessAgentXmppClientChannelEvent,
@@ -90,6 +94,7 @@ void VNController::XmppServerConnect() {
                         boost::bind(&AgentXmppChannel::HandleXmppClientChannelEvent, 
                                     bgp_peer, _2));
             }
+#endif
 
             // create ifmap peer
             AgentIfMapXmppChannel *ifmap_peer = 
@@ -462,10 +467,21 @@ bool VNController::ControllerPeerCleanupTimerExpired() {
             boost::bind(&VNController::ControllerPeerHeadlessAgentDelDone, this, bgp_peer));
     }
 
-    return true;
+    return false;
 }
 
 void VNController::ControllerPeerStartCleanupTimer() {
+    uint32_t cleanup_timer = kUnicastStaleTimer;
+
+    ControllerPeerCancelCleanupTimer();
+    if (!(agent_->headless_agent_mode())) {
+        cleanup_timer = 0;
+    }
+    cleanup_timer_->Start(cleanup_timer,
+        boost::bind(&VNController::ControllerPeerCleanupTimerExpired, this));
+}
+
+void VNController::ControllerPeerCancelCleanupTimer() {
     if (cleanup_timer_ == NULL) {
         return;
     }
@@ -473,6 +489,4 @@ void VNController::ControllerPeerStartCleanupTimer() {
     if (cleanup_timer_->running()) {
         cleanup_timer_->Cancel();
     }
-    cleanup_timer_->Start(kUnicastStaleTimer,
-        boost::bind(&VNController::ControllerPeerCleanupTimerExpired, this));
 }

@@ -147,16 +147,15 @@ public:
     }
 
     virtual void ReceiveUpdate(const XmppStanza::XmppMessage *msg) {
+        if (GetXmppChannel() && GetXmppChannel()->GetPeerState() != xmps::READY) {
+            return;
+        }
         rx_count_++;
         AgentXmppChannel::ReceiveUpdate(msg);
     }
 
     bool ProcessChannelEvent(xmps::PeerState state) {
-        if (Agent::GetInstance()->headless_agent_mode()) {
-            AgentXmppChannel::HandleHeadlessAgentXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
-        } else {
-            AgentXmppChannel::HandleXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
-        }
+        AgentXmppChannel::HandleAgentXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
         return true;
     }
 
@@ -215,8 +214,11 @@ public:
             return;
         }
         if (add_change) {
-            SendBcastRouteMessage(vrf_name, item.entry.nlri.group, label1_++, 
-                                  "127.0.0.1", label1_++, label1_++);
+            uint32_t src_label = label1_++;
+            uint32_t tunnel_label_1 = label1_++;
+            uint32_t tunnel_label_2 = label1_++;
+            SendBcastRouteMessage(vrf_name, item.entry.nlri.group, src_label, 
+                                  "127.0.0.1", tunnel_label_1, tunnel_label_2);
         } else {
             SendBcastRouteDelete(vrf_name, item.entry.nlri.group, "127.0.0.1");
         }
@@ -539,10 +541,8 @@ protected:
     }
 
     virtual void TearDown() {
-        if (Agent::GetInstance()->headless_agent_mode()) {
-            Agent::GetInstance()->controller()->cleanup_timer()->Fire();
-            client->WaitForIdle();
-        }
+        Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+        client->WaitForIdle();
 
         for (int i = 0; i < num_ctrl_peers; i++) {
             xc[i]->ConfigUpdate(new XmppConfigData());
@@ -698,6 +698,7 @@ protected:
         WAIT_FOR(10000, 10000, (agent_->GetInterfaceTable()->Size() == 3));
         VerifyRoutes(true);
         VerifyVmPortActive(false);
+        agent_->controller()->cleanup_timer()->Fire();
         WAIT_FOR(10000, 10000, (Agent::GetInstance()->GetVrfTable()->Size() == 1));
         WAIT_FOR(1000, 1000, (Agent::GetInstance()->GetVnTable()->Size() == 0));
     }
@@ -789,7 +790,7 @@ protected:
         ("vm", opt::value<int>(), "Number of VM per VN")            \
         ("control", opt::value<int>(), "Number of control peer")     \
         ("remote", opt::value<int>(), "Number of remote routes")     \
-        ("headless", opt::value<int>(), "headless agent mode") \
+        ("headless", "Run headless vrouter")                     \
         ("wait_usecs", opt::value<int>(), "Walker Wait in msecs") \
         ("yield", opt::value<int>(), "Walker yield (default 1)");\
     opt::store(opt::parse_command_line(argc, argv, desc), vm); \

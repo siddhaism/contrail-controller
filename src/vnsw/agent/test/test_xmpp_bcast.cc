@@ -73,11 +73,14 @@ public:
     }
 
     bool ProcessChannelEvent(xmps::PeerState state) { 
+        AgentXmppChannel::HandleAgentXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
+#if 0
         if (Agent::GetInstance()->headless_agent_mode()) {
             AgentXmppChannel::HandleHeadlessAgentXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
         } else {
             AgentXmppChannel::HandleXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
         }
+#endif
         return true;
     }
 
@@ -162,12 +165,10 @@ protected:
         xc->Shutdown();
         client->WaitForIdle();
 
-        if (Agent::GetInstance()->headless_agent_mode()) {
-            Agent::GetInstance()->controller()->cleanup_timer()->Fire();
-            client->WaitForIdle();
-            Agent::GetInstance()->controller()->Cleanup();
-            client->WaitForIdle();
-        }
+        Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+        client->WaitForIdle();
+        Agent::GetInstance()->controller()->Cleanup();
+        client->WaitForIdle();
 
         TcpServerManager::DeleteServer(xs);
         TcpServerManager::DeleteServer(xc);
@@ -698,6 +699,10 @@ protected:
         client->Reset();
         DeleteVmportEnv(input, 2, 1, 0);
         client->WaitForIdle();
+
+        Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+        client->WaitForIdle();
+
         WAIT_FOR(100, 1000, (client->CompositeNHDelWait(cnh_del_cnt) == true));
         WAIT_FOR(100, 10000, (client->CompositeNHCount() == 0));
         WAIT_FOR(100, 1000, 
@@ -901,7 +906,7 @@ TEST_F(AgentXmppUnitTest, L2OnlyBcast_Test_SessionDownUp) {
     // Bcast Route with updated olist
     WAIT_FOR(100, 10000, (bgp_peer.get()->Count() == 6));
     if (Agent::GetInstance()->headless_agent_mode()) {
-        client->CompositeNHWait(9);
+        client->CompositeNHWait(7);
         WAIT_FOR(100, 10000, (client->CompositeNHCount() == 3));
         client->WaitForIdle();
     } else {
@@ -924,6 +929,14 @@ TEST_F(AgentXmppUnitTest, L2OnlyBcast_Test_SessionDownUp) {
     IntfCfgDel(input, 0);
     IntfCfgDel(input, 1);
     client->WaitForIdle(5);
+
+    //cleanup all config links via config 
+   
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        XmppSubnetTearDown(3);
+    } else {
+        XmppSubnetTearDown(4);
+    }
 
     xc->ConfigUpdate(new XmppConfigData());
     client->WaitForIdle(5);
@@ -1440,7 +1453,7 @@ TEST_F(AgentXmppUnitTest, Test_Olist_change_with_same_label) {
     MplsLabel *mpls = 
 	Agent::GetInstance()->GetMplsTable()->FindMplsLabel(alloc_label);
     ASSERT_TRUE(mpls == NULL);
-    ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    WAIT_FOR(100, 10000, (Agent::GetInstance()->GetMplsTable()->Size() == 6));
 
     //Send Updated olist label, src-nh label
     SendBcastRouteMessage(mock_peer.get(), "vrf1",
@@ -1462,7 +1475,7 @@ TEST_F(AgentXmppUnitTest, Test_Olist_change_with_same_label) {
     mpls = Agent::GetInstance()->GetMplsTable()->FindMplsLabel(alloc_label+40);
     ASSERT_TRUE(mpls == NULL);
     // Detect mpls label leaks
-    ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    WAIT_FOR(100, 10000, (Agent::GetInstance()->GetMplsTable()->Size() == 6));
 
     //Send Updated olist label, src-nh label
     SendBcastRouteMessage(mock_peer.get(), "vrf1",
@@ -1482,7 +1495,7 @@ TEST_F(AgentXmppUnitTest, Test_Olist_change_with_same_label) {
     mpls = Agent::GetInstance()->GetMplsTable()->FindMplsLabel(alloc_label+41);
     ASSERT_TRUE(mpls == NULL);
     // Detect mpls label leaks
-    ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    WAIT_FOR(100, 10000, (Agent::GetInstance()->GetMplsTable()->Size() == 6));
 
 
     //Verify all-broadcast
@@ -1501,7 +1514,7 @@ TEST_F(AgentXmppUnitTest, Test_Olist_change_with_same_label) {
     //Verify mpls table
     mpls = Agent::GetInstance()->GetMplsTable()->FindMplsLabel(alloc_label+1);
     ASSERT_TRUE(mpls == NULL);
-    ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    WAIT_FOR(100, 10000, (Agent::GetInstance()->GetMplsTable()->Size() == 6));
 
     //Send Updated olist label, src-nh label
     SendBcastRouteMessage(mock_peer.get(), "vrf1",
@@ -1523,7 +1536,7 @@ TEST_F(AgentXmppUnitTest, Test_Olist_change_with_same_label) {
     mpls = Agent::GetInstance()->GetMplsTable()->FindMplsLabel(alloc_label+50);
     ASSERT_TRUE(mpls == NULL);
     // Detect mpls label leaks
-    ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    WAIT_FOR(100, 10000, (Agent::GetInstance()->GetMplsTable()->Size() == 6));
 
     //Send Updated olist label, src-nh label
     SendBcastRouteMessage(mock_peer.get(), "vrf1",
@@ -1543,7 +1556,7 @@ TEST_F(AgentXmppUnitTest, Test_Olist_change_with_same_label) {
     mpls = Agent::GetInstance()->GetMplsTable()->FindMplsLabel(alloc_label+51);
     ASSERT_TRUE(mpls == NULL);
     // Detect mpls label leaks
-    ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    WAIT_FOR(100, 10000, (Agent::GetInstance()->GetMplsTable()->Size() == 6));
 
     XmppSubnetTearDown();
 
@@ -1762,7 +1775,7 @@ int main(int argc, char **argv) {
     client = TestInit(init_file, ksync_init);
     Agent::GetInstance()->SetXmppServer("127.0.0.1", 0);
     Agent::GetInstance()->SetAgentMcastLabelRange(0);
-    Agent::GetInstance()->set_headless_agent_mode(headless_init);
+    Agent::GetInstance()->set_headless_agent_mode(HEADLESS_MODE);
 
     int ret = RUN_ALL_TESTS();
     Agent::GetInstance()->GetEventManager()->Shutdown();
