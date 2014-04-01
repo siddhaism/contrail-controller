@@ -217,6 +217,13 @@ CfgListener *Agent::cfg_listener() const {
     return cfg_.get()->cfg_listener();
 }
 
+void Agent::SetControlNodeMulticastBuilder(AgentXmppChannel *peer) {
+    if (peer) {
+        controller()->increment_multicast_peer_identifier();
+    }
+    cn_mcast_builder_ =  peer;
+}
+
 void Agent::CreateModules() {
     Sandesh::SetLoggingParams(params_->log_local(),
                               params_->log_category(),

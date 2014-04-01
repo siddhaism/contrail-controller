@@ -72,7 +72,7 @@ public:
     }
 
     bool ProcessChannelEvent(xmps::PeerState state) { 
-        AgentXmppChannel::HandleXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
+        AgentXmppChannel::HandleAgentXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
         return true;
     }
 
@@ -161,6 +161,11 @@ protected:
         xc_s->Shutdown();
         client->WaitForIdle();
 
+        Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+        client->WaitForIdle();
+        Agent::GetInstance()->controller()->Cleanup();
+        client->WaitForIdle();
+ 
         mock_peer.reset();
         mock_peer_s.reset();
 
@@ -616,7 +621,11 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_FailOver) {
     ASSERT_TRUE(cnh->ComponentNHCount() == 3);
 
     //Verify label deallocated from Mpls Table
-    EXPECT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 4);
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        EXPECT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 6);
+    } else {
+        EXPECT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 4);
+    }
     // headless
     //EXPECT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 4);
 
@@ -718,7 +727,7 @@ int main(int argc, char **argv) {
     Agent::GetInstance()->SetXmppServer("127.0.0.1", 1);
     Agent::GetInstance()->SetAgentMcastLabelRange(0);
     Agent::GetInstance()->SetAgentMcastLabelRange(1);
-    Agent::GetInstance()->set_headless_agent_mode(headless_init);
+    Agent::GetInstance()->set_headless_agent_mode(HEADLESS_MODE);
 
     int ret = RUN_ALL_TESTS();
     Agent::GetInstance()->GetEventManager()->Shutdown();

@@ -38,10 +38,15 @@ public:
     virtual void ReceiveEvpnUpdate(XmlPugi *pugi);
     virtual void ReceiveMulticastUpdate(XmlPugi *pugi);
     XmppChannel *GetXmppChannel() { return channel_; }
-    static void HandleHeadlessAgentXmppClientChannelEvent(AgentXmppChannel *peer,
-                                                          xmps::PeerState state);
-    static void HandleXmppClientChannelEvent(AgentXmppChannel *peer,
-                                             xmps::PeerState state);
+    static void CleanStale(AgentXmppChannel *peer, bool config, bool unicast, bool multicast);
+    static void UnicastPeerDown(AgentXmppChannel *peer, bool all_peer_gone);
+    static void MulticastPeerDown(AgentXmppChannel *peer, bool all_peer_gone);
+    static void HandleAgentXmppClientChannelEvent(AgentXmppChannel *peer,
+                                                  xmps::PeerState state);
+    //static void HandleHeadlessAgentXmppClientChannelEvent(AgentXmppChannel *peer,
+    //                                                      xmps::PeerState state);
+    //static void HandleXmppClientChannelEvent(AgentXmppChannel *peer,
+    //                                         xmps::PeerState state);
     static bool ControllerSendCfgSubscribe(AgentXmppChannel *peer);
     static bool ControllerSendVmCfgSubscribe(AgentXmppChannel *peer, 
             const boost::uuids::uuid &vm_id, bool subscribe);

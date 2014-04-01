@@ -63,7 +63,7 @@ public:
     }
 
     bool ProcessChannelEvent(xmps::PeerState state) {
-        AgentXmppChannel::HandleXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
+        AgentXmppChannel::HandleAgentXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
         return true;
     }
 
@@ -153,6 +153,12 @@ protected:
         client->WaitForIdle();
         xs_s->Shutdown();
         client->WaitForIdle();
+
+        Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+        client->WaitForIdle();
+        Agent::GetInstance()->controller()->Cleanup();
+        client->WaitForIdle();
+
         TcpServerManager::DeleteServer(xs_p);
         TcpServerManager::DeleteServer(xs_s);
         TcpServerManager::DeleteServer(xc_p);
@@ -576,7 +582,7 @@ int main(int argc, char **argv) {
     client = TestInit(init_file, ksync_init);
     Agent::GetInstance()->SetXmppServer("127.0.0.1", 0);
     Agent::GetInstance()->SetXmppServer("127.0.0.2", 1);
-    Agent::GetInstance()->set_headless_agent_mode(headless_init);
+    Agent::GetInstance()->set_headless_agent_mode(HEADLESS_MODE);
 
     int ret = RUN_ALL_TESTS();
     Agent::GetInstance()->GetEventManager()->Shutdown();

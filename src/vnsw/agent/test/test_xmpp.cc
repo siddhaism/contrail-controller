@@ -88,11 +88,14 @@ public:
     }
 
     bool ProcessChannelEvent(xmps::PeerState state) {
+        AgentXmppChannel::HandleAgentXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
+#if 0
         if (Agent::GetInstance()->headless_agent_mode()) {
             AgentXmppChannel::HandleHeadlessAgentXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
         } else {
             AgentXmppChannel::HandleXmppClientChannelEvent(static_cast<AgentXmppChannel *>(this), state);
         }
+#endif
         return true;
     }
 
@@ -179,12 +182,10 @@ protected:
         xc->Shutdown();
         client->WaitForIdle();
 
-        if (Agent::GetInstance()->headless_agent_mode()) {
-            Agent::GetInstance()->controller()->cleanup_timer()->Fire();
-            client->WaitForIdle();
-            Agent::GetInstance()->controller()->Cleanup();
-            client->WaitForIdle();
-        }
+        Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+        client->WaitForIdle();
+        Agent::GetInstance()->controller()->Cleanup();
+        client->WaitForIdle();
 
         TcpServerManager::DeleteServer(xs);
         TcpServerManager::DeleteServer(xc);
@@ -205,6 +206,7 @@ protected:
     }
 
     static void ValidateSandeshResponse(Sandesh *sandesh, vector<string> &result) {
+#if 0
         AgentXmppConnectionStatus *resp =
                 dynamic_cast<AgentXmppConnectionStatus *>(sandesh);
 
@@ -229,7 +231,7 @@ protected:
             cout << "State:" << list[i].state << endl;
         }
         cout << "*******************************************************"<<endl;
-       
+#endif       
     }
 
     void SendDocument(const pugi::xml_document &xdoc, ControlNodeMockBgpXmppPeer *peer) {
@@ -460,7 +462,6 @@ TEST_F(AgentXmppUnitTest, Connection) {
     client->WaitForIdle();
     xmpp_req->Release();
 
-
     XmppConnectionSetUp();
     //wait for connection establishment
     WAIT_FOR(100, 10000, (sconnection->GetStateMcState() == xmsm::ESTABLISHED));
@@ -476,7 +477,6 @@ TEST_F(AgentXmppUnitTest, Connection) {
     xmpp_req->HandleRequest();
     client->WaitForIdle();
     xmpp_req->Release();
-
     // Create vm-port and vn
     struct PortInfo input[] = {
         {"vnet1", 1, "1.1.1.1", "00:00:00:01:01:01", 1, 1},
@@ -489,9 +489,9 @@ TEST_F(AgentXmppUnitTest, Connection) {
     client->WaitForIdle();
     //Create vn,vrf,vm,vm-port and route entry in vrf1 
     CreateVmportEnv(input, 1);
-    client->WaitForIdle();
     //expect subscribe message+route at the mock server
     WAIT_FOR(100, 10000, (mock_peer.get()->Count() == 6));
+    //client->WaitForIdle(5);
 
     VrfAddReq("vrf2");
     VnAddReq(2, "vn2", 0, "vrf2");
@@ -588,6 +588,9 @@ TEST_F(AgentXmppUnitTest, Connection) {
     VnDelReq(2);
     client->WaitForIdle();
     EXPECT_EQ(0U, Agent::GetInstance()->GetVnTable()->Size());
+
+    Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+    client->WaitForIdle();
 
     EXPECT_FALSE(DBTableFind("vrf1.l2.route.0"));
     EXPECT_FALSE(DBTableFind("vrf1.uc.route.0"));
@@ -769,9 +772,6 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown) {
     EXPECT_TRUE(rt2->GetActivePath()->peer()->GetType() == Peer::LOCAL_VM_PORT_PEER);
     EXPECT_TRUE(l2_rt2->GetActivePath()->peer()->GetType() == Peer::LOCAL_VM_PEER);
 
-    xc->ConfigUpdate(new XmppConfigData());
-    client->WaitForIdle(5);
-
     //Delete vm-port and route entry in vrf1
     DeleteVmportEnv(input, 1, false);
     client->WaitForIdle();
@@ -786,14 +786,20 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown) {
 
     EXPECT_EQ(0U, Agent::GetInstance()->GetVnTable()->Size());
 
+    Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+    client->WaitForIdle();
+
+    WAIT_FOR(1000, 10000, (Agent::GetInstance()->GetVrfTable()->Size() == 1));
     EXPECT_FALSE(DBTableFind("vrf1.uc.route.0"));
     EXPECT_FALSE(DBTableFind("vrf1.l2.route.0"));
     EXPECT_FALSE(VrfFind("vrf1"));
+
+    xc->ConfigUpdate(new XmppConfigData());
+    client->WaitForIdle(5);
+
 }
 
 TEST_F(AgentXmppUnitTest, ConnectionUpDown_DecomissionedPeers) {
-    if (!Agent::GetInstance()->headless_agent_mode())
-        return;
 
     client->Reset();
     client->WaitForIdle();
@@ -810,22 +816,37 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown_DecomissionedPeers) {
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
     client->WaitForIdle();
 
-    ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
                 == 1);
+    } else {
+        ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
+                == 0);
+    }
 
     //bring up the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::READY);
     client->WaitForIdle();
 
-    ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
                 == 1);
+    } else {
+        ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
+                == 0);
+    }
 
     //bring-down the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
     client->WaitForIdle();
 
-    ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
+    if (Agent::GetInstance()->headless_agent_mode()) {
+        ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
                 == 2);
+    } else {
+        ASSERT_TRUE(agent_->controller()->ControllerPeerListSize()
+                == 0);
+    }
 
     xc->ConfigUpdate(new XmppConfigData());
     client->WaitForIdle(5);
@@ -926,6 +947,9 @@ TEST_F(AgentXmppUnitTest, SgList) {
     VnDelReq(2);
     client->WaitForIdle();
     EXPECT_EQ(0U, Agent::GetInstance()->GetVnTable()->Size());
+
+    Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+    client->WaitForIdle();
 
     EXPECT_FALSE(DBTableFind("vrf1.uc.route.0"));
     EXPECT_FALSE(DBTableFind("vrf1.l2.route.0"));
@@ -1104,6 +1128,9 @@ TEST_F(AgentXmppUnitTest, vxlan_peer_l2route_add) {
     //Confirm Vmport is deleted
     EXPECT_FALSE(VmPortFind(input, 0)); 
 
+    Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+    client->WaitForIdle();
+
     WAIT_FOR(1000, 1000, (agent_->GetVnTable()->Size() == 0));
 
     EXPECT_FALSE(DBTableFind("vrf1.uc.route.0"));
@@ -1193,6 +1220,9 @@ TEST_F(AgentXmppUnitTest, mpls_peer_l2route_add) {
 
     WAIT_FOR(1000, 1000, (agent_->GetVnTable()->Size() == 0));
 
+    Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+    client->WaitForIdle();
+
     EXPECT_FALSE(DBTableFind("vrf1.uc.route.0"));
     EXPECT_FALSE(DBTableFind("vrf1.l2.route.0"));
     EXPECT_FALSE(VrfFind("vrf1"));
@@ -1206,7 +1236,7 @@ int main(int argc, char **argv) {
     GETUSERARGS();
     client = TestInit(init_file, ksync_init);
     Agent::GetInstance()->SetXmppServer("127.0.0.1", 0);
-    Agent::GetInstance()->set_headless_agent_mode(headless_init);
+    Agent::GetInstance()->set_headless_agent_mode(HEADLESS_MODE);
 
     int ret = RUN_ALL_TESTS();
     Agent::GetInstance()->GetEventManager()->Shutdown();

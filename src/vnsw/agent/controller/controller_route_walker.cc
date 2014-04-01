@@ -68,9 +68,9 @@ bool ControllerRouteWalker::NotifyAll(DBTablePartBase *partition,
 bool ControllerRouteWalker::DelPeer(DBTablePartBase *partition,
                                     DBEntryBase *entry) {
     VrfEntry *vrf = static_cast<VrfEntry *>(entry);
-    if (entry->IsDeleted()) {
-        return true;
-    }
+    //if (entry->IsDeleted()) {
+    //    return true;
+    //}
 
     if (peer_->GetType() == Peer::BGP_PEER) {
         BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
@@ -79,8 +79,16 @@ bool ControllerRouteWalker::DelPeer(DBTablePartBase *partition,
         VrfExport::State *state = 
             static_cast<VrfExport::State *>(vrf->GetState(partition->parent(), 
                                                           id)); 
-        if (state == NULL) {
-            return true;
+        if (state != NULL) {
+            if (vrf->GetName().compare(peer_->agent()->GetDefaultVrf()) != 0) {
+                for (uint8_t table_type = 0; table_type < Agent::ROUTE_TABLE_MAX;
+                 table_type++) {
+                    state->rt_export_[table_type]->Unregister();
+                }
+            }
+ 
+            vrf->ClearState(partition->parent(), id);
+            delete state;
         }
 
         StartRouteWalk(vrf);
