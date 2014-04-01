@@ -225,14 +225,14 @@ void AgentInit::CreateInterfaces(DB *db) {
     intf_client_id_ = agent_->GetInterfaceTable()->Register
         (boost::bind(&AgentInit::OnInterfaceCreate, this, _2));
 
+    PhysicalInterface::CreateReq(agent_->GetInterfaceTable(),
+                                 params_->eth_port(), agent_->GetDefaultVrf());
     InetInterface::CreateReq(agent_->GetInterfaceTable(),
                              params_->vhost_name(), InetInterface::VHOST,
                              agent_->GetDefaultVrf(),
                              params_->vhost_addr(), params_->vhost_plen(), 
                              params_->vhost_gw(), params_->eth_port(),
                              agent_->GetDefaultVrf());
-    PhysicalInterface::CreateReq(agent_->GetInterfaceTable(),
-                                 params_->eth_port(), agent_->GetDefaultVrf());
     InitXenLinkLocalIntf();
     InitVmwareInterface();
 }

@@ -326,10 +326,19 @@ int InterfaceKSyncEntry::Encode(sandesh_op::type op, char *buf, int buf_len) {
         case InetInterface::LINK_LOCAL:
             encoder.set_vifr_type(VIF_TYPE_XEN_LL_HOST);
             break;
+        case InetInterface::VHOST:
+            encoder.set_vifr_type(VIF_TYPE_HOST);
+            if (xconnect_.get()) {
+                InterfaceKSyncEntry *xconnect = 
+                   static_cast<InterfaceKSyncEntry *>(xconnect_.get());
+                encoder.set_vifr_cross_connect_idx(xconnect->os_index_); 
+            } else {
+                encoder.set_vifr_cross_connect_idx(Interface::kInvalidIndex);
+            }
+            break;
         default:
             encoder.set_vifr_type(VIF_TYPE_HOST); 
             break;
-
         }
         std::vector<int8_t> intf_mac(mac(), mac() + ETHER_ADDR_LEN);
         encoder.set_vifr_mac(intf_mac);
@@ -345,16 +354,6 @@ int InterfaceKSyncEntry::Encode(sandesh_op::type op, char *buf, int buf_len) {
         flags |= VIF_FLAG_L3_ENABLED;
         break;
     }
-    case InetInterface::VHOST:
-        encoder.set_vifr_type(VIF_TYPE_HOST);
-        if (xconnect_.get()) {
-            InterfaceKSyncEntry *xconnect = 
-                static_cast<InterfaceKSyncEntry *>(xconnect_.get());
-            encoder.set_vifr_cross_connect_idx(xconnect->os_index_); 
-        } else {
-            encoder.set_vifr_cross_connect_idx(Interface::kInvalidIndex);
-        }
-        break;
     default:
         assert(0);
     }
