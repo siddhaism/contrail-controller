@@ -30,7 +30,7 @@ public:
     XmppChannel *GetXmppChannel() { return channel_; }
     static void HandleXmppClientChannelEvent(AgentDnsXmppChannel *peer,
                                              xmps::PeerState state);
-    Agent *agent() const {return agent();}
+    Agent *agent() const {return agent_;}
 protected:
     virtual void WriteReadyCb(uint8_t *msg, 
                               const boost::system::error_code &ec);
