@@ -237,6 +237,7 @@ public:
     bool empty() const { return updates_->empty(); }
 
 private:
+    friend class BgpExportTest;
     friend class RibUpdateMonitor;
 
     bool FlagIsSet(Flag flag) const { return flags_ & (1 << flag); }
@@ -292,6 +293,7 @@ public:
     RouteUpdate *MakeRouteUpdate();
 
 private:
+    friend class BgpExportTest;
     friend class RibUpdateMonitor;
 
     tbb::mutex mutex_;

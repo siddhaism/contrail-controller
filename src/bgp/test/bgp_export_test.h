@@ -8,6 +8,7 @@
 #include "bgp/bgp_export.h"
 
 #include <boost/ptr_container/ptr_vector.hpp>
+#include <pthread.h>
 
 #include "base/task.h"
 #include "base/task_annotations.h"
@@ -20,6 +21,7 @@
 #include "bgp/bgp_peer.h"
 #include "bgp/bgp_ribout_updates.h"
 #include "bgp/bgp_update.h"
+#include "bgp/bgp_update_monitor.h"
 #include "bgp/bgp_update_queue.h"
 #include "bgp/scheduling_group.h"
 #include "bgp/inet/inet_table.h"
@@ -37,6 +39,36 @@ static void SchedulerStart() {
 }
 
 static int gbl_index;
+
+struct LockMutexThreadParams {
+    LockMutexThreadParams(tbb::mutex *entry_mutex, tbb::mutex *monitor_mutex,
+        tbb::interface5::condition_variable *cond_var) :
+        entry_mutex(entry_mutex),
+        monitor_mutex(monitor_mutex),
+        cond_var(cond_var) {
+    }
+    tbb::mutex *entry_mutex;
+    tbb::mutex *monitor_mutex;
+    tbb::interface5::condition_variable *cond_var;
+};
+
+static void *LockMutexThreadRun(void *ptr) {
+    LOG(DEBUG, "LockMutexThreadRun is running");
+    LockMutexThreadParams *params = static_cast<LockMutexThreadParams *>(ptr);
+    params->entry_mutex->lock();
+    LOG(DEBUG, "LockMutexThreadRun mutex locked");
+    for (int idx = 0; idx < 100; ++idx) {
+        usleep(1000);
+    }
+    params->entry_mutex->unlock();
+    LOG(DEBUG, "LockMutexThreadRun mutex unlocked");
+    params->monitor_mutex->lock();
+    params->cond_var->notify_all();
+    params->monitor_mutex->unlock();
+    delete params;
+    LOG(DEBUG, "LockMutexThreadRun is done");
+    return NULL;
+}
 
 class BgpTestPeer : public IPeerUpdate {
 public:
@@ -169,6 +201,7 @@ protected:
         export_ = ribout_.bgp_export();
         updates_ = ribout_.updates();
         updates_->SetMessageBuilder(&builder_);
+        monitor_ = updates_->monitor();
         rt_.set_onlist();
     }
 
@@ -211,6 +244,36 @@ protected:
     virtual void TearDown() {
         server_.Shutdown();
         task_util::WaitForIdle();
+    }
+
+    tbb::mutex *GetMutex(RouteUpdate *rt_update) {
+        return &rt_update->mutex_;
+    }
+
+    tbb::mutex *GetMutex(UpdateList *uplist) {
+        return &uplist->mutex_;
+    }
+
+    void CreateLockMutexThread(tbb::mutex *entry_mutex) {
+        LockMutexThreadParams *params = new LockMutexThreadParams(
+            entry_mutex, &monitor_->mutex_, &monitor_->cond_var_);
+        EXPECT_FALSE(
+            pthread_create(&pthread_tid_, NULL, LockMutexThreadRun, params));
+        LOG(DEBUG, "CreateLockMutexThread pthread created");
+        int idx = 0;
+        while (++idx <= 100) {
+            if (!entry_mutex->try_lock())
+                break;
+            entry_mutex->unlock();
+            usleep(1000);
+        }
+        EXPECT_GT(100, idx);
+        LOG(DEBUG, "CreateLockMutexThread wait iterations = " << idx);
+    }
+
+    void JoinLockMutexThread() {
+        pthread_join(pthread_tid_, NULL);
+        LOG(DEBUG, "JoinLockMutexThread pthread joined");
     }
 
     void RunExport() {
@@ -601,6 +664,7 @@ protected:
     RibOut ribout_;
     BgpExport *export_;
     RibOutUpdates *updates_;
+    RibUpdateMonitor *monitor_;
     MsgBuilderMock builder_;
 
     Ip4Prefix prefix_;
@@ -614,6 +678,7 @@ protected:
     RibOutAttr roattrA_, roattrB_, roattrC_;
     RibOutAttr roattr_null_;
     RibPeerSet peerset_[kPeerCount];
+    pthread_t pthread_tid_;
 };
 
 #endif

@@ -180,9 +180,11 @@ public:
     void ClearEntryState(DBEntryBase *db_entry);
 
 private:
+    friend class BgpExportTest;
+
     // Retrieve that mutex associated with the route state.
     tbb::mutex *DBStateMutex(RouteUpdate *rt_update);
-    
+
     // Helper functions for GetRouteStateAndDequeue
     DBState *GetRouteUpdateAndDequeue(DBEntryBase *db_entry,
                                       RouteUpdate *rt_update,

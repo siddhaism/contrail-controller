@@ -98,6 +98,21 @@ TEST_F(BgpExportRouteUpdateTest1, Basic2) {
     }
 }
 
+TEST_F(BgpExportRouteUpdateTest1, Concurrency1) {
+    InitUpdateInfo(attrA_, 0, kPeerCount-1);
+    Initialize();
+
+    rt_.MarkDelete();
+    CreateLockMutexThread(GetMutex(rt_update_));
+    RunExport();
+    JoinLockMutexThread();
+    rt_.ClearDelete();
+    table_.VerifyExportResult(false);
+
+    ExpectNullDBState(&rt_);
+    DrainAndVerifyNoState(&rt_);
+}
+
 //
 // Description: Handle change in attribute for all peers with scheduled state
 //              or pending join state.  All scheduled/pending updates share a
