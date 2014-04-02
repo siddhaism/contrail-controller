@@ -138,9 +138,15 @@ private:
 
 class AgentInet4McRtSandesh : public AgentSandesh {
 public:
+<<<<<<< HEAD
     AgentInet4McRtSandesh(VrfEntry *vrf, std::string context, std::string name, 
                           bool stale) 
         : AgentSandesh(context, name), vrf_(vrf), stale_(stale) {}
+=======
+    AgentInet4McRtSandesh(VrfEntry *vrf, std::string context,
+                std::string name, bool stale) : AgentSandesh(context, name), 
+                vrf_(vrf), stale_(stale) {}
+>>>>>>> ccdc259ebd88eaf24a1db1b2ff334b5c86bf68a4
 
 private:
     DBTable *AgentGetTable();
@@ -153,9 +159,15 @@ private:
 
 class AgentLayer2RtSandesh : public AgentSandesh {
 public:
+<<<<<<< HEAD
     AgentLayer2RtSandesh(VrfEntry *vrf, std::string context, std::string name, 
                          bool stale) 
         : AgentSandesh(context, name), vrf_(vrf), stale_(stale) {}
+=======
+    AgentLayer2RtSandesh(VrfEntry *vrf, std::string context,
+                          std::string name, bool stale) : AgentSandesh(context, name), 
+                          vrf_(vrf), stale_(stale) {}
+>>>>>>> ccdc259ebd88eaf24a1db1b2ff334b5c86bf68a4
 
 private:
     DBTable *AgentGetTable();

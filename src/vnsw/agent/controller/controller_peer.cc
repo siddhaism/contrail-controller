@@ -85,7 +85,6 @@ void AgentXmppChannel::DeCommissionBgpPeer() {
 
     // Add the peer to global decommisioned list
     //ControllerPeer::AgentBgpPeerList.push_front(bgp_peer); 
-    //Controller_Peer.AgentBgpPeerList.push_front(bgp_peer); 
     agent_->controller()->AddToControllerPeerList(bgp_peer_id_);
 }
 

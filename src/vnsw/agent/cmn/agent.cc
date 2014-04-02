@@ -39,6 +39,8 @@
 #include <cmn/agent_factory.h>
 #include <controller/controller_init.h>
 
+#include <controller/controller_init.h>
+
 #include <diag/diag.h>
 
 const std::string Agent::null_str_ = "";
