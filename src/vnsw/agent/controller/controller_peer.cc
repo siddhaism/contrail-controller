@@ -86,7 +86,7 @@ void AgentXmppChannel::DeCommissionBgpPeer() {
     // Add the peer to global decommisioned list
     //ControllerPeer::AgentBgpPeerList.push_front(bgp_peer); 
     //Controller_Peer.AgentBgpPeerList.push_front(bgp_peer); 
-    agent_->controller()->AddToControllerPeerList(bgp_peer);
+    agent_->controller()->AddToControllerPeerList(bgp_peer_id_);
 }
 
 
@@ -561,15 +561,7 @@ void AgentXmppChannel::AddRemoteRoute(string vrf_name, Ip4Address prefix_addr,
 
         case NextHop::VLAN: {
             const VlanNH *vlan_nh = static_cast<const VlanNH *>(nh);
-<<<<<<< HEAD
-            rt_table->AddVlanNHRouteReq(bgp_peer_id_, vrf_name, prefix_addr,
-=======
-            const VmInterface *vm_port =
-                static_cast<const VmInterface *>(vlan_nh->GetInterface());
-            std::vector<int> sg_l;
-            vm_port->CopySgIdList(&sg_l);
             rt_table->AddVlanNHRouteReq(bgp_peer_id(), vrf_name, prefix_addr,
->>>>>>> patch changes from nipa; handle some more getinstance removal
                                         prefix_len, vlan_nh->GetIfUuid(),
                                         vlan_nh->GetVlanTag(), label,
                                         item->entry.virtual_network,

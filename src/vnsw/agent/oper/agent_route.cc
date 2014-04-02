@@ -87,6 +87,7 @@ const string &AgentRouteTable::GetSuffix(Agent::RouteTableType type) {
 void AgentRouteTable::SetVrf(VrfEntry *vrf) {
     agent_ = (static_cast<VrfTable *>(vrf->get_table()))->agent();
     vrf_entry_ = vrf;
+    vrf_id_ = vrf->vrf_id();
     vrf_delete_ref_.Reset(vrf->deleter());
     deleter_.reset(new DeleteActor(this));
 }

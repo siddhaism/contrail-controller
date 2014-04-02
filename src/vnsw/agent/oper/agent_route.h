@@ -122,7 +122,7 @@ public:
 
     Agent *agent() const { return agent_; }
     const std::string &vrf_name() const { return vrf_entry_->GetName();};
-    uint32_t vrf_id() const {return vrf_entry_->vrf_id();}
+    uint32_t vrf_id() const {return vrf_id_;}
     AgentRoute *FindActiveEntry(const AgentRouteKey *key);
 
     // Set VRF for the route-table
@@ -161,6 +161,9 @@ private:
     UnresolvedRouteTree unresolved_rt_tree_;
     UnresolvedNHTree unresolved_nh_tree_;
     VrfEntryRef vrf_entry_;
+    // VRF is stored to identify which VRF this table belonged to
+    // in case lifetimeactor has reset the vrf_. 
+    uint32_t vrf_id_;
     boost::scoped_ptr<DeleteActor> deleter_;
     LifetimeRef<AgentRouteTable> vrf_delete_ref_;
     DISALLOW_COPY_AND_ASSIGN(AgentRouteTable);

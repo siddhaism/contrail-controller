@@ -33,5 +33,7 @@ void Peer::StalePeerRoutes() {
 }
 
 BgpPeer::~BgpPeer() {
-    agent()->GetVrfTable()->Unregister(id_);
+    if (id_ != -1) {
+        agent()->GetVrfTable()->Unregister(id_);
+    }
 }

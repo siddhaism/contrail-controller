@@ -83,7 +83,9 @@ bool ControllerRouteWalker::DelPeer(DBTablePartBase *partition,
             if (vrf->GetName().compare(peer_->agent()->GetDefaultVrf()) != 0) {
                 for (uint8_t table_type = 0; table_type < Agent::ROUTE_TABLE_MAX;
                  table_type++) {
-                    state->rt_export_[table_type]->Unregister();
+                    if (state->rt_export_[table_type]) {
+                        state->rt_export_[table_type]->Unregister();
+                    }
                 }
             }
  

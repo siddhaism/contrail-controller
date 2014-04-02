@@ -113,12 +113,12 @@ private:
 
 class AgentInet4UcRtSandesh : public AgentSandesh {
 public:
-    AgentInet4UcRtSandesh(VrfEntry *vrf, std::string context, bool stale) : 
+    AgentInet4UcRtSandesh(VrfEntry *vrf, std::string context, bool stale)
         : AgentSandesh(context, ""), vrf_(vrf), stale_(stale) {
         dump_table_ = true;
     }
     AgentInet4UcRtSandesh(VrfEntry *vrf, std::string context,
-                          Ip4Address addr, uint8_t plen, bool stale) : 
+                          Ip4Address addr, uint8_t plen, bool stale) 
         : AgentSandesh(context, ""), vrf_(vrf), addr_(addr), plen_(plen), 
         stale_(stale) {
         dump_table_ = false;
