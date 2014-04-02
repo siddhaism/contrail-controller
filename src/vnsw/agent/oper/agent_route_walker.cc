@@ -168,8 +168,8 @@ void AgentRouteWalker::RouteWalkDone(DBTableBase *part) {
     VrfRouteWalkerIdMapIterator iter = route_walkid_[table_type].find(vrf_id);
     if (iter != route_walkid_[table_type].end()) {
         AGENT_LOG(AgentRouteWalkerLog, iter->second, 
-                  walk_type_, "Route table walk done for vrf ", 
-                  table->vrf_name(), table_type);
+                  walk_type_, "Route table walk done for route ", 
+                  table->GetTableName(), table_type);
         route_walkid_[table_type].erase(vrf_id);
         DecrementWalkCount();
         OnWalkComplete();
