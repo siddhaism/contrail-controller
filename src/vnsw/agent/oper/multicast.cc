@@ -847,9 +847,9 @@ bool MulticastGroupObject::ModifyFabricMembers(const TunnelOlist &olist,
     NextHopKey *key; 
     TunnelNHData *tnh_data;
 
-    //tbb::mutex::scoped_lock lock(mutex_);
     //Ignore any modification operation for lesser value as obj is updated 
-    if (peer_identifier_ > peer_identifier) {
+    if ((peer_identifier_ > peer_identifier) && 
+        (peer_identifier_ != INVALID_PEER_IDENTIFIER)) {
         return true;
     }
     tunnel_olist_.clear();

@@ -1769,17 +1769,3 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_sessiondown_after_vn_vrf_link_del) {
 }
 
 }
-
-int main(int argc, char **argv) {
-    GETUSERARGS();
-    client = TestInit(init_file, ksync_init);
-    Agent::GetInstance()->SetXmppServer("127.0.0.1", 0);
-    Agent::GetInstance()->SetAgentMcastLabelRange(0);
-    Agent::GetInstance()->set_headless_agent_mode(HEADLESS_MODE);
-
-    int ret = RUN_ALL_TESTS();
-    Agent::GetInstance()->GetEventManager()->Shutdown();
-    AsioStop();
-    return ret;
-}
-

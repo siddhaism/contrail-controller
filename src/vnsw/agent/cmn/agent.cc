@@ -220,9 +220,7 @@ CfgListener *Agent::cfg_listener() const {
 }
 
 void Agent::SetControlNodeMulticastBuilder(AgentXmppChannel *peer) {
-    if (peer) {
-        controller()->increment_multicast_peer_identifier();
-    }
+    controller()->increment_multicast_peer_identifier();
     cn_mcast_builder_ =  peer;
 }
 

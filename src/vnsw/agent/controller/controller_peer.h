@@ -43,10 +43,6 @@ public:
     static void MulticastPeerDown(AgentXmppChannel *peer, bool all_peer_gone);
     static void HandleAgentXmppClientChannelEvent(AgentXmppChannel *peer,
                                                   xmps::PeerState state);
-    //static void HandleHeadlessAgentXmppClientChannelEvent(AgentXmppChannel *peer,
-    //                                                      xmps::PeerState state);
-    //static void HandleXmppClientChannelEvent(AgentXmppChannel *peer,
-    //                                         xmps::PeerState state);
     static bool ControllerSendCfgSubscribe(AgentXmppChannel *peer);
     static bool ControllerSendVmCfgSubscribe(AgentXmppChannel *peer, 
             const boost::uuids::uuid &vm_id, bool subscribe);
