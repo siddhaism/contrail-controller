@@ -401,10 +401,10 @@ bool DhcpHandler::CreateRelayPacket(bool is_request) {
         read_opt = read_opt->GetNextOptionPtr();
     }
     if (is_request) {
-        dhcp->giaddr = ntohl(agent()->GetRouterId().to_ulong());
+        dhcp->giaddr = htonl(agent()->GetRouterId().to_ulong());
         WriteOption82(write_opt, opt_len);
         write_opt = write_opt->GetNextOptionPtr();
-        pkt_info_->sport = DHCP_CLIENT_PORT;
+        pkt_info_->sport = DHCP_SERVER_PORT;
         pkt_info_->dport = DHCP_SERVER_PORT;
     } else {
         if (!vm_itf_) {
@@ -424,8 +424,9 @@ bool DhcpHandler::CreateRelayPacket(bool is_request) {
     UdpHdr(pkt_info_->len, in_pkt_info.ip->saddr, pkt_info_->sport,
            in_pkt_info.ip->daddr, pkt_info_->dport);
     pkt_info_->len += sizeof(iphdr);
-    IpHdr(pkt_info_->len, in_pkt_info.ip->saddr,
-          in_pkt_info.ip->daddr, IPPROTO_UDP);
+    in_addr_t dest_ip = 0xFFFFFFFF;
+    IpHdr(pkt_info_->len, htonl(agent()->GetRouterId().to_ulong()),
+	  dest_ip, IPPROTO_UDP);
     if (is_request) {
         EthHdr(agent()->GetDhcpProto()->ip_fabric_interface_mac(),
                in_pkt_info.eth->h_dest, 0x800);
