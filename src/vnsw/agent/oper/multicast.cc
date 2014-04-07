@@ -6,7 +6,6 @@
 #include <cmn/agent_cmn.h>
 
 #include <base/logging.h>
-#include <base/timer.h>
 #include <oper/route_common.h>
 #include <oper/interface_common.h>
 #include <oper/nexthop.h>
@@ -21,7 +20,6 @@
 #include <sandesh/sandesh_constants.h>
 #include <sandesh/sandesh.h>
 #include <sandesh/sandesh_trace.h>
-#include <tbb/mutex.h>
 
 using namespace std;
 #define INVALID_PEER_IDENTIFIER VNController::kInvalidPeerIdentifier 
@@ -563,7 +561,6 @@ void MulticastHandler::DeleteVmInterface(const Interface *intf)
 //Delete multicast object for vrf/G
 void MulticastHandler::DeleteMulticastObject(const std::string &vrf_name,
                                              const Ip4Address &grp_addr) {
-    //tbb::mutex::scoped_lock lock(mutex_);
     MCTRACE(Log, "delete obj  vrf/grp/size ", vrf_name, grp_addr.to_string(),
         this->GetMulticastObjList().size());
     for(std::set<MulticastGroupObject *>::iterator it =
@@ -916,47 +913,10 @@ void MulticastGroupObject::FlushAllPeerInfo(uint64_t peer_identifier) {
 }
 
 MulticastHandler::MulticastHandler(Agent *agent) : agent_(agent) { 
-    stale_timer_ = TimerManager::CreateTimer(*(Agent::GetInstance()->
-                                               GetEventManager()->io_service()),
-                                             "MulticastOldPeerFlushTimer",
-                                             TaskScheduler::GetInstance()->
-                                             GetTaskId("db::DBTable"), 0);
     obj_ = this; 
 }
 
-void MulticastHandler::HandlePeerDown() {
-    GetInstance()->FlushPeerInfo(INVALID_PEER_IDENTIFIER);
-}
-
-/*
- * XMPP peer has gone down, so flush off all the information
- * coming via control node i.e. MPLS label and tunnel info
- */
-void MulticastHandler::RemoveStaleBgpPeer(uint64_t peer_sequence) {
-    Timer *timer = MulticastHandler::GetInstance()->stale_timer();
-    //Start a timer
-    if (timer->running()) {
-        timer->Cancel();
-    }
-
-    uint32_t cleanup_timer = kMulticastTimeout;
-    if (!(Agent::GetInstance()->headless_agent_mode())) {
-        cleanup_timer = 0;
-    }
-    timer->Start(cleanup_timer, 
-                 boost::bind(&MulticastHandler::FlushPeerInfo,
-                             MulticastHandler::GetInstance(), peer_sequence));
-}
-
-void MulticastHandler::CancelStaleBgpPeerTimer() {
-    Timer *timer = MulticastHandler::GetInstance()->stale_timer();
-    if (timer->running()) {
-        timer->Cancel();
-    }
-}
-
 bool MulticastHandler::FlushPeerInfo(uint64_t peer_sequence) {
-    //tbb::mutex::scoped_lock lock(mutex_);
     for (std::set<MulticastGroupObject *>::iterator it = 
          GetMulticastObjList().begin(); it != GetMulticastObjList().end(); 
          it++) {

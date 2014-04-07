@@ -41,6 +41,10 @@ void VrfExport::Notify(AgentXmppChannel *bgp_xmpp_peer,
                        DBTablePartBase *partition, DBEntryBase *e) {
 
     BgpPeer *bgp_peer = static_cast<BgpPeer *>(bgp_xmpp_peer->bgp_peer_id());
+    //Peer is decommissioned so ignore the notification as there is no listener
+    if (bgp_peer == NULL)
+        return;
+
     DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
     VrfEntry *vrf = static_cast<VrfEntry *>(e);
     State *state = static_cast<State *>(vrf->GetState(partition->parent(), id));

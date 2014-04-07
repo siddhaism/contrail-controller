@@ -13,7 +13,7 @@
 class AgentXmppChannel;
 class AgentDnsXmppChannel;
 class AgentIfMapVmExport;
-class Peer;
+class BgpPeer;
 
 class VNController {
 public:
@@ -37,22 +37,30 @@ public:
     void ApplyDiscoveryDnsXmppServices(std::vector<DSResponse> resp); 
 
     //Multicast peer identifier
-    void incr_and_get_multicast_peer_identifier() {multicast_peer_identifier_++;}
     void increment_multicast_peer_identifier() {multicast_peer_identifier_++;}
     uint64_t multicast_peer_identifier() {return multicast_peer_identifier_;}
 
     //Peer maintenace 
     uint8_t GetActiveXmppConnections();
     uint32_t ControllerPeerListSize() const {return controller_peer_list_.size();}
-    void AddToControllerPeerList(boost::shared_ptr<Peer> peer);
-    void ControllerPeerHeadlessAgentDelDone(Peer *peer);
-    void ControllerPeerStartCleanupTimer();
-    void ControllerPeerCancelCleanupTimer();
-    bool ControllerPeerCleanupTimerExpired();
+    void AddToControllerPeerList(boost::shared_ptr<BgpPeer> peer);
+    void ControllerPeerHeadlessAgentDelDone(BgpPeer *peer);
+
+    //timer common
+    void CancelTimer(Timer *timer);
+
+    //Unicast timer
+    void StartUnicastCleanupTimer();
+    bool UnicastCleanupTimerExpired();
+    Timer *unicast_cleanup_timer() const {return unicast_cleanup_timer_;}
+
+    //Multicast timer
+    void StartMulticastCleanupTimer(uint64_t peer_sequence);
+    bool MulticastCleanupTimerExpired(uint64_t peer_sequence);
+    Timer *multicast_cleanup_timer() const {return multicast_cleanup_timer_;}
 
     AgentIfMapVmExport *agent_ifmap_vm_export() const {return agent_ifmap_vm_export_.get();}
     Agent *agent() {return agent_;}
-    Timer *cleanup_timer() const {return cleanup_timer_;}
 
 private:
     AgentXmppChannel *FindAgentXmppChannel(std::string server_ip);
@@ -60,9 +68,10 @@ private:
 
     Agent *agent_;
     uint64_t multicast_peer_identifier_;
-    std::list<boost::shared_ptr<Peer> > controller_peer_list_;
+    std::list<boost::shared_ptr<BgpPeer> > controller_peer_list_;
     boost::scoped_ptr<AgentIfMapVmExport> agent_ifmap_vm_export_;
-    Timer *cleanup_timer_;
+    Timer *unicast_cleanup_timer_;
+    Timer *multicast_cleanup_timer_;
 };
 
 extern SandeshTraceBufferPtr ControllerTraceBuf;

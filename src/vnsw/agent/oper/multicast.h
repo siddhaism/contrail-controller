@@ -169,11 +169,6 @@ public:
                                     uint32_t source_label,
                                     const TunnelOlist &olist,
                                     uint64_t peer_identifier = 0);
-    /* Ctrl node came up, start timer to flush all source label and 
-     * tunnel sent by former peer */
-    static void RemoveStaleBgpPeer(uint64_t peer_sequence);
-    static void CancelStaleBgpPeerTimer();
-    static void HandlePeerDown();
     //Registered for VN notification
     static void ModifyVN(DBTablePartBase *partition, DBEntryBase *e);
     //Registered for VM notification
@@ -198,7 +193,7 @@ public:
     MulticastGroupObject *FindGroupObject(const std::string &vrf_name,
                                           const Ip4Address &dip);
     bool FlushPeerInfo(uint64_t peer_sequence);
-    Timer *stale_timer() const {return stale_timer_;}
+
 private:
     //operations on list of all objectas per group/source/vrf
     void AddToMulticastObjList(MulticastGroupObject *obj) {
@@ -327,7 +322,6 @@ private:
     std::map<uuid, string> vn_vrf_mapping_;
     //VM uuid <-> VN uuid
     std::map<uuid, uuid> vm_vn_mapping_;
-    Timer *stale_timer_;
     tbb::mutex mutex_;
     DISALLOW_COPY_AND_ASSIGN(MulticastHandler);
 };

@@ -18,15 +18,12 @@
 
 class AgentRoute;
 class Peer;
+class BgpPeer;
 class VrfEntry;
 class XmlPugi;
 
 class AgentXmppChannel {
 public:
-    typedef enum {
-        DOWN = 0,
-        UP = 1,
-    } AgentXmppChannelState;
     explicit AgentXmppChannel(XmppChannel *channel);
     AgentXmppChannel(Agent *agent, XmppChannel *channel, std::string xmpp_server, 
                      std::string label_range, uint8_t xs_idx);
@@ -39,7 +36,8 @@ public:
     virtual void ReceiveMulticastUpdate(XmlPugi *pugi);
     XmppChannel *GetXmppChannel() { return channel_; }
     static void CleanStale(AgentXmppChannel *peer, bool config, bool unicast, bool multicast);
-    static void UnicastPeerDown(AgentXmppChannel *peer, bool all_peer_gone);
+    static void UnicastPeerDown(AgentXmppChannel *peer, BgpPeer *peer_id, 
+                                bool all_peer_gone);
     static void MulticastPeerDown(AgentXmppChannel *peer, bool all_peer_gone);
     static void HandleAgentXmppClientChannelEvent(AgentXmppChannel *peer,
                                                   xmps::PeerState state);
@@ -77,17 +75,15 @@ public:
     uint8_t GetXmppServerIdx() { return xs_idx_; }
     std::string GetMcastLabelRange() { return label_range_; }
 
-    void SetState(AgentXmppChannelState state) { state_ = state; }
-    AgentXmppChannelState GetState() { return state_; }
     Agent *agent() const {return agent_;}
-    Peer *bgp_peer_id() const {return bgp_peer_id_.get();}
+    BgpPeer *bgp_peer_id() const {return bgp_peer_id_.get();}
+    std::string GetBgpPeerName() const;
    
 protected:
     virtual void WriteReadyCb(const boost::system::error_code &ec);
 
 private:
     void ReceiveInternal(const XmppStanza::XmppMessage *msg);
-    void BgpPeerDelDone();
     void AddEvpnRoute(std::string vrf_name, struct ether_addr &mac, 
                   autogen::EnetItemType *item);
     void AddRoute(std::string vrf_name, Ip4Address ip, uint32_t plen, 
@@ -102,9 +98,7 @@ private:
     std::string xmpp_server_;
     std::string label_range_;
     uint8_t xs_idx_;
-    //Peer *bgp_peer_id_;
-    boost::shared_ptr<Peer> bgp_peer_id_;
-    AgentXmppChannelState state_;
+    boost::shared_ptr<BgpPeer> bgp_peer_id_;
     Agent *agent_;
 };
 

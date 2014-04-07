@@ -165,7 +165,7 @@ protected:
         xc->Shutdown();
         client->WaitForIdle();
 
-        Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+        Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
         client->WaitForIdle();
         Agent::GetInstance()->controller()->Cleanup();
         client->WaitForIdle();
@@ -432,6 +432,7 @@ protected:
 
     void XmppConnectionSetUp(bool l2_l3_forwarding_mode) {
 
+        Agent::GetInstance()->controller()->increment_multicast_peer_identifier();
         Agent::GetInstance()->SetControlNodeMulticastBuilder(NULL);
 
         //Create control-node bgp mock peer 
@@ -491,7 +492,7 @@ protected:
 	client->WaitForIdle();
 
     CreateVmportEnv(input, 2, 0);
-	client->WaitForIdle();
+    WAIT_FOR(100, 10000, (Agent::GetInstance()->GetInterfaceTable()->Size() == 5));
 
 	client->Reset();
     AddIPAM("vn1", ipam_info, 1);
@@ -698,15 +699,15 @@ protected:
         client->WaitForIdle();
         client->Reset();
         DeleteVmportEnv(input, 2, 1, 0);
-        client->WaitForIdle();
-
-        Agent::GetInstance()->controller()->cleanup_timer()->Fire();
-        client->WaitForIdle();
 
         WAIT_FOR(100, 1000, (client->CompositeNHDelWait(cnh_del_cnt) == true));
         WAIT_FOR(100, 10000, (client->CompositeNHCount() == 0));
         WAIT_FOR(100, 1000, 
                  (Agent::GetInstance()->GetMplsTable()->Size() == 0));
+
+        Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
+        client->WaitForIdle();
+
         WAIT_FOR(100, 1000, (VrfFind("vrf1") == false)); 
         WAIT_FOR(100, 1000, (VrfFind("vrf2") == false)); 
         client->NextHopReset();
@@ -957,6 +958,7 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
 
     //bring-down the channel
     AgentXmppChannel *ch = static_cast<AgentXmppChannel *>(bgp_peer.get());
+    Peer *bgp_peer_id = ch->bgp_peer_id();
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
     client->WaitForIdle();
     if (!Agent::GetInstance()->headless_agent_mode()) {
@@ -969,9 +971,9 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
     Ip4Address addr = Ip4Address::from_string("1.1.1.1");
     Inet4UnicastRouteEntry *rt = RouteGet("vrf1", addr, 32);
     if (Agent::GetInstance()->headless_agent_mode()) {
-        WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id())->is_stale()));
+        WAIT_FOR(100, 10000, (rt->FindPath(bgp_peer_id)->is_stale()));
     } else {
-        WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id()) == NULL));
+        WAIT_FOR(100, 10000, (rt->FindPath(bgp_peer_id) == NULL));
     }
 	client->WaitForIdle();
 
@@ -979,11 +981,11 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
     addr = Ip4Address::from_string("1.1.1.2");
     rt = RouteGet("vrf1", addr, 32);
     if (Agent::GetInstance()->headless_agent_mode()) {
-        WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id())->is_stale()));
+        WAIT_FOR(100, 10000, (rt->FindPath(bgp_peer_id)->is_stale()));
         WAIT_FOR(100, 10000, (client->CompositeNHCount() == 6)); 
         client->CompositeNHWait(11);
     } else {
-        WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id()) == NULL));
+        WAIT_FOR(100, 10000, (rt->FindPath(bgp_peer_id) == NULL));
         WAIT_FOR(100, 10000, (client->CompositeNHCount() == 5)); 
         client->CompositeNHWait(17);
     }
@@ -1145,7 +1147,7 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_MultipleRetracts) {
                           "127.0.0.1");
     client->MplsDelWait(2);
     WAIT_FOR(100, 10000, (bgp_peer.get()->Count() == 5));
-    ASSERT_TRUE(Agent::GetInstance()->GetMplsTable()->Size() == 4);
+    WAIT_FOR(100, 1000, (Agent::GetInstance()->GetMplsTable()->Size() == 4));
 
     //ensure route learnt via control-node, path is updated 
     Ip4Address addr = Ip4Address::from_string("1.1.1.255");

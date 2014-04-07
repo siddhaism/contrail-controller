@@ -24,7 +24,6 @@ class VrfTable;
 
 class Peer {
 public:
-    typedef boost::function<void()> DelPeerDone;
     typedef std::map<std::string, Peer *> PeerMap;
     typedef std::pair<std::string, Peer *> PeerPair;
     enum Type {
@@ -37,14 +36,8 @@ public:
         NOVA_PEER
     };
 
-    Peer(Agent *agent, Type type, const std::string &name);
+    Peer(Type type, const std::string &name);
     virtual ~Peer();
-
-    // Table Walkers
-    void DelPeerRoutes(DelPeerDone cb);
-    void PeerNotifyRoutes();
-    void PeerNotifyMulticastRoutes(bool associate);
-    void StalePeerRoutes();
 
     bool IsLess(const Peer *rhs) const {
         if  (type_ != rhs->type_) {
@@ -57,31 +50,19 @@ public:
 
     const std::string &GetName() const { return name_; }
     const Type GetType() const { return type_; }
-    ControllerRouteWalker *route_walker() const {
-        return route_walker_.get(); }
-    bool is_disconnect_walk() const {return is_disconnect_walk_;}
-    void set_is_disconnect_walk(bool is_disconnect_walk) {
-        is_disconnect_walk_ = is_disconnect_walk;
-    }
-    Agent *agent() const {return agent_;}
 
 private:
     Type type_;
     std::string name_;
-    Agent *agent_;
-    boost::scoped_ptr<ControllerRouteWalker> route_walker_;
-    tbb::atomic<bool> is_disconnect_walk_;
     DISALLOW_COPY_AND_ASSIGN(Peer);
 };
 
 // Peer used for BGP paths
 class BgpPeer : public Peer {
 public:
-    BgpPeer(Agent *agent, const Ip4Address &server_ip, const std::string &name,
-            AgentXmppChannel *bgp_xmpp_peer, DBTableBase::ListenerId id) : 
-        Peer(agent, Peer::BGP_PEER, name), server_ip_(server_ip), id_(id),
-        bgp_xmpp_peer_(bgp_xmpp_peer) {
-    }
+    typedef boost::function<void()> DelPeerDone;
+    BgpPeer(const Ip4Address &server_ip, const std::string &name,
+            AgentXmppChannel *bgp_xmpp_peer, DBTableBase::ListenerId id); 
     virtual ~BgpPeer();
 
     bool Compare(const Peer *rhs) const {
@@ -92,10 +73,26 @@ public:
     void SetVrfListenerId(DBTableBase::ListenerId id) { id_ = id; }
     DBTableBase::ListenerId GetVrfExportListenerId() { return id_; } 
     AgentXmppChannel *GetBgpXmppPeer() { return bgp_xmpp_peer_; }    
+
+    // Table Walkers
+    void DelPeerRoutes(DelPeerDone cb);
+    void PeerNotifyRoutes();
+    void PeerNotifyMulticastRoutes(bool associate);
+    void StalePeerRoutes();
+
+    bool is_disconnect_walk() const {return is_disconnect_walk_;}
+    void set_is_disconnect_walk(bool is_disconnect_walk) {
+        is_disconnect_walk_ = is_disconnect_walk;
+    }
+    ControllerRouteWalker *route_walker() const {
+        return route_walker_.get(); }
+
 private: 
     Ip4Address server_ip_;
     DBTableBase::ListenerId id_;
     AgentXmppChannel *bgp_xmpp_peer_;
+    tbb::atomic<bool> is_disconnect_walk_;
+    boost::scoped_ptr<ControllerRouteWalker> route_walker_;
     DISALLOW_COPY_AND_ASSIGN(BgpPeer);
 };
 
@@ -105,7 +102,7 @@ private:
 class LocalVmPortPeer : public Peer {
 public:
     LocalVmPortPeer(const std::string &name, uint64_t handle) :
-        Peer(Agent::GetInstance(), Peer::LOCAL_VM_PORT_PEER, name), handle_(handle) {
+        Peer(Peer::LOCAL_VM_PORT_PEER, name), handle_(handle) {
     }
 
     virtual ~LocalVmPortPeer() { }
@@ -124,7 +121,7 @@ private:
 // ECMP peer
 class EcmpPeer : public Peer {
 public:
-    EcmpPeer() : Peer(Agent::GetInstance(), Peer::ECMP_PEER, "ECMP") { }
+    EcmpPeer() : Peer(Peer::ECMP_PEER, "ECMP") { }
     virtual ~EcmpPeer() { }
 
     bool Compare(const Peer *rhs) const { return false; }

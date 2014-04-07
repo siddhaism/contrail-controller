@@ -106,7 +106,7 @@ void RouteExport::UnicastNotify(AgentXmppChannel *bgp_xmpp_peer,
         if (state->Changed(path)) {
             state->Update(path);
             CONTROLLER_TRACE(RouteExport,
-                             bgp_xmpp_peer->bgp_peer_id()->GetName(),
+                             bgp_xmpp_peer->GetBgpPeerName(),
                              route->vrf()->GetName(),
                              route->ToString(),
                              false, path->GetActiveLabel());
@@ -119,7 +119,7 @@ void RouteExport::UnicastNotify(AgentXmppChannel *bgp_xmpp_peer,
     } else {
         if (state->exported_ == true) {
             CONTROLLER_TRACE(RouteExport, 
-                    bgp_xmpp_peer->bgp_peer_id()->GetName(), 
+                    bgp_xmpp_peer->GetBgpPeerName(), 
                     route->vrf()->GetName(), 
                     route->ToString(), 
                     true, 0);
@@ -148,7 +148,7 @@ void RouteExport::MulticastNotify(AgentXmppChannel *bgp_xmpp_peer,
     bool route_can_be_dissociated = route->CanDissociate();
 
     if (route_can_be_dissociated && (state != NULL) && (state->exported_ == true)) {
-        CONTROLLER_TRACE(RouteExport, bgp_xmpp_peer->bgp_peer_id()->GetName(),
+        CONTROLLER_TRACE(RouteExport, bgp_xmpp_peer->GetBgpPeerName(),
                 route->vrf()->GetName(), 
                 route->ToString(), true, 0);
 
@@ -182,7 +182,7 @@ void RouteExport::MulticastNotify(AgentXmppChannel *bgp_xmpp_peer,
     if (!route_can_be_dissociated && ((state->exported_ == false) || 
                                   (state->force_chg_ == true))) {
 
-        CONTROLLER_TRACE(RouteExport, bgp_xmpp_peer->bgp_peer_id()->GetName(),
+        CONTROLLER_TRACE(RouteExport, bgp_xmpp_peer->GetBgpPeerName(),
                 route->vrf()->GetName(), 
                 route->ToString(), associate, 0);
 

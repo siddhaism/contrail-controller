@@ -161,7 +161,7 @@ protected:
         xc_s->Shutdown();
         client->WaitForIdle();
 
-        Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+        Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
         client->WaitForIdle();
         Agent::GetInstance()->controller()->Cleanup();
         client->WaitForIdle();
@@ -364,6 +364,7 @@ protected:
 
     void XmppConnectionSetUp() {
 
+        Agent::GetInstance()->controller()->increment_multicast_peer_identifier();
         Agent::GetInstance()->SetControlNodeMulticastBuilder(NULL);
 
         //Create control-node bgp mock peer 

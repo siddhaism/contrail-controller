@@ -13,6 +13,8 @@
 #include "pugixml/pugixml.hpp"
 #include "oper/vrf.h"
 #include "oper/peer.h"
+#include "oper/mirror_table.h"
+#include "oper/multicast.h"
 #include "controller/controller_types.h"
 #include "controller/controller_init.h"
 #include "controller/controller_peer.h"
@@ -27,11 +29,18 @@ SandeshTraceBufferPtr ControllerTraceBuf(SandeshTraceBufferCreate(
 
 VNController::VNController(Agent *agent) : agent_(agent), multicast_peer_identifier_(0) {
     controller_peer_list_.clear();
-    cleanup_timer_ = TimerManager::CreateTimer(*(agent->GetEventManager()->
-                                                io_service()),
-                                               "Agent Stale cleanup timer",
-                                               TaskScheduler::GetInstance()->
-                                               GetTaskId("db::DBTable"), 0);
+    unicast_cleanup_timer_ = 
+        TimerManager::CreateTimer(*(agent->GetEventManager()->
+                                    io_service()),
+                                  "Agent Unicast Stale cleanup timer",
+                                  TaskScheduler::GetInstance()->
+                                  GetTaskId("db::DBTable"), 0);
+    multicast_cleanup_timer_ = 
+        TimerManager::CreateTimer(*(agent->GetEventManager()->
+                                    io_service()),
+                                  "Agent Multicast Stale cleanup timer",
+                                  TaskScheduler::GetInstance()->
+                                  GetTaskId("db::DBTable"), 0);
 }
 
 VNController::~VNController() {
@@ -84,17 +93,6 @@ void VNController::XmppServerConnect() {
             client->RegisterConnectionEvent(xmps::BGP,
                     boost::bind(&AgentXmppChannel::HandleAgentXmppClientChannelEvent,
                                 bgp_peer, _2));
-#if 0
-            if (agent_->headless_agent_mode()) {
-                client->RegisterConnectionEvent(xmps::BGP,
-                        boost::bind(&AgentXmppChannel::HandleHeadlessAgentXmppClientChannelEvent,
-                                    bgp_peer, _2));
-            } else {
-                client->RegisterConnectionEvent(xmps::BGP,
-                        boost::bind(&AgentXmppChannel::HandleXmppClientChannelEvent, 
-                                    bgp_peer, _2));
-            }
-#endif
 
             // create ifmap peer
             AgentIfMapXmppChannel *ifmap_peer = 
@@ -168,6 +166,7 @@ void VNController::Connect() {
     DnsXmppServerConnect();
 
     /* Inits */
+    agent_->controller()->increment_multicast_peer_identifier();
     agent_->SetControlNodeMulticastBuilder(NULL);
     agent_ifmap_vm_export_.reset(new AgentIfMapVmExport(agent_));
 }
@@ -177,7 +176,7 @@ void VNController::XmppServerDisConnect() {
     uint8_t count = 0;
     while (count < MAX_XMPP_SERVERS) {
         if ((cl = agent_->GetAgentXmppClient(count)) != NULL) {
-            Peer *peer = agent_->GetAgentXmppChannel(count)->bgp_peer_id();
+            BgpPeer *peer = agent_->GetAgentXmppChannel(count)->bgp_peer_id();
             // Sets the context of walk to decide on callback when walks are
             // done
             if (peer)
@@ -249,6 +248,7 @@ void VNController::Cleanup() {
         count++;
     }
 
+    agent_->controller()->increment_multicast_peer_identifier();
     agent_->SetControlNodeMulticastBuilder(NULL);
     controller_peer_list_.clear();
     agent_ifmap_vm_export_.reset();
@@ -434,7 +434,7 @@ uint8_t VNController::GetActiveXmppConnections() {
     for (uint8_t count = 0; count < MAX_XMPP_SERVERS; count++) {
         AgentXmppChannel *xc = agent_->GetAgentXmppChannel(count);
        if (xc) {
-           if (xc->GetState() == AgentXmppChannel::UP)
+           if (xc->bgp_peer_id() != NULL)
                active_xmpps++;
        }
     }
@@ -442,51 +442,72 @@ uint8_t VNController::GetActiveXmppConnections() {
     return active_xmpps;
 }
 
-void VNController::AddToControllerPeerList(boost::shared_ptr<Peer> peer) {
+void VNController::AddToControllerPeerList(boost::shared_ptr<BgpPeer> peer) {
     controller_peer_list_.push_back(peer);
 }
 
-void VNController::ControllerPeerHeadlessAgentDelDone(Peer *bgp_peer) {
-    for (std::list<boost::shared_ptr<Peer> >::iterator it  = 
+void VNController::ControllerPeerHeadlessAgentDelDone(BgpPeer *bgp_peer) {
+    for (std::list<boost::shared_ptr<BgpPeer> >::iterator it  = 
          controller_peer_list_.begin(); it != controller_peer_list_.end(); 
          ++it) {
-        Peer *peer = static_cast<Peer *>((*it).get());
+        BgpPeer *peer = static_cast<BgpPeer *>((*it).get());
         if (peer == bgp_peer) {
             controller_peer_list_.remove(*it);
             return;
         }
     }
+    if (bgp_peer->is_disconnect_walk()) {
+        agent()->controller()->Cleanup();
+    }
 }
 
-bool VNController::ControllerPeerCleanupTimerExpired() {
-    for (std::list<boost::shared_ptr<Peer> >::iterator it  = 
+void VNController::CancelTimer(Timer *timer) {
+    if (timer == NULL) {
+        return;
+    }
+
+    if (timer->running()) {
+        timer->Cancel();
+    }
+}
+
+bool VNController::UnicastCleanupTimerExpired() {
+    for (std::list<boost::shared_ptr<BgpPeer> >::iterator it  = 
          controller_peer_list_.begin(); it != controller_peer_list_.end(); 
          ++it) {
         BgpPeer *bgp_peer = static_cast<BgpPeer *>((*it).get());
         bgp_peer->DelPeerRoutes(
-            boost::bind(&VNController::ControllerPeerHeadlessAgentDelDone, this, bgp_peer));
+            boost::bind(&VNController::ControllerPeerHeadlessAgentDelDone, 
+                        this, bgp_peer));
     }
 
     return false;
 }
 
-void VNController::ControllerPeerStartCleanupTimer() {
+void VNController::StartUnicastCleanupTimer() {
     uint32_t cleanup_timer = kUnicastStaleTimer;
 
-    ControllerPeerCancelCleanupTimer();
+    CancelTimer(unicast_cleanup_timer_);
     if (!(agent_->headless_agent_mode())) {
         cleanup_timer = 0;
     }
-    cleanup_timer_->Start(cleanup_timer,
-        boost::bind(&VNController::ControllerPeerCleanupTimerExpired, this));
+    unicast_cleanup_timer_->Start(cleanup_timer,
+        boost::bind(&VNController::UnicastCleanupTimerExpired, this));
 }
 
-void VNController::ControllerPeerCancelCleanupTimer() {
-    if (cleanup_timer_ == NULL) {
-        return;
-    }
+bool VNController::MulticastCleanupTimerExpired(uint64_t peer_sequence) {
+    MulticastHandler::GetInstance()->FlushPeerInfo(peer_sequence);
+    return false;
+}
 
-    if (cleanup_timer_->running()) {
-        cleanup_timer_->Cancel();
+void VNController::StartMulticastCleanupTimer(uint64_t peer_sequence) {
+    uint32_t cleanup_timer = kMulticastStaleTimer;
+
+    CancelTimer(multicast_cleanup_timer_);
+    if (!(agent_->headless_agent_mode())) {
+        cleanup_timer = 0;
     }
+    multicast_cleanup_timer_->Start(cleanup_timer,
+        boost::bind(&VNController::MulticastCleanupTimerExpired, this, 
+                    peer_sequence));
 }

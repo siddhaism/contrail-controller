@@ -220,7 +220,6 @@ CfgListener *Agent::cfg_listener() const {
 }
 
 void Agent::SetControlNodeMulticastBuilder(AgentXmppChannel *peer) {
-    controller()->increment_multicast_peer_identifier();
     cn_mcast_builder_ =  peer;
 }
 
@@ -288,10 +287,10 @@ void Agent::CreateDBClients() {
 
 void Agent::InitModules() {
     // Create peer entries
-    local_peer_.reset(new Peer(this, Peer::LOCAL_PEER, LOCAL_PEER_NAME));
-    local_vm_peer_.reset(new Peer(this, Peer::LOCAL_VM_PEER, LOCAL_VM_PEER_NAME));
-    linklocal_peer_.reset(new Peer(this, Peer::LINKLOCAL_PEER, LINKLOCAL_PEER_NAME));
-    ecmp_peer_.reset(new Peer(this, Peer::ECMP_PEER, ECMP_PEER_NAME));
+    local_peer_.reset(new Peer(Peer::LOCAL_PEER, LOCAL_PEER_NAME));
+    local_vm_peer_.reset(new Peer(Peer::LOCAL_VM_PEER, LOCAL_VM_PEER_NAME));
+    linklocal_peer_.reset(new Peer(Peer::LINKLOCAL_PEER, LINKLOCAL_PEER_NAME));
+    ecmp_peer_.reset(new Peer(Peer::ECMP_PEER, ECMP_PEER_NAME));
 
     ksync_.get()->Init();
 

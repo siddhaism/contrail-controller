@@ -52,7 +52,7 @@ public:
 
     InstanceServiceAsyncHandler(boost::asio::io_service& io_service) : io_service_(io_service), 
                                                                        version_(0) {
-        novaPeer_ = new Peer(Agent::GetInstance(), Peer::NOVA_PEER, NOVA_PEER_NAME); 
+        novaPeer_ = new Peer(Peer::NOVA_PEER, NOVA_PEER_NAME); 
     }
     ~InstanceServiceAsyncHandler() {
         delete novaPeer_;

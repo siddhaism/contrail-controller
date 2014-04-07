@@ -182,7 +182,7 @@ protected:
         xc->Shutdown();
         client->WaitForIdle();
 
-        Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+        Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
         client->WaitForIdle();
         Agent::GetInstance()->controller()->Cleanup();
         client->WaitForIdle();
@@ -396,6 +396,7 @@ protected:
 
     void XmppConnectionSetUp() {
 
+        Agent::GetInstance()->controller()->increment_multicast_peer_identifier();
         Agent::GetInstance()->SetControlNodeMulticastBuilder(NULL);
 
         //Create control-node bgp mock peer 
@@ -589,7 +590,7 @@ TEST_F(AgentXmppUnitTest, Connection) {
     client->WaitForIdle();
     EXPECT_EQ(0U, Agent::GetInstance()->GetVnTable()->Size());
 
-    Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+    Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
     client->WaitForIdle();
 
     EXPECT_FALSE(DBTableFind("vrf1.l2.route.0"));
@@ -716,8 +717,9 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown) {
     EXPECT_TRUE(l2_rt->GetActivePath()->peer()->GetType() == Peer::BGP_PEER);
 
     AgentXmppChannel *ch = static_cast<AgentXmppChannel *>(bgp_peer.get());
-    EXPECT_TRUE(rt->FindPath(ch->bgp_peer_id()) != NULL);
-        WAIT_FOR(100, 10000, !(rt->FindPath(ch->bgp_peer_id())->is_stale()));
+    BgpPeer *bgp_peer_id = static_cast<BgpPeer *>(ch->bgp_peer_id());
+    EXPECT_TRUE(rt->FindPath(bgp_peer_id) != NULL);
+        WAIT_FOR(100, 10000, !(rt->FindPath(bgp_peer_id)->is_stale()));
 
     //bring-down the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
@@ -725,9 +727,9 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown) {
 
     //ensure route learnt via control-node is deleted
     if (Agent::GetInstance()->headless_agent_mode()) {
-        WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id())->is_stale()));
+        WAIT_FOR(100, 10000, (rt->FindPath(bgp_peer_id)->is_stale()));
     } else {
-        WAIT_FOR(100, 10000, (rt->FindPath(ch->bgp_peer_id()) == NULL));
+        WAIT_FOR(100, 10000, (rt->FindPath(bgp_peer_id) == NULL));
     }
 
     //Mock Sandesh request
@@ -786,7 +788,7 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown) {
 
     EXPECT_EQ(0U, Agent::GetInstance()->GetVnTable()->Size());
 
-    Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+    Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
     client->WaitForIdle();
 
     WAIT_FOR(1000, 10000, (Agent::GetInstance()->GetVrfTable()->Size() == 1));
@@ -948,7 +950,7 @@ TEST_F(AgentXmppUnitTest, SgList) {
     client->WaitForIdle();
     EXPECT_EQ(0U, Agent::GetInstance()->GetVnTable()->Size());
 
-    Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+    Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
     client->WaitForIdle();
 
     EXPECT_FALSE(DBTableFind("vrf1.uc.route.0"));
@@ -1128,7 +1130,7 @@ TEST_F(AgentXmppUnitTest, vxlan_peer_l2route_add) {
     //Confirm Vmport is deleted
     EXPECT_FALSE(VmPortFind(input, 0)); 
 
-    Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+    Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
     client->WaitForIdle();
 
     WAIT_FOR(1000, 1000, (agent_->GetVnTable()->Size() == 0));
@@ -1220,7 +1222,7 @@ TEST_F(AgentXmppUnitTest, mpls_peer_l2route_add) {
 
     WAIT_FOR(1000, 1000, (agent_->GetVnTable()->Size() == 0));
 
-    Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+    Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
     client->WaitForIdle();
 
     EXPECT_FALSE(DBTableFind("vrf1.uc.route.0"));

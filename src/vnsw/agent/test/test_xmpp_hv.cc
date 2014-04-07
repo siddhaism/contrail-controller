@@ -185,10 +185,10 @@ TEST_F(AgentBasicScaleTest, multicast_one_channel_down_up_skip_route_from_peer) 
     EXPECT_TRUE(mcobj->GetSourceMPLSLabel() != source_flood_label);
     EXPECT_TRUE(old_multicast_identifier != 
                 Agent::GetInstance()->controller()->multicast_peer_identifier());
-    EXPECT_TRUE(MulticastHandler::GetInstance()->stale_timer()->running());
+    EXPECT_TRUE(Agent::GetInstance()->controller()->multicast_cleanup_timer()->running());
 
     //Fire the timer
-    MulticastHandler::GetInstance()->stale_timer()->Fire();
+    Agent::GetInstance()->controller()->multicast_cleanup_timer()->Fire();
     mc_addr = Ip4Address::from_string("1.1.1.255");
     mcobj = MulticastHandler::GetInstance()->FindGroupObject("vrf1", mc_addr);
     EXPECT_TRUE(mcobj != NULL);
@@ -243,7 +243,7 @@ TEST_F(AgentBasicScaleTest, v4_unicast_one_channel_down_up) {
     EXPECT_TRUE(path->is_stale());
 
     //Fire timer and verify stale path is gone
-    Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+    Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
     WAIT_FOR(1000, 1000, (rt->FindPath(peer) == NULL));
     EXPECT_TRUE(rt->GetPathList().size() == 2);
     new_path = static_cast<AgentPath *>(rt->FindPath(new_peer));
@@ -329,10 +329,10 @@ TEST_F(AgentBasicScaleTest, DISABLED_unicast_one_channel_down_up_skip_route_from
     EXPECT_TRUE(mcobj->GetSourceMPLSLabel() != source_flood_label);
     EXPECT_TRUE(old_multicast_identifier != 
                 Agent::GetInstance()->controller()->multicast_peer_identifier());
-    EXPECT_TRUE(MulticastHandler::GetInstance()->stale_timer()->running());
+    EXPECT_TRUE(Agent::GetInstance()->controller()->multicast_cleanup_timer()->running());
 
     //Fire the timer
-    MulticastHandler::GetInstance()->stale_timer()->Fire();
+    Agent::GetInstance()->controller()->multicast_cleanup_timer()->Fire();
     mc_addr = Ip4Address::from_string("1.1.1.255");
     mcobj = MulticastHandler::GetInstance()->FindGroupObject("vrf1", mc_addr);
     EXPECT_TRUE(mcobj != NULL);

@@ -131,7 +131,6 @@ public:
     // Helper functions to delete routes
     bool DeleteAllBgpPath(DBTablePartBase *part, DBEntryBase *entry);
     bool DelExplicitRouteWalkerCb(DBTablePartBase *part, DBEntryBase *entry);
-    bool StalePeerRoutes(DBTablePartBase *part, DBEntryBase *entry, Peer *peer);
 
     // Lifetime actor routines
     LifetimeActor *deleter();
@@ -154,8 +153,6 @@ private:
     void DeleteRouteDone(DBTableBase *base, RouteTableWalkerState *state);
 
     void Input(DBTablePartition *part, DBClient *client, DBRequest *req);
-    void StalePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
-                            const Peer *peer);
 
     Agent *agent_;
     UnresolvedRouteTree unresolved_rt_tree_;
@@ -220,7 +217,10 @@ public:
     bool HasUnresolvedPath();
     bool CanDissociate() const;
     bool Sync(void);
+
+    //Stale path handling
     bool StalePathFromPeer(DBTablePartBase *part, const Peer *peer);
+    void SquashStalePaths(const AgentPath *path);
 
     //TODO Move dependantroutes and nh  to inet4
     void UpdateDependantRoutes();// analogous to updategatewayroutes
@@ -230,6 +230,7 @@ public:
     void FillTrace(RouteInfo &route, Trace event, const AgentPath *path);
 protected:
     void SetVrf(VrfEntryRef vrf) { vrf_ = vrf; }
+    void RemovePathInternal(AgentPath *path);
     void RemovePath(AgentPath *path);
     void InsertPath(const AgentPath *path);
 

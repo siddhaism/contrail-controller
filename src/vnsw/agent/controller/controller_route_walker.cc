@@ -80,7 +80,8 @@ bool ControllerRouteWalker::DelPeer(DBTablePartBase *partition,
             static_cast<VrfExport::State *>(vrf->GetState(partition->parent(), 
                                                           id)); 
         if (state != NULL) {
-            if (vrf->GetName().compare(peer_->agent()->GetDefaultVrf()) != 0) {
+            if (vrf->GetName().compare(bgp_peer->GetBgpXmppPeer()->agent()->
+                                       GetDefaultVrf()) != 0) {
                 for (uint8_t table_type = 0; table_type < Agent::ROUTE_TABLE_MAX;
                  table_type++) {
                     if (state->rt_export_[table_type]) {

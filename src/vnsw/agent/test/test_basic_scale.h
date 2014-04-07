@@ -541,7 +541,7 @@ protected:
     }
 
     virtual void TearDown() {
-        Agent::GetInstance()->controller()->cleanup_timer()->Fire();
+        Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
         client->WaitForIdle();
 
         for (int i = 0; i < num_ctrl_peers; i++) {
@@ -698,7 +698,7 @@ protected:
         WAIT_FOR(10000, 10000, (agent_->GetInterfaceTable()->Size() == 3));
         VerifyRoutes(true);
         VerifyVmPortActive(false);
-        agent_->controller()->cleanup_timer()->Fire();
+        agent_->controller()->unicast_cleanup_timer()->Fire();
         WAIT_FOR(10000, 10000, (Agent::GetInstance()->GetVrfTable()->Size() == 1));
         WAIT_FOR(1000, 1000, (Agent::GetInstance()->GetVnTable()->Size() == 0));
     }
@@ -751,6 +751,7 @@ protected:
     }
 
     void XmppConnectionSetUp() {
+        Agent::GetInstance()->controller()->increment_multicast_peer_identifier();
         Agent::GetInstance()->SetControlNodeMulticastBuilder(NULL);
         BuildControlPeers();
     }

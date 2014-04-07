@@ -103,15 +103,6 @@ auto_ptr<DBEntry> AgentRouteTable::AllocEntry(const DBRequestKey *k) const {
     return auto_ptr<DBEntry>(static_cast<DBEntry *>(route));
 }
 
-bool AgentRouteTable::StalePeerRoutes(DBTablePartBase *part, 
-                                      DBEntryBase *entry, Peer *peer) {
-    AgentRoute *route = static_cast<AgentRoute *>(entry);
-    if (route) {
-        StalePathFromPeer(part, route, peer);
-    }
-    return true;
-}
-
 // Delete all paths from BGP Peer. Delete route if no path left
 bool AgentRouteTable::DeleteAllBgpPath(DBTablePartBase *part,
                                        DBEntryBase *entry) {
@@ -245,16 +236,6 @@ void AgentRouteTable::DeletePathFromPeer(DBTablePartBase *part,
     }
 }
 
-void AgentRouteTable::StalePathFromPeer(DBTablePartBase *part,
-                                        AgentRoute *rt, const Peer *peer) {
-    if (rt == NULL) {
-        return;
-    }
-
-    // Stale path from the route
-    rt->StalePathFromPeer(part, peer);
-}
-
 // Inline processing of Route request.
 void AgentRouteTable::Process(DBRequest &req) {
     CHECK_CONCURRENCY("db::DBTable");
@@ -323,6 +304,8 @@ void AgentRouteTable::Input(DBTablePartition *part, DBClient *client,
 
             if (rt && (rt->IsDeleted() == false)) {
                 path->set_is_stale(true);
+                // Remove all stale path except the path received
+                rt->SquashStalePaths(path);
                 rt->GetPathList().sort(&AgentRouteTable::PathSelection);
                 rt->Sync();
                 notify = true;
@@ -483,13 +466,17 @@ void AgentRoute::InsertPath(const AgentPath *path) {
     Sort(&AgentRouteTable::PathSelection, prev_front);
 }
 
-void AgentRoute::RemovePath(AgentPath *path) {
-    const Path *prev_front = front();
+void AgentRoute::RemovePathInternal(AgentPath *path) {
     remove(path);
     path->clear_sg_list();
     // ECMP path are managed by route module. Update ECMP path with this path
     // delete
     EcmpDeletePath(path);
+}
+
+void AgentRoute::RemovePath(AgentPath *path) {
+    const Path *prev_front = front();
+    RemovePathInternal(path);
     Sort(&AgentRouteTable::PathSelection, prev_front);
     delete path;
     return;
@@ -516,6 +503,16 @@ AgentPath *AgentRoute::FindPath(const Peer *peer) const {
         }
     }
     return NULL;
+}
+
+void AgentRoute::SquashStalePaths(const AgentPath *exception_path) {
+    for(Route::PathList::iterator it = GetPathList().begin(); 
+        it != GetPathList().end(); it++) {
+        AgentPath *path = static_cast<AgentPath *>(it.operator->());
+        if (path->is_stale() && (path != exception_path)) {
+            RemovePathInternal(path);
+        }
+    }
 }
 
 // First path in list is always treated as active path.
