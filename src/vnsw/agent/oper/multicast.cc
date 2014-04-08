@@ -845,14 +845,21 @@ bool MulticastGroupObject::ModifyFabricMembers(const TunnelOlist &olist,
     TunnelNHData *tnh_data;
 
     //Ignore any modification operation for lesser value as obj is updated 
-    if ((peer_identifier_ > peer_identifier) && 
-        (peer_identifier_ != INVALID_PEER_IDENTIFIER)) {
-        return true;
+    if (peer_identifier <= peer_identifier_) {
+        if (delete_op || (peer_identifier < peer_identifier_))
+            return true;
     }
+
     tunnel_olist_.clear();
     SetSourceMPLSLabel(label);
     if (delete_op) {
         return true;
+    }
+
+    if (peer_identifier == INVALID_PEER_IDENTIFIER) {
+        MCTRACE(Log, "Invalid peer identifier sent for modification", 
+                vrf_name_, grp_address_.to_string(), label);
+        return false;
     }
 
     peer_identifier_ = peer_identifier;

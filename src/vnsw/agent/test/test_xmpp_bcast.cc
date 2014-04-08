@@ -1132,6 +1132,98 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_SessionDownUp) {
     client->WaitForIdle(5);
 }
 
+TEST_F(AgentXmppUnitTest, Test_mcast_peer_identifier) {
+    client->Reset();
+    client->WaitForIdle();
+ 
+    XmppConnectionSetUp(true);
+
+    EXPECT_TRUE(Agent::GetInstance()->GetControlNodeMulticastBuilder() != NULL);
+    EXPECT_STREQ(Agent::GetInstance()->GetControlNodeMulticastBuilder()->
+                 GetXmppServer().c_str(), "127.0.0.1");
+
+	IpamInfo ipam_info[] = {
+	    {"1.1.1.0", 24, "1.1.1.200"}
+	};
+	
+    AddIPAM("vn1", ipam_info, 1);
+    client->WaitForIdle();
+
+    Ip4Address addr = Ip4Address::from_string("1.1.1.255");
+    ASSERT_TRUE(RouteFind("vrf1", addr, 32));
+    Inet4UnicastRouteEntry *rt = static_cast<Inet4UnicastRouteEntry *>
+        (RouteGet("vrf1", addr, 32));
+    NextHop *nh = const_cast<NextHop *>(rt->GetActiveNextHop());
+    ASSERT_TRUE(nh != NULL);
+    ASSERT_TRUE(nh->GetType() == NextHop::COMPOSITE);
+    CompositeNH *cnh = static_cast<CompositeNH *>(nh);
+    MulticastGroupObject *obj;
+    obj = MulticastHandler::GetInstance()->FindGroupObject(cnh->vrf_name(),
+		    cnh->GetGrpAddr());
+    EXPECT_TRUE(obj != NULL);
+    uint64_t peer_identifier_1 = obj->peer_identifier();
+
+    //bring-down the channel
+    AgentXmppChannel *ch = static_cast<AgentXmppChannel *>(bgp_peer.get());
+    bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
+    client->WaitForIdle();
+
+    EXPECT_TRUE(RouteFind("vrf1", addr, 32));
+    obj = MulticastHandler::GetInstance()->FindGroupObject("vrf1", addr);
+    EXPECT_TRUE(obj != NULL);
+    CompositeNHKey *key = new CompositeNHKey(obj->vrf_name(), 
+                                             obj->GetGroupAddress(),
+                                             obj->GetSourceAddress(), false,
+                                             Composite::L3COMP); 
+    cnh = static_cast<CompositeNH *>(Agent::GetInstance()->
+                                     GetNextHopTable()->FindActiveEntry(key));
+    ASSERT_TRUE(cnh != NULL);
+    obj = MulticastHandler::GetInstance()->FindGroupObject(cnh->vrf_name(),
+		    cnh->GetGrpAddr());
+    EXPECT_TRUE(obj != NULL);
+    EXPECT_TRUE(obj->peer_identifier() == peer_identifier_1);
+    EXPECT_TRUE(obj->peer_identifier() != Agent::GetInstance()->controller()->
+                multicast_peer_identifier());
+
+    //bring-up the channel
+    ch = static_cast<AgentXmppChannel *>(bgp_peer.get());
+    bgp_peer.get()->HandleXmppChannelEvent(xmps::READY);
+    client->WaitForIdle();
+
+    SendBcastRouteMessage(mock_peer.get(), "vrf1",
+			  "1.1.1.255", 9000, "127.0.0.1", 9012, 9013);
+    EXPECT_TRUE(RouteFind("vrf1", addr, 32));
+    obj = MulticastHandler::GetInstance()->FindGroupObject("vrf1", addr);
+    EXPECT_TRUE(obj != NULL);
+
+    WAIT_FOR(1000, 1000, obj->GetSourceMPLSLabel() == 9000);
+    Agent::GetInstance()->controller()->multicast_cleanup_timer()->Fire();
+    client->WaitForIdle();
+
+    obj = MulticastHandler::GetInstance()->FindGroupObject("vrf1", addr);
+    EXPECT_TRUE(obj != NULL);
+    key = new CompositeNHKey(obj->vrf_name(), 
+                             obj->GetGroupAddress(),
+                             obj->GetSourceAddress(), false,
+                             Composite::L3COMP); 
+    cnh = static_cast<CompositeNH *>(Agent::GetInstance()->
+                                     GetNextHopTable()->FindActiveEntry(key));
+    ASSERT_TRUE(cnh != NULL);
+    obj = MulticastHandler::GetInstance()->FindGroupObject(cnh->vrf_name(),
+		    cnh->GetGrpAddr());
+    EXPECT_TRUE(obj != NULL);
+    WAIT_FOR(1000, 1000, obj->GetSourceMPLSLabel() == 9000);
+    EXPECT_TRUE(obj->peer_identifier() == (peer_identifier_1 + 2));
+    EXPECT_TRUE(obj->peer_identifier() == Agent::GetInstance()->controller()->
+                multicast_peer_identifier());
+
+    XmppSubnetTearDown();
+
+    xc->ConfigUpdate(new XmppConfigData());
+    WAIT_FOR(1000, 1000, (VrfGet("vrf1") == NULL));
+    client->WaitForIdle(5);
+}
+
 // Remote VM Deactivate Test, resuting in retracts
 TEST_F(AgentXmppUnitTest, SubnetBcast_MultipleRetracts) {
 
@@ -1427,6 +1519,7 @@ TEST_F(AgentXmppUnitTest, Test_Olist_change) {
     xc->ConfigUpdate(new XmppConfigData());
     client->WaitForIdle(5);
 }
+
 
 // Test to check olist changes, with same labels
 TEST_F(AgentXmppUnitTest, Test_Olist_change_with_same_label) {
