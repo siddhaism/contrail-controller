@@ -1,5 +1,83 @@
 #include <test/test_basic_scale.h>
 
+TEST_F(AgentBasicScaleTest, Del_peer_deleted_vrf_1) {
+    client->Reset();
+    client->WaitForIdle();
+
+    XmppConnectionSetUp();
+    BuildVmPortEnvironment();
+    
+    //Get the vrf export id
+    BgpPeer *peer = static_cast<BgpPeer *>(bgp_peer[0].get()->bgp_peer_id());
+    uint32_t listener_id = peer->GetVrfExportListenerId();
+    EXPECT_TRUE(listener_id != 0);
+    VrfEntry *vrf = VrfGet("vrf1");
+    DBTablePartBase *part = Agent::GetInstance()->GetVrfTable()->GetTablePartition(vrf);
+    EXPECT_TRUE(vrf->GetState(part->parent(), listener_id) != NULL);
+
+    bgp_peer[0].get()->HandleXmppChannelEvent(xmps::NOT_READY);
+    client->WaitForIdle();
+    DelVrf("vrf1");
+    client->WaitForIdle();
+
+    EXPECT_TRUE(vrf->GetState(part->parent(), listener_id) == NULL);
+
+    //Delete vm-port and route entry in vrf1
+    DeleteVmPortEnvironment();
+}
+
+TEST_F(AgentBasicScaleTest, Del_peer_deleted_vrf_2) {
+    client->Reset();
+    client->WaitForIdle();
+
+    XmppConnectionSetUp();
+    BuildVmPortEnvironment();
+    
+    //Get the vrf export id
+    BgpPeer *peer = static_cast<BgpPeer *>(bgp_peer[0].get()->bgp_peer_id());
+    uint32_t listener_id = peer->GetVrfExportListenerId();
+    EXPECT_TRUE(listener_id != 0);
+    VrfEntry *vrf = VrfGet("vrf1");
+    DBTablePartBase *part = Agent::GetInstance()->GetVrfTable()->GetTablePartition(vrf);
+    EXPECT_TRUE(vrf->GetState(part->parent(), listener_id) != NULL);
+
+    DelVrf("vrf1");
+    client->WaitForIdle();
+
+    EXPECT_TRUE(vrf->GetState(part->parent(), listener_id) == NULL);
+
+    bgp_peer[0].get()->HandleXmppChannelEvent(xmps::NOT_READY);
+    client->WaitForIdle();
+    //Delete vm-port and route entry in vrf1
+    DeleteVmPortEnvironment();
+}
+
+TEST_F(AgentBasicScaleTest, Del_peer_deleted_vrf_3) {
+    client->Reset();
+    client->WaitForIdle();
+
+    XmppConnectionSetUp();
+    BuildVmPortEnvironment();
+    
+    //Get the vrf export id
+    BgpPeer *peer = static_cast<BgpPeer *>(bgp_peer[0].get()->bgp_peer_id());
+    uint32_t listener_id = peer->GetVrfExportListenerId();
+    EXPECT_TRUE(listener_id != 0);
+    VrfEntry *vrf = VrfGet("vrf1");
+    DBTablePartBase *part = Agent::GetInstance()->GetVrfTable()->GetTablePartition(vrf);
+    EXPECT_TRUE(vrf->GetState(part->parent(), listener_id) != NULL);
+
+    bgp_peer[0].get()->HandleXmppChannelEvent(xmps::NOT_READY);
+    client->WaitForIdle();
+    EXPECT_TRUE(vrf->GetState(part->parent(), listener_id) == NULL);
+
+    DelVrf("vrf1");
+    client->WaitForIdle();
+
+    //Delete vm-port and route entry in vrf1
+    DeleteVmPortEnvironment();
+}
+
 TEST_F(AgentBasicScaleTest, Basic) {
     client->Reset();
     client->WaitForIdle();
@@ -343,7 +421,6 @@ TEST_F(AgentBasicScaleTest, DISABLED_unicast_one_channel_down_up_skip_route_from
     WAIT_FOR(1000, 10000, !RouteFind("vrf1", Ip4Address::from_string("1.1.1.255"), 32));
     DeleteVmPortEnvironment();
 }
-
 
 int main(int argc, char **argv) {
     GETSCALEARGS();

@@ -16,37 +16,28 @@
 
 VrfExport::State::State() : DBState(), exported_(false), 
     force_chg_(false), rt_export_() {
-        for (uint32_t rt_table_type = 0; 
-             rt_table_type < Agent::ROUTE_TABLE_MAX; rt_table_type++) {
-            ucwalkid_[rt_table_type] = DBTableWalker::kInvalidWalkerId;
-            mcwalkid_[rt_table_type] = DBTableWalker::kInvalidWalkerId;
-        }
 };
 
 VrfExport::State::~State() {
-    DBTableWalker *walker = Agent::GetInstance()->GetDB()->GetWalker();
-
-    for (uint32_t rt_table_type = 0; 
-         rt_table_type < Agent::ROUTE_TABLE_MAX; rt_table_type++)
-    {
-        if (ucwalkid_[rt_table_type] != DBTableWalker::kInvalidWalkerId)
-            walker->WalkCancel(ucwalkid_[rt_table_type]);
-
-        if (mcwalkid_[rt_table_type] != DBTableWalker::kInvalidWalkerId)
-            walker->WalkCancel(mcwalkid_[rt_table_type]);
-    }
 };
 
 void VrfExport::Notify(AgentXmppChannel *bgp_xmpp_peer, 
                        DBTablePartBase *partition, DBEntryBase *e) {
 
     BgpPeer *bgp_peer = static_cast<BgpPeer *>(bgp_xmpp_peer->bgp_peer_id());
-    //Peer is decommissioned so ignore the notification as there is no listener
-    if (bgp_peer == NULL)
+    VrfEntry *vrf = static_cast<VrfEntry *>(e);
+    //Peer is decommissioned so ignore the notification as there is no active
+    //listener. Deletion of state for decommisioned peer will happen via delpeer
+    //walk.
+    if (!AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer)) {
+        if (vrf->IsDeleted()) {
+            bgp_xmpp_peer->agent()->controller()->
+                DeleteVrfStateOfDecommisionedPeers(partition, e);
+        }
         return;
+    }
 
     DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
-    VrfEntry *vrf = static_cast<VrfEntry *>(e);
     State *state = static_cast<State *>(vrf->GetState(partition->parent(), id));
     uint8_t table_type;
 

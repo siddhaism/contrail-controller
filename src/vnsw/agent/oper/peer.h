@@ -75,7 +75,7 @@ public:
     AgentXmppChannel *GetBgpXmppPeer() { return bgp_xmpp_peer_; }    
 
     // Table Walkers
-    void DelPeerRoutes(DelPeerDone cb);
+    void DelPeerRoutes(DelPeerDone walk_done_cb);
     void PeerNotifyRoutes();
     void PeerNotifyMulticastRoutes(bool associate);
     void StalePeerRoutes();

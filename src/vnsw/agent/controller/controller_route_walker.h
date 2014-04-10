@@ -19,19 +19,28 @@ public:
     ControllerRouteWalker(Agent *agent, Peer *peer);
     virtual ~ControllerRouteWalker() { }
 
-    void Start(Type type, bool associate, AgentRouteWalker::WalkDone cb);
+    void Start(Type type, bool associate, 
+               AgentRouteWalker::WalkDone walk_done_cb);
     void Cancel();
+    void RouteWalkDoneForVrf(DBTableBase *partition, VrfEntry *vrf);
     virtual bool VrfWalkNotify(DBTablePartBase *partition, DBEntryBase *e);
     virtual bool RouteWalkNotify(DBTablePartBase *partition, DBEntryBase *e);
 
 private:
-    bool Notify(DBTablePartBase *partition, DBEntryBase *e);
-    bool NotifyAll(DBTablePartBase *partition, DBEntryBase *e);
-    bool DelPeer(DBTablePartBase *partition, DBEntryBase *e);
-    bool StaleMarker(DBTablePartBase *partition, DBEntryBase *e);
+    bool VrfNotifyInternal(DBTablePartBase *partition, DBEntryBase *e);
+    bool VrfNotifyMulticast(DBTablePartBase *partition, DBEntryBase *e);
+    bool VrfNotifyStale(DBTablePartBase *partition, DBEntryBase *e);
+    bool VrfNotifyAll(DBTablePartBase *partition, DBEntryBase *e);
+    bool VrfDelPeer(DBTablePartBase *partition, DBEntryBase *e);
+    bool VrfStaleMarker(DBTablePartBase *partition, DBEntryBase *e);
+    bool RouteNotifyInternal(DBTablePartBase *partition, DBEntryBase *e);
     bool RouteNotifyAll(DBTablePartBase *partition, DBEntryBase *e);
+    bool RouteNotifyMulticast(DBTablePartBase *partition, DBEntryBase *e);
     bool RouteDelPeer(DBTablePartBase *partition, DBEntryBase *e);
     bool RouteStaleMarker(DBTablePartBase *partition, DBEntryBase *e);
+
+    DBState *GetVrfExportState(DBTablePartBase *partition, DBEntryBase *e);
+    DBState *GetRouteExportState(DBTablePartBase *partition, DBEntryBase *e);
 
     Peer *peer_;
     bool associate_;

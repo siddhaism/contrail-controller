@@ -20,6 +20,7 @@
 #include "controller/controller_peer.h"
 #include "controller/controller_ifmap.h"
 #include "controller/controller_dns.h"
+#include "controller/controller_export.h"
 #include "bind/bind_resolver.h"
 
 using namespace boost::asio;
@@ -510,4 +511,54 @@ void VNController::StartMulticastCleanupTimer(uint64_t peer_sequence) {
     multicast_cleanup_timer_->Start(cleanup_timer,
         boost::bind(&VNController::MulticastCleanupTimerExpired, this, 
                     peer_sequence));
+}
+
+void VNController::DeleteRouteStateOfDecommisionedPeers(DBTablePartBase *partition,
+                                                        DBEntryBase *e) {
+    AgentRoute *route = static_cast<AgentRoute *>(e);
+    for (std::list<boost::shared_ptr<BgpPeer> >::iterator it  = 
+         controller_peer_list_.begin(); it != controller_peer_list_.end(); 
+         ++it) {
+        BgpPeer *bgp_peer = static_cast<BgpPeer *>((*it).get());
+        DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
+        VrfEntry *vrf = route->vrf();
+        DBTablePartBase *vrf_partition = agent()->GetVrfTable()->
+            GetTablePartition(vrf);
+        VrfExport::State *vrf_state = 
+            static_cast<VrfExport::State *>(vrf->GetState(vrf_partition->parent(), 
+                                                          id)); 
+        if (vrf_state == NULL)
+            return;
+
+        RouteExport::State *state = static_cast<RouteExport::State *>
+            (route->GetState(partition->parent(),
+                     vrf_state->rt_export_[route->GetTableType()]->GetListenerId()));
+        if (state) {
+            route->ClearState(partition->parent(), 
+                              vrf_state->rt_export_[route->GetTableType()]->GetListenerId());
+            delete state;
+        }
+    }
+}
+
+void VNController::DeleteVrfStateOfDecommisionedPeers(DBTablePartBase *partition,
+                                                      DBEntryBase *e) {
+    VrfEntry *vrf = static_cast<VrfEntry *>(e);
+    for (std::list<boost::shared_ptr<BgpPeer> >::iterator it  = 
+         controller_peer_list_.begin(); it != controller_peer_list_.end(); 
+         ++it) {
+        BgpPeer *bgp_peer = static_cast<BgpPeer *>((*it).get());
+        DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
+
+        VrfExport::State *vrf_state = 
+            static_cast<VrfExport::State *>(vrf->GetState(partition->parent(), 
+                                                          id)); 
+        if (vrf_state == NULL)
+            return;
+
+        if (vrf_state) {
+            vrf->ClearState(partition->parent(), id);
+            delete vrf_state;
+        }
+    }
 }

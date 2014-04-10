@@ -123,6 +123,7 @@ public:
     Agent *agent() const { return agent_; }
     const std::string &vrf_name() const { return vrf_entry_->GetName();};
     uint32_t vrf_id() const {return vrf_id_;}
+    VrfEntry *vrf_entry() const {return vrf_entry_.get();}
     AgentRoute *FindActiveEntry(const AgentRouteKey *key);
 
     // Set VRF for the route-table
@@ -145,6 +146,10 @@ public:
     static const std::string &GetSuffix(Agent::RouteTableType type);
     void DeletePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
                             const Peer *peer);
+    //Stale path handling
+    void StalePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
+                           const Peer *peer);
+
 private:
     class DeleteActor;
     void AddUnresolvedRoute(const AgentRoute *rt);
@@ -217,9 +222,6 @@ public:
     bool HasUnresolvedPath();
     bool CanDissociate() const;
     bool Sync(void);
-
-    //Stale path handling
-    bool StalePathFromPeer(DBTablePartBase *part, const Peer *peer);
     void SquashStalePaths(const AgentPath *path);
 
     //TODO Move dependantroutes and nh  to inet4

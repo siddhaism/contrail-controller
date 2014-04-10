@@ -12,7 +12,8 @@ using namespace std;
 
 AgentRouteWalker::AgentRouteWalker(Agent *agent, WalkType type) :
     agent_(agent), walk_type_(type),
-    vrf_walkid_(DBTableWalker::kInvalidWalkerId), walk_done_cb_() {
+    vrf_walkid_(DBTableWalker::kInvalidWalkerId), walk_done_cb_(),
+    route_walk_done_for_vrf_cb_() {
     walk_count_ = AgentRouteWalker::kInvalidWalkCount;
     for (uint8_t table_type = 0; table_type < Agent::ROUTE_TABLE_MAX; 
          table_type++) {
@@ -172,7 +173,17 @@ void AgentRouteWalker::RouteWalkDone(DBTableBase *part) {
                   table->GetTableName(), table_type);
         route_walkid_[table_type].erase(vrf_id);
         DecrementWalkCount();
-        OnWalkComplete();
+
+        // vrf entry can be null as table wud have released the reference
+        // via lifetime actor
+        VrfEntry *vrf = table->vrf_entry();
+        // If there is no vrf entry for table, that signifies that 
+        // routes have gone and table is empty. Since routes have gone
+        // state from vncontroller on routes have been removed and so would
+        // have happened on vrf entry as well.
+        if (vrf != NULL) {
+            Callback(part, vrf);
+        }
     }
 }
 
@@ -180,6 +191,27 @@ void AgentRouteWalker::DecrementWalkCount() {
     if (walk_count_ != AgentRouteWalker::kInvalidWalkCount) {
         walk_count_--;
     }
+}
+
+void AgentRouteWalker::Callback(DBTableBase *part, VrfEntry *vrf) {
+    OnRouteTableWalkCompleteForVrf(part, vrf);
+    OnWalkComplete();
+}
+
+void AgentRouteWalker::OnRouteTableWalkCompleteForVrf(DBTableBase *part, 
+                                                     VrfEntry *vrf) {
+    if (!route_walk_done_for_vrf_cb_)
+        return;
+
+    for (uint8_t table_type = 0; table_type < Agent::ROUTE_TABLE_MAX; 
+         table_type++) {
+        VrfRouteWalkerIdMapIterator iter = 
+            route_walkid_[table_type].find(vrf->vrf_id());
+        if (iter != route_walkid_[table_type].end()) {
+            return;
+        }
+    }
+    route_walk_done_for_vrf_cb_(part, vrf);
 }
 
 void AgentRouteWalker::OnWalkComplete() {
@@ -205,4 +237,8 @@ void AgentRouteWalker::OnWalkComplete() {
 
 void AgentRouteWalker::WalkDoneCallback(WalkDone cb) {
     walk_done_cb_ = cb;
+}
+
+void AgentRouteWalker::RouteWalkDoneForVrfCallback(RouteWalkDoneCb cb) {
+    route_walk_done_for_vrf_cb_ = cb;
 }

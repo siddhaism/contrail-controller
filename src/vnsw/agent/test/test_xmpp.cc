@@ -723,7 +723,7 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown) {
 
     //bring-down the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::NOT_READY);
-    client->WaitForIdle();
+    client->WaitForIdle(5);
 
     //ensure route learnt via control-node is deleted
     if (Agent::GetInstance()->headless_agent_mode()) {
@@ -745,7 +745,7 @@ TEST_F(AgentXmppUnitTest, ConnectionUpDown) {
 
     //bring up the channel
     bgp_peer.get()->HandleXmppChannelEvent(xmps::READY);
-    client->WaitForIdle();
+    client->WaitForIdle(5);
 
     //expect subscribe for __default__, vrf1,route
     //at the mock server

@@ -139,6 +139,7 @@ bool AgentRouteTable::PathSelection(const Path &path1, const Path &path2) {
     const AgentPath &l_path = dynamic_cast<const AgentPath &> (path1);
     const AgentPath &r_path = dynamic_cast<const AgentPath &> (path2);
 
+    // Stale path should take last precedence
     if (l_path.is_stale() != r_path.is_stale()) {
         return (l_path.is_stale() < r_path.is_stale());
     }
@@ -219,6 +220,10 @@ void AgentRouteTable::DeletePathFromPeer(DBTablePartBase *part,
 
     // Remove path from the route
     rt->RemovePath(path);
+    // Squash all stale when peer delete is of non bgp type
+    if (peer->GetType() != Peer::BGP_PEER) {
+        rt->SquashStalePaths(NULL);
+    }
 
     // Delete route if no more paths 
     if (rt->GetActivePath() == NULL) {
@@ -293,20 +298,6 @@ void AgentRouteTable::Input(DBTablePartition *part, DBClient *client,
         if (key->sub_op_ == AgentKey::RESYNC) {
             // Ignore RESYNC if received on non-existing or deleted route entry
             if (rt && (rt->IsDeleted() == false)) {
-                rt->Sync();
-                notify = true;
-            }
-        } else if (key->sub_op_ == AgentKey::STALE) {
-            path = rt->FindPath(key->peer());
-            if (path == NULL) {
-                return;
-            }
-
-            if (rt && (rt->IsDeleted() == false)) {
-                path->set_is_stale(true);
-                // Remove all stale path except the path received
-                rt->SquashStalePaths(path);
-                rt->GetPathList().sort(&AgentRouteTable::PathSelection);
                 rt->Sync();
                 notify = true;
             }
@@ -506,12 +497,20 @@ AgentPath *AgentRoute::FindPath(const Peer *peer) const {
 }
 
 void AgentRoute::SquashStalePaths(const AgentPath *exception_path) {
-    for(Route::PathList::iterator it = GetPathList().begin(); 
-        it != GetPathList().end(); it++) {
+    Route::PathList::iterator it = GetPathList().begin();
+    Route::PathList::iterator it_next = GetPathList().begin();
+
+    while (it != GetPathList().end()) {
+        it_next++;
+
+        // Delete all stale path except for the path sent(exception_path)
         AgentPath *path = static_cast<AgentPath *>(it.operator->());
         if (path->is_stale() && (path != exception_path)) {
             RemovePathInternal(path);
         }
+
+        // Move iterator to next ptr
+        it = it_next;
     }
 }
 
@@ -636,12 +635,29 @@ bool AgentRoute::Sync(void) {
     return ret;
 }
 
-bool AgentRoute::StalePathFromPeer(DBTablePartBase *part, const Peer *peer) {
-    DBRequest  req(DBRequest::DB_ENTRY_ADD_CHANGE);
-    req.key = GetDBRequestKey();
-    (static_cast<AgentKey *>(req.key.get()))->sub_op_ = AgentKey::STALE;
-    (static_cast<AgentRouteKey*>(req.key.get()))->peer_ = peer;
-    //TODO can this be made part->Process(NULL, &req);
-    get_table()->Enqueue(&req);
-    return true;
+void AgentRouteTable::StalePathFromPeer(DBTablePartBase *part, AgentRoute *rt,
+                                        const Peer *peer) {
+    if (rt == NULL) {
+        return;
+    }
+
+    // Find path for the peer
+    AgentPath *path = rt->FindPath(peer);
+
+    RouteInfo rt_info;
+    rt->FillTrace(rt_info, AgentRoute::STALE_PATH, path);
+    OPER_TRACE(Route, rt_info);
+
+    if (path == NULL) {
+        return;
+    }
+
+    if (rt && (rt->IsDeleted() == false)) {
+        path->set_is_stale(true);
+        // Remove all stale path except the path received
+        rt->SquashStalePaths(path);
+        rt->GetPathList().sort(&AgentRouteTable::PathSelection);
+        rt->Sync();
+        part->Notify(rt);
+    }
 }

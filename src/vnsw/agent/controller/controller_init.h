@@ -62,6 +62,9 @@ public:
     AgentIfMapVmExport *agent_ifmap_vm_export() const {return agent_ifmap_vm_export_.get();}
     Agent *agent() {return agent_;}
 
+    void DeleteVrfStateOfDecommisionedPeers(DBTablePartBase *partition, DBEntryBase *e);
+    void DeleteRouteStateOfDecommisionedPeers(DBTablePartBase *partition, DBEntryBase *e);
+
 private:
     AgentXmppChannel *FindAgentXmppChannel(std::string server_ip);
     AgentDnsXmppChannel *FindAgentDnsXmppChannel(std::string server_ip);

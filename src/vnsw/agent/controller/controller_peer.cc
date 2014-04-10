@@ -81,14 +81,15 @@ void AgentXmppChannel::DeCommissionBgpPeer() {
 
 bool AgentXmppChannel::SendUpdate(uint8_t *msg, size_t size) {
 
-    if ((channel_ && (bgp_peer_id() != NULL) && 
-        (channel_->GetPeerState() == xmps::READY))) {
-        AgentStats::GetInstance()->incr_xmpp_out_msgs(xs_idx_);
-	    return channel_->Send(msg, size, xmps::BGP,
-			  boost::bind(&AgentXmppChannel::WriteReadyCb, this, _1));
-    } else {
-        return false; 
-    }
+    //TODO move this to early part of calls
+    //if ((channel_ && (bgp_peer_id() != NULL) && 
+    //    (channel_->GetPeerState() == xmps::READY))) {
+    AgentStats::GetInstance()->incr_xmpp_out_msgs(xs_idx_);
+    return channel_->Send(msg, size, xmps::BGP,
+                          boost::bind(&AgentXmppChannel::WriteReadyCb, this, _1));
+    //} else {
+    //    return false; 
+    //}
 }
 
 void AgentXmppChannel::ReceiveEvpnUpdate(XmlPugi *pugi) {
@@ -736,9 +737,10 @@ void AgentXmppChannel::UnicastPeerDown(AgentXmppChannel *peer,
     }
 
     //Enqueue delete of unicast routes
-    peer_id->DelPeerRoutes(boost::bind(
-                         &VNController::ControllerPeerHeadlessAgentDelDone, 
-                         peer->agent()->controller(), peer_id));
+    // Callbacks for all walk done - this invokes cleanup in case delete of peer
+    // is issued because of channel getting disconnected.
+    peer_id->DelPeerRoutes(boost::bind(&VNController::ControllerPeerHeadlessAgentDelDone, 
+                                       peer->agent()->controller(), peer_id));
 }
 
 void AgentXmppChannel::MulticastPeerDown(AgentXmppChannel *peer, 
@@ -750,6 +752,14 @@ void AgentXmppChannel::MulticastPeerDown(AgentXmppChannel *peer,
     }
 
     AgentXmppChannel::CleanStale(peer, false, false, true);
+}
+
+bool AgentXmppChannel::IsBgpPeerActive(AgentXmppChannel *peer) {
+    if (peer && peer->GetXmppChannel() && peer->bgp_peer_id() &&
+        (peer->GetXmppChannel()->GetPeerState() == xmps::READY)) {
+        return true;
+    }
+    return false;
 }
 
 bool AgentXmppChannel::SetConfigPeer(AgentXmppChannel *peer) {
@@ -1175,9 +1185,8 @@ bool AgentXmppChannel::ControllerSendEvpnRoute(AgentXmppChannel *peer,
     auto_ptr<XmlBase> impl(XmppStanza::AllocXmppXmlImpl());
     XmlPugi *pugi = reinterpret_cast<XmlPugi *>(impl.get());
 
-    //TODO remove hardcoding
-    item.entry.nlri.af = 25; 
-    item.entry.nlri.safi = 242; 
+    item.entry.nlri.af = BgpAf::L2Vpn; 
+    item.entry.nlri.safi = BgpAf::Enet; 
     stringstream rstr;
     rstr << route->ToString();
     item.entry.nlri.mac = rstr.str();

@@ -23,13 +23,15 @@ BgpPeer::BgpPeer(const Ip4Address &server_ip, const std::string &name,
 }
 
 BgpPeer::~BgpPeer() {
+    // TODO verify if this unregister can be done in walkdone callback 
+    // for delpeer
     if ((id_ != -1) && route_walker_->agent()->GetVrfTable()) {
         route_walker_->agent()->GetVrfTable()->Unregister(id_);
     }
 }
 
-void BgpPeer::DelPeerRoutes(DelPeerDone cb) {
-    route_walker_->Start(ControllerRouteWalker::DELPEER, false, cb);
+void BgpPeer::DelPeerRoutes(DelPeerDone walk_done_cb) {
+    route_walker_->Start(ControllerRouteWalker::DELPEER, false, walk_done_cb);
 }
 
 void BgpPeer::PeerNotifyRoutes() {

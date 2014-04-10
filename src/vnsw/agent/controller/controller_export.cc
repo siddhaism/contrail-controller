@@ -71,13 +71,18 @@ void RouteExport::Notify(AgentXmppChannel *bgp_xmpp_peer,
                          bool associate, Agent::RouteTableType type, 
                          DBTablePartBase *partition, DBEntryBase *e) {
     AgentRoute *route = static_cast<AgentRoute *>(e);
-
-    //If multicast or subnetbroadcast digress to multicast
-    if (route->is_multicast()) {
-    	return MulticastNotify(bgp_xmpp_peer, associate, partition, e);
+    if (AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer)) {
+        //If multicast or subnetbroadcast digress to multicast
+        if (route->is_multicast()) {
+            return MulticastNotify(bgp_xmpp_peer, associate, partition, e);
+        }
+        return UnicastNotify(bgp_xmpp_peer, partition, e, type);
     }
-    return UnicastNotify(bgp_xmpp_peer, partition, e, type);
 
+    if (route->IsDeleted()) {
+        bgp_xmpp_peer->agent()->controller()->DeleteRouteStateOfDecommisionedPeers(
+                                              partition, e);                                     
+    }
 }
 
 void RouteExport::UnicastNotify(AgentXmppChannel *bgp_xmpp_peer, 
@@ -96,6 +101,11 @@ void RouteExport::UnicastNotify(AgentXmppChannel *bgp_xmpp_peer,
     if (!state && route->IsDeleted()) {
         goto done;
     }
+
+    // Dont notify if agenxtxmppchannel does not have peer in active state
+    if (!AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer))
+        return;
+
 
     if (state == NULL) {
         state = new State();

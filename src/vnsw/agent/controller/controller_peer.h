@@ -35,6 +35,8 @@ public:
     virtual void ReceiveEvpnUpdate(XmlPugi *pugi);
     virtual void ReceiveMulticastUpdate(XmlPugi *pugi);
     XmppChannel *GetXmppChannel() { return channel_; }
+
+    static bool IsBgpPeerActive(AgentXmppChannel *peer);
     static bool SetConfigPeer(AgentXmppChannel *peer);
     static void SetMulticastPeer(AgentXmppChannel *old_peer, AgentXmppChannel *new_peer);
     static void CleanStale(AgentXmppChannel *peer, bool config, bool unicast, bool multicast);
