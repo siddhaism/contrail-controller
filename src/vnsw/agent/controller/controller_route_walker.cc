@@ -8,6 +8,7 @@
 #include "controller/controller_vrf_export.h"
 #include "controller/controller_export.h"
 #include "oper/route_common.h"
+#include "oper/peer.h"
 #include "oper/vrf.h"
 #include "oper/mirror_table.h"
 #include "oper/agent_sandesh.h"
@@ -67,7 +68,7 @@ bool ControllerRouteWalker::VrfDelPeer(DBTablePartBase *partition,
         // walks 
         RouteWalkDoneForVrfCallback(boost::bind(
                                     &ControllerRouteWalker::RouteWalkDoneForVrf,
-                                    this, _1, _2));
+                                    this, _1));
         StartRouteWalk(vrf);
         return true;
     }
@@ -122,38 +123,6 @@ bool ControllerRouteWalker::RouteWalkNotify(DBTablePartBase *partition,
     return false;
 }
 
-DBState *ControllerRouteWalker::GetVrfExportState(DBTablePartBase *partition, 
-                                                  DBEntryBase *entry) {
-    BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
-    DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
-    VrfEntry *vrf = static_cast<VrfEntry *>(entry);
-    return(static_cast<VrfExport::State *>(vrf->GetState(partition->parent(), 
-                                                         id)));
-}
-
-DBState *ControllerRouteWalker::GetRouteExportState(DBTablePartBase *partition, 
-                                                    DBEntryBase *entry) {
-    AgentRoute *route = static_cast<AgentRoute *>(entry);
-    VrfEntry *vrf = route->vrf();
-
-    DBTablePartBase *vrf_partition = 
-        agent()->GetVrfTable()->GetTablePartition(vrf);
-
-    VrfExport::State *vs = static_cast<VrfExport::State *>
-        (GetVrfExportState(vrf_partition, vrf)); 
-
-    if (vs == NULL)
-        return NULL;
-
-    Agent::RouteTableType table_type = route->GetTableType();
-    RouteExport::State *state = NULL;
-    if (vs->rt_export_[table_type]) {
-        state = static_cast<RouteExport::State *>(route->GetState(partition->parent(),
-                            vs->rt_export_[table_type]->GetListenerId()));
-    }
-    return state;
-}
-
 bool ControllerRouteWalker::RouteNotifyInternal(DBTablePartBase *partition, 
                                                 DBEntryBase *entry) {
     AgentRoute *route = static_cast<AgentRoute *>(entry);
@@ -165,7 +134,7 @@ bool ControllerRouteWalker::RouteNotifyInternal(DBTablePartBase *partition,
     Agent::RouteTableType table_type = route->GetTableType();
 
     RouteExport::State *route_state = static_cast<RouteExport::State *>
-        (GetRouteExportState(partition, entry));
+        (bgp_peer->GetRouteExportState(partition, entry));
     if (route_state) {
         route_state->force_chg_ = true;
     }
@@ -174,7 +143,7 @@ bool ControllerRouteWalker::RouteNotifyInternal(DBTablePartBase *partition,
     DBTablePartBase *vrf_partition = agent()->GetVrfTable()->
         GetTablePartition(vrf);
     VrfExport::State *vs = static_cast<VrfExport::State *>
-        (GetVrfExportState(vrf_partition, vrf));
+        (bgp_peer->GetVrfExportState(vrf_partition, vrf));
 
     vs->rt_export_[table_type]->
       Notify(bgp_peer->GetBgpXmppPeer(), associate_, table_type, partition, 
@@ -195,16 +164,19 @@ bool ControllerRouteWalker::RouteNotifyMulticast(DBTablePartBase *partition,
 bool ControllerRouteWalker::RouteDelPeer(DBTablePartBase *partition,
                                          DBEntryBase *entry) {
     AgentRoute *route = static_cast<AgentRoute *>(entry);
+    BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
 
     if (!route)
         return true;
 
     VrfEntry *vrf = route->vrf();
+    DBTablePartBase *vrf_partition = agent()->GetVrfTable()->
+        GetTablePartition(vrf);
     VrfExport::State *vrf_state = static_cast<VrfExport::State *>
-        (GetVrfExportState(partition, entry));
+        (bgp_peer->GetVrfExportState(vrf_partition, vrf));
     RouteExport::State *state = static_cast<RouteExport::State *>
-        (GetRouteExportState(partition, entry));
-    if (vrf_state && state) {
+        (bgp_peer->GetRouteExportState(partition, entry));
+    if (vrf_state && state && vrf_state->rt_export_[route->GetTableType()]) {
         route->ClearState(partition->parent(), vrf_state->rt_export_[route->
                           GetTableType()]->GetListenerId());
         delete state;
@@ -225,32 +197,16 @@ bool ControllerRouteWalker::RouteStaleMarker(DBTablePartBase *partition,
     return true;
 }
 
-void ControllerRouteWalker::RouteWalkDoneForVrf(DBTableBase *partition,
-                                                VrfEntry *vrf) {
+void ControllerRouteWalker::RouteWalkDoneForVrf(VrfEntry *vrf) {
     // Currently used only for delete peer handling
     // Deletes the state and release the listener id
     if (type_ != DELPEER)
         return;
 
     BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
-
-    DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
-    VrfExport::State *state = 
-        static_cast<VrfExport::State *>(vrf->GetState(partition, id)); 
-    if (state != NULL) {
-        if (vrf->GetName().compare(bgp_peer->GetBgpXmppPeer()->agent()->
-                                   GetDefaultVrf()) != 0) {
-            for (uint8_t table_type = 0; table_type < Agent::ROUTE_TABLE_MAX;
-                 table_type++) {
-                if (state->rt_export_[table_type]) {
-                    state->rt_export_[table_type]->Unregister();
-                }
-            }
-        }
-
-        vrf->ClearState(partition, id);
-        delete state;
-    }
+    DBEntryBase *entry = static_cast<DBEntryBase *>(vrf);
+    DBTablePartBase *partition = agent()->GetVrfTable()->GetTablePartition(vrf);
+    bgp_peer->DeleteVrfState(partition, entry);
 }
 
 void ControllerRouteWalker::Start(Type type, bool associate, 

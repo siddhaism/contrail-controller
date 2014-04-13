@@ -60,9 +60,10 @@ public:
     Timer *multicast_cleanup_timer() const {return multicast_cleanup_timer_;}
 
     AgentIfMapVmExport *agent_ifmap_vm_export() const {return agent_ifmap_vm_export_.get();}
-    Agent *agent() {return agent_;}
 
-    void DeleteVrfStateOfDecommisionedPeers(DBTablePartBase *partition, DBEntryBase *e);
+    void DeleteVrfStateOfDecommisionedPeers(DBTablePartBase *partition, 
+                                            DBEntryBase *e);
+    Agent *agent() {return agent_;}
 
 private:
     AgentXmppChannel *FindAgentXmppChannel(std::string server_ip);

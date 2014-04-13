@@ -73,6 +73,7 @@ public:
                                         uint32_t mpls_label, 
                                         uint32_t tunnel_bmap, 
                                         bool add_route);
+
     void CreateBgpPeer();
     void DeCommissionBgpPeer();
     std::string GetXmppServer() { return xmpp_server_; }

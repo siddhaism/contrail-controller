@@ -182,7 +182,7 @@ void AgentRouteWalker::RouteWalkDone(DBTableBase *part) {
         // state from vncontroller on routes have been removed and so would
         // have happened on vrf entry as well.
         if (vrf != NULL) {
-            Callback(part, vrf);
+            Callback(vrf);
         }
     }
 }
@@ -193,16 +193,15 @@ void AgentRouteWalker::DecrementWalkCount() {
     }
 }
 
-void AgentRouteWalker::Callback(DBTableBase *part, VrfEntry *vrf) {
-    OnRouteTableWalkCompleteForVrf(part, vrf);
+void AgentRouteWalker::Callback(VrfEntry *vrf) {
+    OnRouteTableWalkCompleteForVrf(vrf);
     OnWalkComplete();
 }
 
 /*
  * Check if all route table walk have been reset for this VRF
  */
-void AgentRouteWalker::OnRouteTableWalkCompleteForVrf(DBTableBase *part, 
-                                                     VrfEntry *vrf) {
+void AgentRouteWalker::OnRouteTableWalkCompleteForVrf(VrfEntry *vrf) {
     if (!route_walk_done_for_vrf_cb_)
         return;
 
@@ -214,7 +213,7 @@ void AgentRouteWalker::OnRouteTableWalkCompleteForVrf(DBTableBase *part,
             return;
         }
     }
-    route_walk_done_for_vrf_cb_(part, vrf);
+    route_walk_done_for_vrf_cb_(vrf);
 }
 
 /*

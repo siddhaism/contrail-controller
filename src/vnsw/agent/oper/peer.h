@@ -87,6 +87,15 @@ public:
     ControllerRouteWalker *route_walker() const {
         return route_walker_.get(); }
 
+    //Helper routines to get export state for vrf and route
+    DBState *GetVrfExportState(DBTablePartBase *partition,
+                               DBEntryBase *e);
+    DBState *GetRouteExportState(DBTablePartBase *partition,
+                                 DBEntryBase *e);
+    void DeleteVrfState(DBTablePartBase *partition, DBEntryBase *entry);
+
+    Agent *agent() const;
+
 private: 
     Ip4Address server_ip_;
     DBTableBase::ListenerId id_;

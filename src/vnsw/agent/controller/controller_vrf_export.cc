@@ -35,10 +35,15 @@ void VrfExport::Notify(AgentXmppChannel *bgp_xmpp_peer,
         return;
     }
 
-    if (vrf->IsDeleted() && (vrf->GetName().compare(bgp_xmpp_peer->agent()->
-                                                    GetDefaultVrf()) != 0)) {
+    if (vrf->IsDeleted()) {
+        if (bgp_peer) { 
+            CONTROLLER_TRACE(Trace, bgp_peer->GetName(), vrf->GetName(), 
+                             "VRF deleted, remove state");
+            bgp_peer->DeleteVrfState(partition, e);
+        }
         bgp_xmpp_peer->agent()->controller()->
             DeleteVrfStateOfDecommisionedPeers(partition, e);
+        return;
     }
 
     if (!AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer))
@@ -48,37 +53,6 @@ void VrfExport::Notify(AgentXmppChannel *bgp_xmpp_peer,
     State *state = static_cast<State *>(vrf->GetState(partition->parent(), id));
     uint8_t table_type;
 
-    if (vrf->IsDeleted()) {
-        if (state == NULL) {
-            return;
-        }
-
-        if (vrf->GetName().compare(bgp_xmpp_peer->agent()->GetDefaultVrf()) != 0) {
-            for (table_type = 0; table_type < Agent::ROUTE_TABLE_MAX;
-                 table_type++) {
-                state->rt_export_[table_type]->Unregister();
-            }
-        }
- 
-        if (state->exported_ == false) {
-            CONTROLLER_TRACE(Trace, bgp_peer->GetName(), vrf->GetName(),
-                             "Not subscribed");
-            vrf->ClearState(partition->parent(), id);
-            delete state;
-            return;
-        }
-  
-        if (AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer)) {
-            CONTROLLER_TRACE(Trace, bgp_peer->GetName(), vrf->GetName(),
-                             "Unsubscribe");
-            AgentXmppChannel::ControllerSendSubscribe(bgp_xmpp_peer, vrf, 
-                                                      false); 
-        }
-
-        vrf->ClearState(partition->parent(), id);
-        delete state;
-        return;
-    }
 
     if (state == NULL) {
         state = new State();

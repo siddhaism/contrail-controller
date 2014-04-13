@@ -515,27 +515,10 @@ void VNController::StartMulticastCleanupTimer(uint64_t peer_sequence) {
 
 void VNController::DeleteVrfStateOfDecommisionedPeers(DBTablePartBase *partition,
                                                       DBEntryBase *e) {
-    VrfEntry *vrf = static_cast<VrfEntry *>(e);
     for (std::list<boost::shared_ptr<BgpPeer> >::iterator it  = 
          controller_peer_list_.begin(); it != controller_peer_list_.end(); 
          ++it) {
         BgpPeer *bgp_peer = static_cast<BgpPeer *>((*it).get());
-        DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
-
-        VrfExport::State *vrf_state = 
-            static_cast<VrfExport::State *>(vrf->GetState(partition->parent(), 
-                                                          id)); 
-        if (vrf_state == NULL)
-            return;
-
-        for (uint8_t table_type = 0; table_type < Agent::ROUTE_TABLE_MAX;
-             table_type++) {
-            vrf_state->rt_export_[table_type]->Unregister();
-        }
-
-        if (vrf_state) {
-            vrf->ClearState(partition->parent(), id);
-            delete vrf_state;
-        }
+        bgp_peer->DeleteVrfState(partition, e);
     }
 }

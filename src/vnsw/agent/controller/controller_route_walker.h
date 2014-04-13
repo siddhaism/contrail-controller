@@ -22,7 +22,7 @@ public:
     void Start(Type type, bool associate, 
                AgentRouteWalker::WalkDone walk_done_cb);
     void Cancel();
-    void RouteWalkDoneForVrf(DBTableBase *partition, VrfEntry *vrf);
+    void RouteWalkDoneForVrf(VrfEntry *vrf);
     virtual bool VrfWalkNotify(DBTablePartBase *partition, DBEntryBase *e);
     virtual bool RouteWalkNotify(DBTablePartBase *partition, DBEntryBase *e);
 
@@ -38,9 +38,6 @@ private:
     bool RouteNotifyMulticast(DBTablePartBase *partition, DBEntryBase *e);
     bool RouteDelPeer(DBTablePartBase *partition, DBEntryBase *e);
     bool RouteStaleMarker(DBTablePartBase *partition, DBEntryBase *e);
-
-    DBState *GetVrfExportState(DBTablePartBase *partition, DBEntryBase *e);
-    DBState *GetRouteExportState(DBTablePartBase *partition, DBEntryBase *e);
 
     Peer *peer_;
     bool associate_;
