@@ -198,6 +198,9 @@ void AgentRouteWalker::Callback(DBTableBase *part, VrfEntry *vrf) {
     OnWalkComplete();
 }
 
+/*
+ * Check if all route table walk have been reset for this VRF
+ */
 void AgentRouteWalker::OnRouteTableWalkCompleteForVrf(DBTableBase *part, 
                                                      VrfEntry *vrf) {
     if (!route_walk_done_for_vrf_cb_)
@@ -214,6 +217,9 @@ void AgentRouteWalker::OnRouteTableWalkCompleteForVrf(DBTableBase *part,
     route_walk_done_for_vrf_cb_(part, vrf);
 }
 
+/*
+ * Check if all walks are over.
+ */
 void AgentRouteWalker::OnWalkComplete() {
     bool walk_done = false;
     if (vrf_walkid_ == DBTableWalker::kInvalidWalkerId) {
@@ -235,10 +241,15 @@ void AgentRouteWalker::OnWalkComplete() {
     }
 }
 
+/* Callback set, his is called when all walks are done i.e. VRF + route */
 void AgentRouteWalker::WalkDoneCallback(WalkDone cb) {
     walk_done_cb_ = cb;
 }
 
+/* 
+ * Callback is registered to notify walk complete of all route tables for 
+ * a VRF.
+ */
 void AgentRouteWalker::RouteWalkDoneForVrfCallback(RouteWalkDoneCb cb) {
     route_walk_done_for_vrf_cb_ = cb;
 }

@@ -221,7 +221,7 @@ void AgentRouteTable::DeletePathFromPeer(DBTablePartBase *part,
     // Remove path from the route
     rt->RemovePath(path);
     // Squash all stale when peer delete is of non bgp type
-    if (peer->GetType() != Peer::BGP_PEER) {
+    if (peer && (peer->GetType() != Peer::BGP_PEER)) {
         rt->SquashStalePaths(NULL);
     }
 
@@ -507,6 +507,7 @@ void AgentRoute::SquashStalePaths(const AgentPath *exception_path) {
         AgentPath *path = static_cast<AgentPath *>(it.operator->());
         if (path->is_stale() && (path != exception_path)) {
             RemovePathInternal(path);
+            delete path;
         }
 
         // Move iterator to next ptr

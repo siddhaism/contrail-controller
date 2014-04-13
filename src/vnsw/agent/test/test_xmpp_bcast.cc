@@ -700,13 +700,16 @@ protected:
         client->Reset();
         DeleteVmportEnv(input, 2, 1, 0);
 
+        Agent::GetInstance()->controller()->multicast_cleanup_timer()->Fire();
+        client->WaitForIdle();
+
+        Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
+        client->WaitForIdle();
+
         WAIT_FOR(100, 1000, (client->CompositeNHDelWait(cnh_del_cnt) == true));
         WAIT_FOR(100, 10000, (client->CompositeNHCount() == 0));
         WAIT_FOR(100, 1000, 
                  (Agent::GetInstance()->GetMplsTable()->Size() == 0));
-
-        Agent::GetInstance()->controller()->unicast_cleanup_timer()->Fire();
-        client->WaitForIdle();
 
         WAIT_FOR(100, 1000, (VrfFind("vrf1") == false)); 
         WAIT_FOR(100, 1000, (VrfFind("vrf2") == false)); 
@@ -1800,8 +1803,9 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_sessiondown_after_ipam_del) {
 
     XmppSubnetTearDown();
 
+    WAIT_FOR(1000, 10000, (Agent::GetInstance()->GetVrfTable()->Size() == 1));
+
     xc->ConfigUpdate(new XmppConfigData());
-    WAIT_FOR(1000, 1000, (VrfGet("vrf1") == NULL));
     client->WaitForIdle(5);
 }
 
@@ -1858,8 +1862,9 @@ TEST_F(AgentXmppUnitTest, SubnetBcast_Test_sessiondown_after_vn_vrf_link_del) {
 
     XmppSubnetTearDown();
 
+    WAIT_FOR(1000, 10000, (Agent::GetInstance()->GetVrfTable()->Size() == 1));
+
     xc->ConfigUpdate(new XmppConfigData());
-    WAIT_FOR(1000, 1000, (VrfGet("vrf1") == NULL));
     client->WaitForIdle(5);
 }
 

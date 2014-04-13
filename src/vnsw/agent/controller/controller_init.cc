@@ -513,34 +513,6 @@ void VNController::StartMulticastCleanupTimer(uint64_t peer_sequence) {
                     peer_sequence));
 }
 
-void VNController::DeleteRouteStateOfDecommisionedPeers(DBTablePartBase *partition,
-                                                        DBEntryBase *e) {
-    AgentRoute *route = static_cast<AgentRoute *>(e);
-    for (std::list<boost::shared_ptr<BgpPeer> >::iterator it  = 
-         controller_peer_list_.begin(); it != controller_peer_list_.end(); 
-         ++it) {
-        BgpPeer *bgp_peer = static_cast<BgpPeer *>((*it).get());
-        DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
-        VrfEntry *vrf = route->vrf();
-        DBTablePartBase *vrf_partition = agent()->GetVrfTable()->
-            GetTablePartition(vrf);
-        VrfExport::State *vrf_state = 
-            static_cast<VrfExport::State *>(vrf->GetState(vrf_partition->parent(), 
-                                                          id)); 
-        if (vrf_state == NULL)
-            return;
-
-        RouteExport::State *state = static_cast<RouteExport::State *>
-            (route->GetState(partition->parent(),
-                     vrf_state->rt_export_[route->GetTableType()]->GetListenerId()));
-        if (state) {
-            route->ClearState(partition->parent(), 
-                              vrf_state->rt_export_[route->GetTableType()]->GetListenerId());
-            delete state;
-        }
-    }
-}
-
 void VNController::DeleteVrfStateOfDecommisionedPeers(DBTablePartBase *partition,
                                                       DBEntryBase *e) {
     VrfEntry *vrf = static_cast<VrfEntry *>(e);
@@ -555,6 +527,11 @@ void VNController::DeleteVrfStateOfDecommisionedPeers(DBTablePartBase *partition
                                                           id)); 
         if (vrf_state == NULL)
             return;
+
+        for (uint8_t table_type = 0; table_type < Agent::ROUTE_TABLE_MAX;
+             table_type++) {
+            vrf_state->rt_export_[table_type]->Unregister();
+        }
 
         if (vrf_state) {
             vrf->ClearState(partition->parent(), id);

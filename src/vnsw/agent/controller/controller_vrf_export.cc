@@ -26,16 +26,23 @@ void VrfExport::Notify(AgentXmppChannel *bgp_xmpp_peer,
 
     BgpPeer *bgp_peer = static_cast<BgpPeer *>(bgp_xmpp_peer->bgp_peer_id());
     VrfEntry *vrf = static_cast<VrfEntry *>(e);
+
     //Peer is decommissioned so ignore the notification as there is no active
     //listener. Deletion of state for decommisioned peer will happen via delpeer
     //walk.
-    if (!AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer)) {
-        if (vrf->IsDeleted()) {
-            bgp_xmpp_peer->agent()->controller()->
-                DeleteVrfStateOfDecommisionedPeers(partition, e);
-        }
+    if (!AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer) 
+        && !(vrf->IsDeleted())) {
         return;
     }
+
+    if (vrf->IsDeleted() && (vrf->GetName().compare(bgp_xmpp_peer->agent()->
+                                                    GetDefaultVrf()) != 0)) {
+        bgp_xmpp_peer->agent()->controller()->
+            DeleteVrfStateOfDecommisionedPeers(partition, e);
+    }
+
+    if (!AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer))
+        return;
 
     DBTableBase::ListenerId id = bgp_peer->GetVrfExportListenerId();
     State *state = static_cast<State *>(vrf->GetState(partition->parent(), id));
@@ -61,9 +68,12 @@ void VrfExport::Notify(AgentXmppChannel *bgp_xmpp_peer,
             return;
         }
   
-        CONTROLLER_TRACE(Trace, bgp_peer->GetName(), vrf->GetName(),
-                         "Unsubscribe");
-        AgentXmppChannel::ControllerSendSubscribe(bgp_xmpp_peer, vrf, false); 
+        if (AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer)) {
+            CONTROLLER_TRACE(Trace, bgp_peer->GetName(), vrf->GetName(),
+                             "Unsubscribe");
+            AgentXmppChannel::ControllerSendSubscribe(bgp_xmpp_peer, vrf, 
+                                                      false); 
+        }
 
         vrf->ClearState(partition->parent(), id);
         delete state;

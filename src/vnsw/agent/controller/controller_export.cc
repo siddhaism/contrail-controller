@@ -71,17 +71,32 @@ void RouteExport::Notify(AgentXmppChannel *bgp_xmpp_peer,
                          bool associate, Agent::RouteTableType type, 
                          DBTablePartBase *partition, DBEntryBase *e) {
     AgentRoute *route = static_cast<AgentRoute *>(e);
-    if (AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer)) {
-        //If multicast or subnetbroadcast digress to multicast
-        if (route->is_multicast()) {
-            return MulticastNotify(bgp_xmpp_peer, associate, partition, e);
+
+    if (!route->IsDeleted()) {
+        if (!AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer))
+            return;
+
+        //Get the listener ID of active BGP peer
+        //Replace this common logic with GetRouteExportState
+        VrfEntry *vrf = route->vrf();
+        DBTablePartBase *vrf_partition =
+            bgp_xmpp_peer->agent()->GetVrfTable()->GetTablePartition(vrf);
+        BgpPeer *bgp_peer = static_cast<BgpPeer *>(bgp_xmpp_peer->bgp_peer_id());
+        DBTableBase::ListenerId vrf_id = bgp_peer->GetVrfExportListenerId();
+        VrfExport::State *vs = static_cast<VrfExport::State *>
+            (vrf->GetState(vrf_partition->parent(), vrf_id));
+        if (vs) {
+            DBTableBase::ListenerId id = vs->rt_export_[route->GetTableType()]->
+                GetListenerId();
+            if (id != id_)
+                return;
         }
-        return UnicastNotify(bgp_xmpp_peer, partition, e, type);
     }
 
-    if (route->IsDeleted()) {
-        bgp_xmpp_peer->agent()->controller()->DeleteRouteStateOfDecommisionedPeers(
-                                              partition, e);                                     
+    if (route->is_multicast()) {
+        MulticastNotify(bgp_xmpp_peer, associate, partition, e);
+    } else {
+        UnicastNotify(bgp_xmpp_peer, partition, e, type);
     }
 }
 
@@ -101,11 +116,6 @@ void RouteExport::UnicastNotify(AgentXmppChannel *bgp_xmpp_peer,
     if (!state && route->IsDeleted()) {
         goto done;
     }
-
-    // Dont notify if agenxtxmppchannel does not have peer in active state
-    if (!AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer))
-        return;
-
 
     if (state == NULL) {
         state = new State();

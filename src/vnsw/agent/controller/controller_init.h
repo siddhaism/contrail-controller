@@ -63,7 +63,6 @@ public:
     Agent *agent() {return agent_;}
 
     void DeleteVrfStateOfDecommisionedPeers(DBTablePartBase *partition, DBEntryBase *e);
-    void DeleteRouteStateOfDecommisionedPeers(DBTablePartBase *partition, DBEntryBase *e);
 
 private:
     AgentXmppChannel *FindAgentXmppChannel(std::string server_ip);
