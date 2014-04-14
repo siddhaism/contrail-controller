@@ -87,7 +87,7 @@ port = 6000
 
     # Test help string
     def test7(self):
-        print subprocess.check_output("python options.py --help", shell=True)
+        subprocess.check_output("python options.py --help", shell=True)
 
 if __name__ == "__main__":
     OptionsTest().test1()
