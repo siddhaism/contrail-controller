@@ -73,6 +73,10 @@ trace sandesh AgentXmppDiscoveryConnection {
     3: string message;
 }
 
+trace sandesh AgentXmppGeneric {
+    1: string message;
+}
+
 request sandesh AgentXmppConnectionStatusReq {
 }
 

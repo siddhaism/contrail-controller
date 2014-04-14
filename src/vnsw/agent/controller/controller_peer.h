@@ -36,10 +36,13 @@ public:
     virtual void ReceiveMulticastUpdate(XmlPugi *pugi);
     XmppChannel *GetXmppChannel() { return channel_; }
 
+    //Helper to identify if specified peer has active BGP peer attached
     static bool IsBgpPeerActive(AgentXmppChannel *peer);
     static bool SetConfigPeer(AgentXmppChannel *peer);
-    static void SetMulticastPeer(AgentXmppChannel *old_peer, AgentXmppChannel *new_peer);
-    static void CleanStale(AgentXmppChannel *peer, bool config, bool unicast, bool multicast);
+    static void SetMulticastPeer(AgentXmppChannel *old_peer, 
+                                 AgentXmppChannel *new_peer);
+    static void CleanStale(AgentXmppChannel *peer, bool config, bool unicast, 
+                           bool multicast);
     static void UnicastPeerDown(AgentXmppChannel *peer, BgpPeer *peer_id, 
                                 bool all_peer_gone);
     static void MulticastPeerDown(AgentXmppChannel *peer, bool all_peer_gone);
@@ -74,8 +77,18 @@ public:
                                         uint32_t tunnel_bmap, 
                                         bool add_route);
 
+    // Routines for BGP peer manipulations, lifecycle of bgp peer in xmpp
+    // channel is as follows:
+    // 1) Created whenever channel is xmps::READY
+    // 2) When channel moves out of READY state, bgp peer moves to decommisioned
+    // list. Once moved there it can never go back to active peer and can only
+    // get deleted later.
+    // 3) On arrival of some other active peer(i.e. channel is READY) cleanup
+    // timers are started, expiration of which triggers removal of
+    // decommissioned peer and eventually gets destroyed.
     void CreateBgpPeer();
     void DeCommissionBgpPeer();
+
     std::string GetXmppServer() { return xmpp_server_; }
     uint8_t GetXmppServerIdx() { return xs_idx_; }
     std::string GetMcastLabelRange() { return label_range_; }

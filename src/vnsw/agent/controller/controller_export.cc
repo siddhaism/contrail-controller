@@ -67,17 +67,25 @@ void RouteExport::ManagedDelete() {
     marked_delete_ = true;
 }
 
+// Route entry add/change/del notification handler
 void RouteExport::Notify(AgentXmppChannel *bgp_xmpp_peer, 
                          bool associate, Agent::RouteTableType type, 
                          DBTablePartBase *partition, DBEntryBase *e) {
     AgentRoute *route = static_cast<AgentRoute *>(e);
 
+    // Primitive checks for non-delete notification
     if (!route->IsDeleted()) {
+        // If there is no active BGP peer attached to channel, ignore 
+        // non-delete notification for this channel
         if (!AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer))
             return;
 
-        //Get the listener ID of active BGP peer
-        //Replace this common logic with GetRouteExportState
+        // Extract the listener ID of active BGP peer for route table to which
+        // this route entry belongs to. Listeners of route table can be active
+        // bgp peers as well as decommisioned BGP peers(if they exist). Active
+        // and decommisoned BGP peer can co-exist till cleanup timer is fired.
+        // During this interval ignore notification for decommisioned bgp peer
+        // listener id  
         VrfEntry *vrf = route->vrf();
         DBTablePartBase *vrf_partition =
             bgp_xmpp_peer->agent()->GetVrfTable()->GetTablePartition(vrf);

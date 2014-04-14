@@ -220,7 +220,9 @@ void AgentRouteTable::DeletePathFromPeer(DBTablePartBase *part,
 
     // Remove path from the route
     rt->RemovePath(path);
-    // Squash all stale when peer delete is of non bgp type
+    // Local path(non BGP type) is going away and so will route.
+    // For active peers reflector will remove the route but for 
+    // non active peers explicitly squash the paths.
     if (peer && (peer->GetType() != Peer::BGP_PEER)) {
         rt->SquashStalePaths(NULL);
     }

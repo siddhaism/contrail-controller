@@ -625,11 +625,16 @@ bool IFMapAgentStaleCleaner::StaleTimeout() {
     return false;
 }
 
+// Remove stale config entries.
+// Entries are considered stale when sequence number
+// is not same as global seq number
 void IFMapAgentStaleCleaner::StaleCleanup(uint64_t seq) {
-
     //If already running, cancel and start again
     if (timer_->running()) {
-        timer_->Cancel();
+        if (timer_->Cancel() == false) {
+            IFMAP_AGENT_TRACE(Trace, seq_,
+                              "Cancel Timer failed, timer was fired");
+        }
     }
 
     seq_ = seq;

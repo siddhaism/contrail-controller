@@ -111,7 +111,8 @@ void AgentIfMapVmExport::Notify(DBTablePartBase *partition, DBEntryBase *e) {
 
         if (agent_->GetXmppCfgServerIdx() != -1) {
             peer = agent_->GetAgentXmppChannel(agent_->GetXmppCfgServerIdx());
-            ifmap = agent_->GetAgentIfMapXmppChannel(agent_->GetXmppCfgServerIdx());
+            ifmap = agent_->GetAgentIfMapXmppChannel(agent_->
+                                                     GetXmppCfgServerIdx());
             if (AgentXmppChannel::IsBgpPeerActive(peer) && ifmap) {
                 if ((info->seq_number_ == ifmap->GetSeqNumber()) && 
                                         (info->vmi_list_.size() == 1)) {
@@ -156,7 +157,7 @@ void AgentIfMapVmExport::Notify(DBTablePartBase *partition, DBEntryBase *e) {
             return;
         }
 
-        //Ensure that peer exists
+        //Ensure that peer exists and is in active state
         peer = agent_->GetAgentXmppChannel(agent_->GetXmppCfgServerIdx());
         if (!AgentXmppChannel::IsBgpPeerActive(peer)) {
             return;

@@ -18,6 +18,8 @@ ControllerRouteWalker::ControllerRouteWalker(Agent *agent, Peer *peer) :
     associate_(false), type_(NOTIFYALL) {
 }
 
+// Takes action based on context of walk. These walks are not parallel.
+// At a time peer can be only in one state. 
 bool ControllerRouteWalker::VrfWalkNotify(DBTablePartBase *partition,
                                           DBEntryBase *entry) {
     switch (type_) {
@@ -53,7 +55,7 @@ bool ControllerRouteWalker::VrfNotifyAll(DBTablePartBase *partition,
         }
 
         //Pass this object pointer so that VrfExport::Notify can start the route
-        //walk if required on this VRF.
+        //walk if required on this VRF. Also it adds state if none is found.
         VrfExport::Notify(bgp_peer->GetBgpXmppPeer(), partition, entry);
         return true;
     }
@@ -106,6 +108,8 @@ bool ControllerRouteWalker::VrfNotifyInternal(DBTablePartBase *partition,
     return false;
 }
 
+// Takes action based on context of walk. These walks are not parallel.
+// At a time peer can be only in one state. 
 bool ControllerRouteWalker::RouteWalkNotify(DBTablePartBase *partition,
                                       DBEntryBase *entry) {
     switch (type_) {
@@ -133,9 +137,11 @@ bool ControllerRouteWalker::RouteNotifyInternal(DBTablePartBase *partition,
     BgpPeer *bgp_peer = static_cast<BgpPeer *>(peer_);
     Agent::RouteTableType table_type = route->GetTableType();
 
+    //Get the route state
     RouteExport::State *route_state = static_cast<RouteExport::State *>
         (bgp_peer->GetRouteExportState(partition, entry));
     if (route_state) {
+        // Forcibly send the notification to peer.
         route_state->force_chg_ = true;
     }
 
@@ -161,6 +167,7 @@ bool ControllerRouteWalker::RouteNotifyMulticast(DBTablePartBase *partition,
     return RouteNotifyInternal(partition, entry);
 }
 
+// Deletes the peer and corresponding state in route
 bool ControllerRouteWalker::RouteDelPeer(DBTablePartBase *partition,
                                          DBEntryBase *entry) {
     AgentRoute *route = static_cast<AgentRoute *>(entry);
@@ -197,6 +204,8 @@ bool ControllerRouteWalker::RouteStaleMarker(DBTablePartBase *partition,
     return true;
 }
 
+// Called when for a VRF all route table walks are complete.
+// Deletes the VRF state of that peer.
 void ControllerRouteWalker::RouteWalkDoneForVrf(VrfEntry *vrf) {
     // Currently used only for delete peer handling
     // Deletes the state and release the listener id

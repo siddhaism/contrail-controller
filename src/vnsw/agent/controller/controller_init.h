@@ -40,19 +40,19 @@ public:
     void increment_multicast_peer_identifier() {multicast_peer_identifier_++;}
     uint64_t multicast_peer_identifier() {return multicast_peer_identifier_;}
 
-    //Peer maintenace 
+    //Peer maintenace routines 
     uint8_t GetActiveXmppConnections();
     uint32_t ControllerPeerListSize() const {return controller_peer_list_.size();}
     void AddToControllerPeerList(boost::shared_ptr<BgpPeer> peer);
-    void ControllerPeerHeadlessAgentDelDone(BgpPeer *peer);
 
     //timer common
-    void CancelTimer(Timer *timer);
+    bool CancelTimer(Timer *timer);
 
-    //Unicast timer
+    //Unicast timer related routines
     void StartUnicastCleanupTimer();
     bool UnicastCleanupTimerExpired();
     Timer *unicast_cleanup_timer() const {return unicast_cleanup_timer_;}
+    void ControllerPeerHeadlessAgentDelDone(BgpPeer *peer);
 
     //Multicast timer
     void StartMulticastCleanupTimer(uint64_t peer_sequence);
@@ -61,6 +61,7 @@ public:
 
     AgentIfMapVmExport *agent_ifmap_vm_export() const {return agent_ifmap_vm_export_.get();}
 
+    // Clear of decommissioned peer listener id for vrf specified
     void DeleteVrfStateOfDecommisionedPeers(DBTablePartBase *partition, 
                                             DBEntryBase *e);
     Agent *agent() {return agent_;}
