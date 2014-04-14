@@ -18,8 +18,6 @@ import socket
 import json
 import uuid
 import copy
-import argparse
-import ConfigParser
 from pprint import pformat
 #import GreenletProfiler
 
@@ -72,13 +70,10 @@ import vnc_perms
 from cfgm_common import vnc_cpu_info
 
 from pysandesh.sandesh_base import *
-from pysandesh.gen_py.sandesh.ttypes import SandeshLevel
 import discoveryclient.client as client
 #from gen_py.vnc_api.ttypes import *
 import netifaces
-
-_WEB_HOST = '0.0.0.0'
-_WEB_PORT = 8082
+import options
 
 _ACTION_RESOURCES = [
     {'uri': '/fqname-to-id', 'link_name': 'name-to-id',
@@ -130,7 +125,6 @@ def error_503(err):
     return err.body
 # end error_503
 
-
 class VncApiServer(VncApiServerGen):
 
     """
@@ -145,19 +139,23 @@ class VncApiServer(VncApiServerGen):
         return obj
     # end __new__
 
+    def _args(self, arg, section = 'DEFAULT'):
+        return self.cmd_options.get_options_dict()[section][arg]
+
     def __init__(self, args_str=None):
         # self._init_logging()
 
-        self._args = None
         if not args_str:
             args_str = ' '.join(sys.argv[1:])
-        self._parse_args(args_str)
+        self.cmd_options = options.Options()
+        self.cmd_options._parse_args(args_str)
 
         # set python logging level from logging_level cmdline arg
-        logging.basicConfig(level = getattr(logging, self._args.logging_level))
+        logging.basicConfig(
+            level = getattr(logging, self._args('logging_level')))
 
-        self._base_url = "http://%s:%s" % (self._args.listen_ip_addr,
-                                           self._args.listen_port)
+        self._base_url = "http://%s:%s" % (self._args('listen_ip_addr'),
+                                           self._args('listen_port'))
         super(VncApiServer, self).__init__()
         self._pipe_start_app = None
 
@@ -247,10 +245,10 @@ class VncApiServer(VncApiServerGen):
 
         # Initialize discovery client
         self._disc = None
-        if self._args.disc_server_ip and self._args.disc_server_port:
-            self._disc = client.DiscoveryClient(self._args.disc_server_ip,
-                                                self._args.disc_server_port,
-                                                ModuleNames[Module.API_SERVER])
+        if self._args('server', 'DISCOVERY') and self._args('port', 'DISCOVERY'):
+            self._disc = client.DiscoveryClient(
+                self._args('server', 'DISCOVERY'),
+                self._args('port', 'DISCOVERY'), ModuleNames[Module.API_SERVER])
 
         # sandesh init
         self._sandesh = Sandesh()
@@ -258,22 +256,22 @@ class VncApiServer(VncApiServerGen):
         module_name = ModuleNames[Module.API_SERVER]
         node_type = Module2NodeType[module]
         node_type_name = NodeTypeNames[node_type]
-        if self._args.worker_id:
-            instance_id = self._args.worker_id
+        if self._args('worker_id'):
+            instance_id = self._args('worker_id')
         else:
             instance_id = INSTANCE_ID_DEFAULT
         self._sandesh.init_generator(module_name, socket.gethostname(),
                                      node_type_name, instance_id,
-                                     self._args.collectors, 
+                                     self._args('collectors'),
                                      'vnc_api_server_context',
-                                     int(self._args.http_server_port),
+                                     int(self._args('http_server_port')),
                                      ['cfgm_common', 'sandesh'], self._disc)
         self._sandesh.trace_buffer_create(name="VncCfgTraceBuf", size=1000)
         self._sandesh.set_logging_params(
-            enable_local_log=self._args.log_local,
-            category=self._args.log_category,
-            level=self._args.log_level,
-            file=self._args.log_file)
+            enable_local_log=self._args('log_local'),
+            category=self._args('log_category'),
+            level=self._args('log_level'),
+            file=self._args('log_file'))
 
         # Load extensions
         self._extension_mgrs = {}
@@ -289,10 +287,12 @@ class VncApiServer(VncApiServerGen):
         self._addr_mgmt = addr_mgmt
 
         # Authn/z interface
-        if self._args.auth == 'keystone':
-            auth_svc = vnc_auth_keystone.AuthServiceKeystone(self, self._args)
+        if self._args('auth') == 'keystone':
+            auth_svc = vnc_auth_keystone.AuthServiceKeystone(self,
+                           self.cmd_options.get_options_dict())
         else:
-            auth_svc = vnc_auth.AuthService(self, self._args)
+            auth_svc = vnc_auth.AuthService(self,
+                           self.cmd_options.get_options_dict())
 
         self._pipe_start_app = auth_svc.get_middleware_app()
         if not self._pipe_start_app:
@@ -303,10 +303,10 @@ class VncApiServer(VncApiServerGen):
         self._permissions = vnc_perms.VncPermissions(self, self._args)
 
         # DB interface initialization
-        if self._args.wipe_config:
+        if self._args('wipe_config'):
             self._db_connect(True)
         else:
-            self._db_connect(self._args.reset_config)
+            self._db_connect(self._args('reset_config')
             self._db_init_entries()
 
         # recreate subnet operating state from DB
@@ -333,7 +333,7 @@ class VncApiServer(VncApiServerGen):
 
     # Public Methods
     def get_args(self):
-        return self._args
+        return self.cmd_options.get_options_dict()
     # end get_args
 
     def get_server_ip(self):
@@ -351,11 +351,11 @@ class VncApiServer(VncApiServerGen):
     # end get_server_ip
 
     def get_listen_ip(self):
-        return self._args.listen_ip_addr
+        return self._args('listen_ip_addr')
     # end get_listen_ip
 
     def get_server_port(self):
-        return self._args.listen_port
+        return self._args('listen_port')
     # end get_server_port
 
     def get_pipe_start_app(self):
@@ -477,204 +477,7 @@ class VncApiServer(VncApiServerGen):
     # end get_resource_class
 
     # Private Methods
-    def _parse_args(self, args_str):
-        '''
-        Eg. python vnc_cfg_api_server.py --ifmap_server_ip 192.168.1.17
-                                         --ifmap_server_port 8443
-                                         --ifmap_username test
-                                         --ifmap_password test
-                                         --cassandra_server_list\
-                                             10.1.2.3:9160 10.1.2.4:9160
-                                         --redis_server_ip 127.0.0.1
-                                         --redis_server_port 6382
-                                         --collectors 127.0.0.1:8086
-                                         --http_server_port 8090
-                                         --listen_ip_addr 127.0.0.1
-                                         --listen_port 8082
-                                         --log_local
-                                         --log_level SYS_DEBUG
-                                         --logging_level DEBUG
-                                         --log_category test
-                                         --log_file <stdout>
-                                         --disc_server_ip 127.0.0.1
-                                         --disc_server_port 5998
-                                         --worker_id 1
-                                         [--auth keystone]
-                                         [--ifmap_server_loc
-                                          /home/contrail/source/ifmap-server/]
-        '''
 
-        # Source any specified config/ini file
-        # Turn off help, so we print all options in response to -h
-        conf_parser = argparse.ArgumentParser(add_help=False)
-
-        conf_parser.add_argument("-c", "--conf_file",
-                                 help="Specify config file", metavar="FILE")
-        args, remaining_argv = conf_parser.parse_known_args(args_str.split())
-
-        defaults = {
-            'reset_config': False,
-            'wipe_config': False,
-            'listen_ip_addr': _WEB_HOST,
-            'listen_port': _WEB_PORT,
-            'ifmap_server_ip': _WEB_HOST,
-            'ifmap_server_port': "8443",
-            'collectors': None,
-            'http_server_port': '8084',
-            'log_local': False,
-            'log_level': SandeshLevel.SYS_DEBUG,
-            'log_category': '',
-            'log_file': Sandesh._DEFAULT_LOG_FILE,
-            'logging_level': 'WARN',
-            'multi_tenancy': False,
-            'disc_server_ip': None,
-            'disc_server_port': None,
-            'zk_server_ip': '127.0.0.1:2181',
-            'worker_id': '0',
-            'rabbit_server': 'localhost',
-            'rabbit_user': 'guest',
-            'rabbit_password': 'guest',
-            'rabbit_vhost': None,
-        }
-        # ssl options
-        secopts = {
-            'use_certs': False,
-            'keyfile': '',
-            'certfile': '',
-            'ca_certs': '',
-            'ifmap_certauth_port': "8444",
-        }
-        # keystone options
-        ksopts = {
-            'auth_host': '127.0.0.1',
-            'auth_port': '35357',
-            'auth_protocol': 'http',
-            'admin_user': '',
-            'admin_password': '',
-            'admin_tenant_name': '',
-        }
-
-        config = None
-        if args.conf_file:
-            config = ConfigParser.SafeConfigParser({'admin_token': None})
-            config.read([args.conf_file])
-            defaults.update(dict(config.items("DEFAULTS")))
-            if 'multi_tenancy' in config.options('DEFAULTS'):
-                defaults['multi_tenancy'] = config.getboolean(
-                    'DEFAULTS', 'multi_tenancy')
-            if 'SECURITY' in config.sections() and\
-                    'use_certs' in config.options('SECURITY'):
-                if config.getboolean('SECURITY', 'use_certs'):
-                    secopts.update(dict(config.items("SECURITY")))
-            if 'KEYSTONE' in config.sections():
-                ksopts.update(dict(config.items("KEYSTONE")))
-
-        # Override with CLI options
-        # Don't surpress add_help here so it will handle -h
-        parser = argparse.ArgumentParser(
-            # Inherit options from config_parser
-            parents=[conf_parser],
-            # print script description with -h/--help
-            description=__doc__,
-            # Don't mess with format of description
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-        )
-        defaults.update(secopts)
-        defaults.update(ksopts)
-        parser.set_defaults(**defaults)
-
-        parser.add_argument(
-            "--ifmap_server_ip", help="IP address of ifmap server")
-        parser.add_argument(
-            "--ifmap_server_port", help="Port of ifmap server")
-
-        # TODO should be from certificate
-        parser.add_argument(
-            "--ifmap_username",
-            help="Username known to ifmap server")
-        parser.add_argument(
-            "--ifmap_password",
-            help="Password known to ifmap server")
-        parser.add_argument(
-            "--cassandra_server_list",
-            help="List of cassandra servers in IP Address:Port format",
-            nargs='+')
-        parser.add_argument(
-            "--redis_server_ip",
-            help="IP address of redis server")
-        parser.add_argument(
-            "--redis_server_port",
-            help="Port of redis server")
-        parser.add_argument(
-            "--auth", choices=['keystone'],
-            help="Type of authentication for user-requests")
-        parser.add_argument(
-            "--reset_config", action="store_true",
-            help="Warning! Destroy previous configuration and start clean")
-        parser.add_argument(
-            "--wipe_config", action="store_true",
-            help="Warning! Destroy previous configuration")
-        parser.add_argument(
-            "--listen_ip_addr",
-            help="IP address to provide service on, default %s" % (_WEB_HOST))
-        parser.add_argument(
-            "--listen_port",
-            help="Port to provide service on, default %s" % (_WEB_PORT))
-        parser.add_argument(
-            "--collectors",
-            help="List of VNC collectors in ip:port format",
-            nargs="+")
-        parser.add_argument(
-            "--http_server_port",
-            help="Port of local HTTP server")
-        parser.add_argument(
-            "--ifmap_server_loc",
-            help="Location of IFMAP server")
-        parser.add_argument(
-            "--log_local", action="store_true",
-            help="Enable local logging of sandesh messages")
-        parser.add_argument(
-            "--log_level",
-            help="Severity level for local logging of sandesh messages")
-        parser.add_argument(
-            "--logging_level",
-            help=("Log level for python logging: DEBUG, INFO, WARN, ERROR default: %s"
-                  % defaults['logging_level']))
-        parser.add_argument(
-            "--log_category",
-            help="Category filter for local logging of sandesh messages")
-        parser.add_argument(
-            "--log_file",
-            help="Filename for the logs to be written to")
-        parser.add_argument(
-            "--multi_tenancy", action="store_true",
-            help="Validate resource permissions (implies token validation)")
-        parser.add_argument(
-            "--worker_id",
-            help="Worker Id")
-        parser.add_argument(
-            "--zk_server_ip",
-            help="Ip address:port of zookeeper server")
-        parser.add_argument(
-            "--rabbit_server",
-            help="Rabbitmq server address")
-        parser.add_argument(
-            "--rabbit_user",
-            help="Username for rabbit")
-        parser.add_argument(
-            "--rabbit_vhost",
-            help="vhost for rabbit")
-        parser.add_argument(
-            "--rabbit_password",
-            help="password for rabbit")
-        self._args = parser.parse_args(remaining_argv)
-        self._args.config_sections = config
-        if type(self._args.cassandra_server_list) is str:
-            self._args.cassandra_server_list =\
-                self._args.cassandra_server_list.split()
-        if type(self._args.collectors) is str:
-            self._args.collectors = self._args.collectors.split()
-    # end _parse_args
 
     # sigchld handler is currently not engaged. See comment @sigchld
     def sigchld_handler(self):
@@ -689,34 +492,34 @@ class VncApiServer(VncApiServerGen):
 
     def _load_extensions(self):
         try:
-            conf_sections = self._args.config_sections
+            conf_sections = self.cmd_options.get_options_dict()
             self._extension_mgrs['resync'] = ExtensionManager(
-                'vnc_cfg_api.resync', api_server_ip=self._args.listen_ip_addr,
-                api_server_port=self._args.listen_port,
+                'vnc_cfg_api.resync', api_server_ip=self._args('listen_ip_addr'),
+                api_server_port=self._args('listen_port'),
                 conf_sections=conf_sections)
             self._extension_mgrs['resourceApi'] = ExtensionManager(
                 'vnc_cfg_api.resourceApi',
-                api_server_ip=self._args.listen_ip_addr,
-                api_server_port=self._args.listen_port,
+                api_server_ip=self._args('listen_ip_addr'),
+                api_server_port=self._args('listen_port'),
                 conf_sections=conf_sections)
         except Exception as e:
             pass
     # end _load_extensions
 
     def _db_connect(self, reset_config):
-        ifmap_ip = self._args.ifmap_server_ip
-        ifmap_port = self._args.ifmap_server_port
-        user = self._args.ifmap_username
-        passwd = self._args.ifmap_password
-        cass_server_list = self._args.cassandra_server_list
-        redis_server_ip = self._args.redis_server_ip
-        redis_server_port = self._args.redis_server_port
-        ifmap_loc = self._args.ifmap_server_loc
-        zk_server = self._args.zk_server_ip
-        rabbit_server = self._args.rabbit_server
-        rabbit_user = self._args.rabbit_user
-        rabbit_password = self._args.rabbit_password
-        rabbit_vhost = self._args.rabbit_vhost
+        ifmap_ip = self._args('server', 'IFMAP')
+        ifmap_port = self._args('port', 'IFMAP')
+        user = self._args('user', 'IFMAP')
+        passwd = self._args('password', 'IFMAP')
+        cass_server_list = self._args('cassandra_server_list')
+        redis_server_ip = self._args('server', 'REDIS')
+        redis_server_port = self._args('port', 'REDIS')
+        ifmap_loc = self._args('server_url', 'IFMAP')
+        zk_server = self._args('zk_server_ip')
+        rabbit_server = self._args('server', 'RABBIT')
+        rabbit_user = self._args('user', 'RABBIT')
+        rabbit_password = self._args('password', 'RABBIT')
+        rabbit_vhost = self._args('vhost', 'RABBIT')
 
 
         db_conn = VncDbClient(self, ifmap_ip, ifmap_port, user, passwd,
@@ -884,7 +687,7 @@ class VncApiServer(VncApiServerGen):
     # uuid is parent's for collections
     def _http_get_common(self, request, uuid=None):
         # TODO check api + resource perms etc.
-        if self._args.multi_tenancy and uuid:
+        if self._args('multi_tenancy') and uuid:
             if isinstance(uuid, list):
                 for u_id in uuid:
                     ok, result = self._permissions.check_perms_read(request,
@@ -987,7 +790,7 @@ class VncApiServer(VncApiServerGen):
         log.send(sandesh=self._sandesh)
 
         # TODO check api + resource perms etc.
-        if not self._args.multi_tenancy or not parent_type:
+        if not self._args('multi_tenancy') or not parent_type:
             return (True, '')
 
         """
@@ -1166,23 +969,24 @@ class VncApiServer(VncApiServerGen):
             pipe_start_app.set_mt(multi_tenancy)
         except AttributeError:
             pass
-        self._args.multi_tenancy = multi_tenancy
+        self.cmd_options.get_options_dict()['DEFAULT']['multi_tenancy'] =\
+            multi_tenancy
         return {}
     # end
 
     def publish(self):
         # publish API server
         data = {
-            'ip-address': self._args.ifmap_server_ip,
-            'port': self._args.listen_port,
+            'ip-address': self._args('server', 'IFMAP')
+            'port': self._args('listen_port')
         }
         self.api_server_task = self._disc.publish(
             ModuleNames[Module.API_SERVER], data)
 
         # publish ifmap server
         data = {
-            'ip-address': self._args.ifmap_server_ip,
-            'port': self._args.ifmap_server_port,
+            'ip-address': self._args('server', 'IFMAP')
+            'port': self._args('port', 'IFMAP')
         }
         self.ifmap_task = self._disc.publish(
             ModuleNames[Module.IFMAP_SERVER], data)
@@ -1199,8 +1003,8 @@ def main(args_str=None):
     server_port = vnc_api_server.get_server_port()
 
     # Advertise services
-    if vnc_api_server._args.disc_server_ip and\
-            vnc_api_server._args.disc_server_port:
+    if vnc_api_server._args('server', 'DISCOVERY') and
+            vnc_api_server._args('port', 'DISCOVERY'):
         vnc_api_server.publish()
 
     """ @sigchld

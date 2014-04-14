@@ -87,16 +87,16 @@ class AuthServiceKeystone(object):
 
     def __init__(self, server_mgr, args):
         self._conf_info = {
-            'auth_host': args.auth_host,
-            'auth_port': args.auth_port,
-            'auth_protocol': args.auth_protocol,
-            'admin_user': args.admin_user,
-            'admin_password': args.admin_password,
-            'admin_tenant_name': args.admin_tenant_name,
+            'auth_host': args['KEYSTONE']['auth_host'],
+            'auth_port': args['KEYSTONE']['auth_port'],
+            'auth_protocol': args['KEYSTONE']['auth_protocol'],
+            'admin_user': args['KEYSTONE']['admin_user'],
+            'admin_password': args['KEYSTONE']['admin_password'],
+            'admin_tenant_name': args['KEYSTONE']['admin_tenant_name'],
         }
         self._server_mgr = server_mgr
-        self._auth_method = args.auth
-        self._multi_tenancy = args.multi_tenancy
+        self._auth_method = args['DEFAULT']['auth']
+        self._multi_tenancy = args['DEFAULT']['multi_tenancy']
         self._auth_token = None
         self._auth_middleware = None
         if not self._auth_method:
@@ -110,11 +110,12 @@ class AuthServiceKeystone(object):
         self._ks_users = {}
 
         # configure memcache if enabled
-        if self._multi_tenancy and 'memcache_servers' in args:
+        if self._multi_tenancy and args['KEYSTONE']['memcache_servers']:
             self._conf_info[
-                'memcache_servers'] = args.memcache_servers.split(',')
-            if 'token_cache_time' in args:
-                self._conf_info['token_cache_time'] = args.token_cache_time
+                'memcache_servers'] = args['KEYSTONE']['memcache_servers'].split(',')
+            if args['KEYSTONE']['token_cache_time']:
+                self._conf_info['token_cache_time'] = \
+                    args['KEYSTONE']['token_cache_time']
     # end __init__
 
     def json_request(self, method, path):

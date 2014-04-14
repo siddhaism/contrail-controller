@@ -18,7 +18,7 @@ class VncPermissions(object):
 
     @property
     def _multi_tenancy(self):
-        return self._server_mgr._args.multi_tenancy
+        return self._server_mgr._args('multi_tenancy')
     # end
 
     def validate_perms(self, request, uuid, mode=PERMS_R):

@@ -31,13 +31,13 @@ class OpenstackDriver(vnc_plugin_base.Resync):
         self._vnc_api_port = api_server_port
 
         self._config_sections = conf_sections
-        self._auth_host = conf_sections.get('KEYSTONE', 'auth_host')
-        self._auth_port = conf_sections.get('KEYSTONE', 'auth_port')
-        self._auth_user = conf_sections.get('KEYSTONE', 'admin_user')
-        self._auth_passwd = conf_sections.get('KEYSTONE', 'admin_password')
-        self._admin_token = conf_sections.get('KEYSTONE', 'admin_token')
-        self._auth_tenant = conf_sections.get('KEYSTONE', 'admin_tenant_name')
-        auth_proto = conf_sections.get('KEYSTONE', 'auth_protocol')
+        self._auth_host = conf_sections.get('KEYSTONE')['auth_host']
+        self._auth_port = conf_sections.get('KEYSTONE')['auth_port']
+        self._auth_user = conf_sections.get('KEYSTONE')['admin_user']
+        self._auth_passwd = conf_sections.get('KEYSTONE')['admin_password']
+        self._admin_token = conf_sections.get('KEYSTONE')['admin_token']
+        self._auth_tenant = conf_sections.get('KEYSTONE')['admin_tenant_name']
+        auth_proto = conf_sections.get('KEYSTONE')['auth_protocol']
         auth_url = "%s://%s:%s/v2.0" % (auth_proto, self._auth_host, self._auth_port)
         self._auth_url = auth_url
         self._resync_interval_secs = 2
@@ -179,10 +179,10 @@ class ResourceApiDriver(vnc_plugin_base.ResourceApi):
         self._vnc_api_ip = api_server_ip
         self._vnc_api_port = api_server_port
         self._config_sections = conf_sections
-        self._auth_host = conf_sections.get('KEYSTONE', 'auth_host')
-        self._auth_user = conf_sections.get('KEYSTONE', 'admin_user')
-        self._auth_passwd = conf_sections.get('KEYSTONE', 'admin_password')
-        self._auth_tenant = conf_sections.get('KEYSTONE', 'admin_tenant_name')
+        self._auth_host = conf_sections.get('KEYSTONE')['auth_host']
+        self._auth_user = conf_sections.get('KEYSTONE')['admin_user']
+        self._auth_passwd = conf_sections.get('KEYSTONE')['admin_password']
+        self._auth_tenant = conf_sections.get('KEYSTONE')['admin_tenant_name']
         self._vnc_lib = None
 
     def _get_api_connection(self):

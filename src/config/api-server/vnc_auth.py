@@ -14,13 +14,13 @@ class AuthService(object):
 
     def __init__(self, server_mgr, args):
         self._conf_info = {
-            'auth_host': args.auth_host,
-            'auth_protocol': args.auth_protocol,
-            'admin_user': args.admin_user,
-            'admin_password': args.admin_password,
+            'auth_host': args['KEYSTONE']['auth_host'],
+            'auth_protocol': args['KEYSTONE']['auth_protocol'],
+            'admin_user': args['KEYSTONE']['admin_user'],
+            'admin_password': args['KEYSTONE']['admin_password'],
         }
         self._server_mgr = server_mgr
-        self._auth_method = args.auth
+        self._auth_method = args['DEFAULT']['auth']
         self._auth_token = None
         self._auth_middleware = None
     # end __init__
