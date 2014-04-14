@@ -1055,11 +1055,11 @@ class VncDbClient(object):
 
         # certificate auth
         ssl_options = None
-        if api_svr_mgr._args.use_certs:
+        if api_svr_mgr._args('use_certs', 'SECURITY'):
             ssl_options = {
-                'keyfile': api_svr_mgr._args.keyfile,
-                'certfile': api_svr_mgr._args.certfile,
-                'ca_certs': api_svr_mgr._args.ca_certs,
+                'keyfile': api_svr_mgr._args('keyfile', 'SECURITY'),
+                'certfile': api_svr_mgr._args('certfile', 'SECURITY'),
+                'ca_certs': api_svr_mgr._args('ca_certs', 'SECURITY'),
                 'cert_reqs': ssl.CERT_REQUIRED,
                 'ciphers': 'ALL'
             }
@@ -1080,7 +1080,7 @@ class VncDbClient(object):
         self._msgbus = VncKombuClient(self, rabbit_server, self._ifmap_db,
                                       rabbit_user, rabbit_password,
                                       rabbit_vhost)
-        self._zk_db = VncZkClient(api_svr_mgr._args.worker_id, zk_server_ip,
+        self._zk_db = VncZkClient(api_svr_mgr._args('worker_id'), zk_server_ip,
                                   reset_config)
     # end __init__
 
