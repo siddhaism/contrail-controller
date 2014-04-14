@@ -51,6 +51,12 @@ void BgpPeer::StalePeerRoutes() {
     route_walker_->Start(ControllerRouteWalker::STALE, true, NULL);
 }
 
+/*
+ * Get the VRF state and unregister from all route table using
+ * rt_export listener id. This will be called for active and non active bgp
+ * peers. In case of active bgp peers send unsubscribe to control node(request 
+ * came via vrf delete).
+ */
 void BgpPeer::DeleteVrfState(DBTablePartBase *partition,
                              DBEntryBase *entry) {
     VrfEntry *vrf = static_cast<VrfEntry *>(entry);
@@ -71,6 +77,11 @@ void BgpPeer::DeleteVrfState(DBTablePartBase *partition,
     }
 
     if (vrf_state->exported_ == true) {
+        // Check if the notification is for active bgp peer or not.
+        // Send unsubscribe only for active bgp peer.
+        // Note that decommisioned bgp_peer_id can have reference to parent 
+        // agentxmppchannel, however agentzmppchannel wud have moved to some
+        // other new peer.
         if (bgp_xmpp_peer_ && (bgp_xmpp_peer_->bgp_peer_id() == this) && 
             AgentXmppChannel::IsBgpPeerActive(bgp_xmpp_peer_)) {
             AgentXmppChannel::ControllerSendSubscribe(bgp_xmpp_peer_, vrf, 

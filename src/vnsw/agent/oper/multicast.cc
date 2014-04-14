@@ -844,7 +844,22 @@ bool MulticastGroupObject::ModifyFabricMembers(const TunnelOlist &olist,
     NextHopKey *key; 
     TunnelNHData *tnh_data;
 
-    //Ignore any modification operation for lesser value as obj is updated 
+    // Peer identifier cases
+    // if its a delete operation -
+    // 1) Internal delete (invalid peer identifier), dont update peer identifier
+    // as it is a forced removal.
+    // 2) Control node removing stales i.e. delete if local peer identifier is
+    // less than global peer identifier. 
+    //
+    // if its not a delete operation -
+    // 1) Update only if local peer identifier is less than or equal to sent
+    // global peer identifier.
+
+    // Criterias where call has to be ignored:
+    // - delete operation with local peer identifier not less than global
+    // sequence
+    // - Update operation with lower sequence number sent compared to 
+    // local identifier.
     if (peer_identifier <= peer_identifier_) {
         if (delete_op || (peer_identifier < peer_identifier_))
             return true;
@@ -852,10 +867,14 @@ bool MulticastGroupObject::ModifyFabricMembers(const TunnelOlist &olist,
 
     tunnel_olist_.clear();
     SetSourceMPLSLabel(label);
+
+    // After resetting tunnel and mpls label return if it was a delete call,
+    // dont update peer_identifier. Let it get updated via update operation only 
     if (delete_op) {
         return true;
     }
 
+    // Ideally wrong update call
     if (peer_identifier == INVALID_PEER_IDENTIFIER) {
         MCTRACE(Log, "Invalid peer identifier sent for modification", 
                 vrf_name_, grp_address_.to_string(), label);
@@ -913,7 +932,9 @@ void MulticastHandler::ModifyFabricMembers(const std::string &vrf_name,
     MCTRACE(Log, "Add fabric grp label ", vrf_name, grp.to_string(), label);
 }
 
-//Helper to delete fabric nh
+// Helper to delete fabric nh
+// For internal delete it uses invalid identifier. 
+// For delete via control node it uses the sequence sent.
 void MulticastGroupObject::FlushAllPeerInfo(uint64_t peer_identifier) {
     TunnelOlist olist;
     ModifyFabricMembers(olist, peer_identifier, true, 0);

@@ -37,6 +37,11 @@ bool ControllerRouteWalker::VrfWalkNotify(DBTablePartBase *partition,
     return false;
 }
 
+/*
+ * Notification for vrf entry - Creates states (VRF and route) and 
+ * send subscription to control node
+ * This will be called for active bgp peer only.
+ */ 
 bool ControllerRouteWalker::VrfNotifyAll(DBTablePartBase *partition, 
                                          DBEntryBase *entry) {
     VrfEntry *vrf = static_cast<VrfEntry *>(entry);
@@ -62,6 +67,9 @@ bool ControllerRouteWalker::VrfNotifyAll(DBTablePartBase *partition,
     return false;
 }
 
+/*
+ * Delete peer notifications for VRF.
+ */
 bool ControllerRouteWalker::VrfDelPeer(DBTablePartBase *partition,
                                        DBEntryBase *entry) {
     VrfEntry *vrf = static_cast<VrfEntry *>(entry);
@@ -218,6 +226,7 @@ void ControllerRouteWalker::RouteWalkDoneForVrf(VrfEntry *vrf) {
     bgp_peer->DeleteVrfState(partition, entry);
 }
 
+// walk_done_cb - Called back when all walk i.e. VRF and route are done.
 void ControllerRouteWalker::Start(Type type, bool associate, 
                             AgentRouteWalker::WalkDone walk_done_cb) {
     associate_ = associate;
