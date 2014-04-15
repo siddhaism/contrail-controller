@@ -25,8 +25,9 @@ class XmlPugi;
 class AgentXmppChannel {
 public:
     explicit AgentXmppChannel(XmppChannel *channel);
-    AgentXmppChannel(Agent *agent, XmppChannel *channel, std::string xmpp_server, 
-                     std::string label_range, uint8_t xs_idx);
+    AgentXmppChannel(Agent *agent, XmppChannel *channel, 
+                     const std::string &xmpp_server, 
+                     const std::string &label_range, uint8_t xs_idx);
     virtual ~AgentXmppChannel();
 
     virtual std::string ToString() const;

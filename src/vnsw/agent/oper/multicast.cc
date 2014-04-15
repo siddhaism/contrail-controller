@@ -855,14 +855,17 @@ bool MulticastGroupObject::ModifyFabricMembers(const TunnelOlist &olist,
     // 1) Update only if local peer identifier is less than or equal to sent
     // global peer identifier.
 
-    // Criterias where call has to be ignored:
-    // - delete operation with local peer identifier not less than global
-    // sequence
+    // if its internal delete then peer_identifier will be 0xFFFFFFFF;
+    // if external delete(via control node) then its stale cleanup so delete 
+    // only when local peer identifier is less than global multicast sequence.
+    if (delete_op && peer_identifier <= peer_identifier_) {
+        return true;
+    }
+
     // - Update operation with lower sequence number sent compared to 
-    // local identifier.
-    if (peer_identifier <= peer_identifier_) {
-        if (delete_op || (peer_identifier < peer_identifier_))
-            return true;
+    // local identifier, ignore
+    if (!delete_op && peer_identifier < peer_identifier_) {
+        return true;
     }
 
     tunnel_olist_.clear();

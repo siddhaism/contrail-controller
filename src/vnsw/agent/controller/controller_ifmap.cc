@@ -202,8 +202,8 @@ void AgentIfMapVmExport::NotifyAll(AgentXmppChannel *peer) {
     //We have all the required data. Send config subscribe for all VM's
     AgentIfMapVmExport *agent_ifmap_vm_export = peer->agent()->controller()->
         agent_ifmap_vm_export();
-    vm_it = agent_ifmap_vm_export->vm_map().begin();
-    for(; vm_it != agent_ifmap_vm_export->vm_map().end(); vm_it++) {
+    vm_it = agent_ifmap_vm_export->vm_map_.begin();
+    for(; vm_it != agent_ifmap_vm_export->vm_map_.end(); vm_it++) {
         info = vm_it->second;
         if (info->seq_number_ == ifmap->GetSeqNumber()) {
             continue;

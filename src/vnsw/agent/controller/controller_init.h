@@ -17,6 +17,7 @@ class BgpPeer;
 
 class VNController {
 public:
+    typedef boost::shared_ptr<BgpPeer> BgpPeerPtr; 
     static const uint64_t kInvalidPeerIdentifier = 0xFFFFFFFFFFFFFFFF;
     static const uint32_t kUnicastStaleTimer = (2 * 60 * 1000); 
     static const uint32_t kMulticastStaleTimer = (5 * 60 * 1000); 
@@ -41,7 +42,7 @@ public:
     uint64_t multicast_peer_identifier() {return multicast_peer_identifier_;}
 
     //Peer maintenace routines 
-    uint8_t GetActiveXmppConnections();
+    uint8_t ActiveXmppConnectionCount();
     uint32_t ControllerPeerListSize() const {return controller_peer_list_.size();}
     void AddToControllerPeerList(boost::shared_ptr<BgpPeer> peer);
 
@@ -59,7 +60,8 @@ public:
     bool MulticastCleanupTimerExpired(uint64_t peer_sequence);
     Timer *multicast_cleanup_timer() const {return multicast_cleanup_timer_;}
 
-    AgentIfMapVmExport *agent_ifmap_vm_export() const {return agent_ifmap_vm_export_.get();}
+    AgentIfMapVmExport *agent_ifmap_vm_export() const {
+        return agent_ifmap_vm_export_.get();}
 
     // Clear of decommissioned peer listener id for vrf specified
     void DeleteVrfStateOfDecommisionedPeers(DBTablePartBase *partition, 
@@ -67,8 +69,8 @@ public:
     Agent *agent() {return agent_;}
 
 private:
-    AgentXmppChannel *FindAgentXmppChannel(std::string server_ip);
-    AgentDnsXmppChannel *FindAgentDnsXmppChannel(std::string server_ip);
+    AgentXmppChannel *FindAgentXmppChannel(const std::string &server_ip);
+    AgentDnsXmppChannel *FindAgentDnsXmppChannel(const std::string &server_ip);
 
     Agent *agent_;
     uint64_t multicast_peer_identifier_;

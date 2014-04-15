@@ -257,7 +257,8 @@ void VNController::Cleanup() {
 }
 
 
-AgentXmppChannel *VNController::FindAgentXmppChannel(std::string server_ip) {
+AgentXmppChannel *VNController::FindAgentXmppChannel(
+                                const std::string &server_ip) {
 
     uint8_t count = 0;
     while (count < MAX_XMPP_SERVERS) {
@@ -346,7 +347,8 @@ void VNController::ApplyDiscoveryXmppServices(std::vector<DSResponse> resp) {
     XmppServerConnect();
 }
 
-AgentDnsXmppChannel *VNController::FindAgentDnsXmppChannel(std::string server_ip) {
+AgentDnsXmppChannel *VNController::FindAgentDnsXmppChannel(
+                                   const std::string &server_ip) {
 
     uint8_t count = 0;
     while (count < MAX_XMPP_SERVERS) {
@@ -436,7 +438,7 @@ void VNController::ApplyDiscoveryDnsXmppServices(std::vector<DSResponse> resp) {
  * AgentXmppChannel is identified as active if it has a BGP peer
  * attached to it.
  */
-uint8_t VNController::GetActiveXmppConnections() {
+uint8_t VNController::ActiveXmppConnectionCount() {
     uint8_t active_xmpps = 0;
     for (uint8_t count = 0; count < MAX_XMPP_SERVERS; count++) {
         AgentXmppChannel *xc = agent_->GetAgentXmppChannel(count);
@@ -450,7 +452,7 @@ uint8_t VNController::GetActiveXmppConnections() {
     return active_xmpps;
 }
 
-void VNController::AddToControllerPeerList(boost::shared_ptr<BgpPeer> peer) {
+void VNController::AddToControllerPeerList(BgpPeerPtr peer) {
     controller_peer_list_.push_back(peer);
 }
 
@@ -507,16 +509,18 @@ bool VNController::UnicastCleanupTimerExpired() {
 
 void VNController::StartUnicastCleanupTimer() {
     if (CancelTimer(unicast_cleanup_timer_) == false) {
+        //TODO handle failure case.
         CONTROLLER_TRACE(Generic, "Cancel of unicast cleanup timer failed.");
+    }
+
+    // In non-headless mode trigger cleanup 
+    if (!(agent_->headless_agent_mode())) {
+        UnicastCleanupTimerExpired();
+        return;
     }
 
     unicast_cleanup_timer_->Start(kUnicastStaleTimer,
         boost::bind(&VNController::UnicastCleanupTimerExpired, this));
-
-    // In non-headless mode trigger cleanup as soon as timer is started.
-    if (!(agent_->headless_agent_mode())) {
-        unicast_cleanup_timer_->Fire();
-    }
 }
 
 // Multicast info is maintained using sequence number and not peer,
@@ -529,7 +533,14 @@ bool VNController::MulticastCleanupTimerExpired(uint64_t peer_sequence) {
 
 void VNController::StartMulticastCleanupTimer(uint64_t peer_sequence) {
     if (CancelTimer(multicast_cleanup_timer_) == false) {
+        //TODO handle failure case.
         CONTROLLER_TRACE(Generic, "Cancel of multicast cleanup timer failed.");
+    }
+
+    // In non-headless mode trigger cleanup 
+    if (!(agent_->headless_agent_mode())) {
+        MulticastCleanupTimerExpired(peer_sequence);
+        return;
     }
 
     // Pass the current peer sequence. In the timer expiration interval 
@@ -538,11 +549,6 @@ void VNController::StartMulticastCleanupTimer(uint64_t peer_sequence) {
     multicast_cleanup_timer_->Start(kMulticastStaleTimer,
         boost::bind(&VNController::MulticastCleanupTimerExpired, this, 
                     peer_sequence));
-
-    // In non-headless mode trigger cleanup as soon as timer is started.
-    if (!(agent_->headless_agent_mode())) {
-        multicast_cleanup_timer_->Fire();
-    }
 }
 
 // Helper to iterate thru all decommisioned peer and delete the vrf state for

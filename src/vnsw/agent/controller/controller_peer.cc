@@ -32,8 +32,9 @@ using namespace boost::asio;
 using namespace autogen;
  
 AgentXmppChannel::AgentXmppChannel(Agent *agent, XmppChannel *channel, 
-                                   std::string xmpp_server, 
-                                   std::string label_range, uint8_t xs_idx) 
+                                   const std::string &xmpp_server, 
+                                   const std::string &label_range, 
+                                   uint8_t xs_idx) 
     : channel_(channel), xmpp_server_(xmpp_server), label_range_(label_range),
       xs_idx_(xs_idx), agent_(agent) {
     bgp_peer_id_.reset();
@@ -54,7 +55,7 @@ std::string AgentXmppChannel::GetBgpPeerName() const {
 }
 
 void AgentXmppChannel::CreateBgpPeer() {
-    //Ensure older bgp_peer_id in decommisioned list
+    assert(bgp_peer_id_.get() == NULL);
     DBTableBase::ListenerId id = 
         agent_->GetVrfTable()->Register(boost::bind(&VrfExport::Notify,
                                        this, _1, _2)); 
@@ -81,7 +82,7 @@ void AgentXmppChannel::DeCommissionBgpPeer() {
 
 bool AgentXmppChannel::SendUpdate(uint8_t *msg, size_t size) {
 
-    AgentStats::GetInstance()->incr_xmpp_out_msgs(xs_idx_);
+    agent_->stats()->incr_xmpp_out_msgs(xs_idx_);
     return channel_->Send(msg, size, xmps::BGP,
                           boost::bind(&AgentXmppChannel::WriteReadyCb, this, _1));
 }
@@ -585,7 +586,7 @@ void AgentXmppChannel::AddRoute(string vrf_name, Ip4Address prefix_addr,
 
 void AgentXmppChannel::ReceiveUpdate(const XmppStanza::XmppMessage *msg) {
     
-    AgentStats::GetInstance()->incr_xmpp_in_msgs(xs_idx_);
+    agent_->stats()->incr_xmpp_in_msgs(xs_idx_);
     if (msg && msg->type == XmppStanza::MESSAGE_STANZA) {
       
         XmlBase *impl = msg->dom.get();
@@ -788,12 +789,13 @@ bool AgentXmppChannel::IsBgpPeerActive(AgentXmppChannel *peer) {
  * Notify for new config peer, set it in agent xmppcfg
  */
 bool AgentXmppChannel::SetConfigPeer(AgentXmppChannel *peer) {
+    Agent *agent = peer->agent();
     if (AgentXmppChannel::ControllerSendCfgSubscribe(peer)) {
-        peer->agent()->SetXmppCfgServer(peer->GetXmppServer(), 
-                                 peer->GetXmppServerIdx());
+        agent->SetXmppCfgServer(peer->GetXmppServer(), 
+                                peer->GetXmppServerIdx());
         //Generate a new sequence number for the configuration
         AgentIfMapXmppChannel::NewSeqNumber();
-        AgentIfMapVmExport::NotifyAll(peer);
+        agent->controller()->agent_ifmap_vm_export()->NotifyAll(peer);
         return true;
     }
     return false;
@@ -894,7 +896,7 @@ void AgentXmppChannel::HandleAgentXmppClientChannelEvent(AgentXmppChannel *peer,
 
         // Remove or stale all unicast peer paths
         bool all_active_unicast_peer_gone = (agent->controller()->
-                                             GetActiveXmppConnections() < 1);
+                                             ActiveXmppConnectionCount() < 1);
         AgentXmppChannel::UnicastPeerDown(peer, decommissioned_peer_id, 
                                           all_active_unicast_peer_gone);
 

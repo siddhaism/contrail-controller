@@ -53,10 +53,9 @@ public:
     AgentIfMapVmExport(Agent *agent);
     ~AgentIfMapVmExport();
     void Notify(DBTablePartBase *partition, DBEntryBase *e);
-    static void NotifyAll(AgentXmppChannel *peer);
+    void NotifyAll(AgentXmppChannel *peer);
     typedef std::map<boost::uuids::uuid, struct VmExportInfo *> VmMap; 
     Agent *agent() const {return agent_;}
-    VmMap &vm_map() {return vm_map_;}
 
 private:
     DBTableBase::ListenerId vmi_list_id_;
