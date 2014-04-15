@@ -76,11 +76,8 @@ class Options(object):
 
         # REDIS section options
         self.options['REDIS'] = {
-            'password': "ap-server",
             'port': 8443,
             'server': "127.0.0.1",
-            'server_url': "https://127.0.0.1:8443",
-            'user': "ap-server",
         }
 
         # SECURITY section options
@@ -218,6 +215,10 @@ class Options(object):
             "--zk_server_ip",
             help="Ip address:port of zookeeper server")
 
+    def check_bool(self, opt, section = 'DEFAULT'):
+        if isinstance(self.options[section][opt], str):
+            self.options[section][opt] = (self.options[section][opt] == 'True')
+
     def _parse_args(self, args_str):
 
         # Source any specified config/ini file
@@ -275,6 +276,14 @@ class Options(object):
         if type(self.options['DEFAULT']['collectors']) is str:
             self.options['DEFAULT']['collectors'] =\
                 self.options['DEFAULT']['collectors'].split()
+
+        # Convert True/False str to boolean
+        self.check_bool('log_local')
+        self.check_bool('multi_tenancy')
+        self.check_bool('reset_config')
+        self.check_bool('wipe_config')
+
+        self.check_bool('use_certs', 'SECURITY')
 
     # end _parse_args
 # class Options

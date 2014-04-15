@@ -306,7 +306,7 @@ class VncApiServer(VncApiServerGen):
         if self._args('wipe_config'):
             self._db_connect(True)
         else:
-            self._db_connect(self._args('reset_config')
+            self._db_connect(self._args('reset_config'))
             self._db_init_entries()
 
         # recreate subnet operating state from DB
@@ -977,7 +977,7 @@ class VncApiServer(VncApiServerGen):
     def publish(self):
         # publish API server
         data = {
-            'ip-address': self._args('server', 'IFMAP')
+            'ip-address': self._args('server', 'IFMAP'),
             'port': self._args('listen_port')
         }
         self.api_server_task = self._disc.publish(
@@ -985,7 +985,7 @@ class VncApiServer(VncApiServerGen):
 
         # publish ifmap server
         data = {
-            'ip-address': self._args('server', 'IFMAP')
+            'ip-address': self._args('server', 'IFMAP'),
             'port': self._args('port', 'IFMAP')
         }
         self.ifmap_task = self._disc.publish(
@@ -1003,7 +1003,7 @@ def main(args_str=None):
     server_port = vnc_api_server.get_server_port()
 
     # Advertise services
-    if vnc_api_server._args('server', 'DISCOVERY') and
+    if vnc_api_server._args('server', 'DISCOVERY') and \
             vnc_api_server._args('port', 'DISCOVERY'):
         vnc_api_server.publish()
 
