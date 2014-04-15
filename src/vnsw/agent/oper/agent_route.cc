@@ -500,20 +500,17 @@ AgentPath *AgentRoute::FindPath(const Peer *peer) const {
 
 void AgentRoute::SquashStalePaths(const AgentPath *exception_path) {
     Route::PathList::iterator it = GetPathList().begin();
-    Route::PathList::iterator it_next = GetPathList().begin();
 
     while (it != GetPathList().end()) {
-        it_next++;
-
         // Delete all stale path except for the path sent(exception_path)
         AgentPath *path = static_cast<AgentPath *>(it.operator->());
         if (path->is_stale() && (path != exception_path)) {
-            RemovePathInternal(path);
-            delete path;
+            // Since we squash stales, at any point of time there should be only
+            // one stale other than exception_path in list
+            RemovePath(path);
+            return;
         }
-
-        // Move iterator to next ptr
-        it = it_next;
+        it++;
     }
 }
 

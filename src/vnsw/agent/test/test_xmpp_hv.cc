@@ -1,5 +1,6 @@
 #include <test/test_basic_scale.h>
 
+// Bring channel down and delete VRF
 TEST_F(AgentBasicScaleTest, Del_peer_deleted_vrf_1) {
     client->Reset();
     client->WaitForIdle();
@@ -26,6 +27,7 @@ TEST_F(AgentBasicScaleTest, Del_peer_deleted_vrf_1) {
     DeleteVmPortEnvironment();
 }
 
+// Delete VRF and bring channel down
 TEST_F(AgentBasicScaleTest, Del_peer_deleted_vrf_2) {
     client->Reset();
     client->WaitForIdle();
@@ -48,32 +50,6 @@ TEST_F(AgentBasicScaleTest, Del_peer_deleted_vrf_2) {
 
     bgp_peer[0].get()->HandleXmppChannelEvent(xmps::NOT_READY);
     client->WaitForIdle();
-    //Delete vm-port and route entry in vrf1
-    DeleteVmPortEnvironment();
-}
-
-TEST_F(AgentBasicScaleTest, Del_peer_deleted_vrf_3) {
-    client->Reset();
-    client->WaitForIdle();
-
-    XmppConnectionSetUp();
-    BuildVmPortEnvironment();
-    
-    //Get the vrf export id
-    BgpPeer *peer = static_cast<BgpPeer *>(bgp_peer[0].get()->bgp_peer_id());
-    uint32_t listener_id = peer->GetVrfExportListenerId();
-    EXPECT_TRUE(listener_id != 0);
-    VrfEntry *vrf = VrfGet("vrf1");
-    DBTablePartBase *part = Agent::GetInstance()->GetVrfTable()->GetTablePartition(vrf);
-    EXPECT_TRUE(vrf->GetState(part->parent(), listener_id) != NULL);
-
-    bgp_peer[0].get()->HandleXmppChannelEvent(xmps::NOT_READY);
-    client->WaitForIdle();
-    EXPECT_TRUE(vrf->GetState(part->parent(), listener_id) == NULL);
-
-    DelVrf("vrf1");
-    client->WaitForIdle();
-
     //Delete vm-port and route entry in vrf1
     DeleteVmPortEnvironment();
 }
@@ -331,7 +307,64 @@ TEST_F(AgentBasicScaleTest, v4_unicast_one_channel_down_up) {
     DeleteVmPortEnvironment();
 }
 
-TEST_F(AgentBasicScaleTest, DISABLED_unicast_one_channel_down_up_skip_route_from_peer) {
+static uint8_t CountStalePath(AgentRoute *rt) {
+    uint8_t stale_path_count = 0;
+    //Check only one stale path is thr
+    for(Route::PathList::const_iterator it = rt->GetPathList().begin(); 
+        it != rt->GetPathList().end(); it++) {
+        const AgentPath *path = static_cast<const AgentPath *>(it.operator->());
+        if (path->is_stale()) {
+            EXPECT_TRUE(path->peer()->GetType() == Peer::BGP_PEER);
+            stale_path_count++;
+        } 
+    }
+    return stale_path_count;
+}
+
+TEST_F(AgentBasicScaleTest, flap_xmpp_channel_check_stale_path_count) {
+    client->Reset();
+    client->WaitForIdle();
+
+    XmppConnectionSetUp();
+    BuildVmPortEnvironment();
+
+    //expect subscribe message+route at the mock server
+    Ip4Address uc_addr = Ip4Address::from_string("1.1.1.1");
+    WAIT_FOR(1000, 10000, RouteFind("vrf1", uc_addr, 32));
+    Inet4UnicastRouteEntry *rt = RouteGet("vrf1", uc_addr, 32);
+    WAIT_FOR(1000, 10000, (rt->GetPathList().size() == 2));
+
+    //Get the peer
+    Peer *peer = Agent::GetInstance()->GetAgentXmppChannel(0)->bgp_peer_id();
+    AgentPath *path = static_cast<AgentPath *>(rt->FindPath(peer));
+    EXPECT_TRUE(path->is_stale() == false);
+
+    VerifyVmPortActive(true);
+    VerifyRoutes(false);
+    
+    AgentXmppChannel *ch = static_cast<AgentXmppChannel *>(bgp_peer[0].get());
+    //Bring down the channel
+    bgp_peer[0].get()->HandleXmppChannelEvent(xmps::NOT_READY);
+    client->WaitForIdle();
+    EXPECT_TRUE(CountStalePath(rt) == 1);
+    //Bring up the channel
+    bgp_peer[0].get()->HandleXmppChannelEvent(xmps::READY);
+    client->WaitForIdle();
+    EXPECT_TRUE(CountStalePath(rt) == 1);
+    //Bring down the channel
+    bgp_peer[0].get()->HandleXmppChannelEvent(xmps::NOT_READY);
+    client->WaitForIdle();
+    EXPECT_TRUE(CountStalePath(rt) == 1);
+    //Bring up the channel
+    bgp_peer[0].get()->HandleXmppChannelEvent(xmps::READY);
+    client->WaitForIdle();
+    EXPECT_TRUE(CountStalePath(rt) == 1);
+
+    //Delete vm-port and route entry in vrf1
+    DeleteVmPortEnvironment();
+}
+
+TEST_F(AgentBasicScaleTest, unicast_one_channel_down_up_skip_route_from_peer) {
     client->Reset();
     client->WaitForIdle();
 
@@ -373,17 +406,14 @@ TEST_F(AgentBasicScaleTest, DISABLED_unicast_one_channel_down_up_skip_route_from
     mcobj = MulticastHandler::GetInstance()->FindGroupObject("vrf1", mc_addr);
     EXPECT_TRUE(mcobj != NULL);
     EXPECT_TRUE(mcobj->GetSourceMPLSLabel() == subnet_src_label);
-    //EXPECT_TRUE(mcobj->peer_identifier() == 
-    EXPECT_TRUE((mcobj->peer_identifier() + 1) == 
+    EXPECT_TRUE(mcobj->peer_identifier() == 
                 Agent::GetInstance()->controller()->multicast_peer_identifier());
-    //EXPECT_TRUE(Agent::GetInstance()->GetMplsTable()->FindMplsLabel(subnet_src_label));
 
     uint32_t source_flood_label = mcobj->GetSourceMPLSLabel();
     mc_addr = Ip4Address::from_string("255.255.255.255");
     EXPECT_TRUE(MCRouteFind("vrf1", mc_addr));
     EXPECT_TRUE(mcobj->GetSourceMPLSLabel() != 0);
-    //EXPECT_TRUE(mcobj->peer_identifier() == 
-    EXPECT_TRUE((mcobj->peer_identifier() + 1) == 
+    EXPECT_TRUE(mcobj->peer_identifier() == 
                 Agent::GetInstance()->controller()->multicast_peer_identifier());
 
     //Bring up the channel
@@ -424,10 +454,6 @@ TEST_F(AgentBasicScaleTest, DISABLED_unicast_one_channel_down_up_skip_route_from
 
 int main(int argc, char **argv) {
     GETSCALEARGS();
-    if (!headless_init) {
-        return 0;
-    } 
-
     if ((num_vns * num_vms_per_vn) > MAX_INTERFACES) {
         LOG(DEBUG, "Max interfaces is 200");
         return false;

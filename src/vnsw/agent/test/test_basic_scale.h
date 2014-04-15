@@ -150,6 +150,7 @@ public:
         if (GetXmppChannel() && GetXmppChannel()->GetPeerState() != xmps::READY) {
             return;
         }
+
         rx_count_++;
         AgentXmppChannel::ReceiveUpdate(msg);
     }
@@ -699,6 +700,7 @@ protected:
         VerifyRoutes(true);
         VerifyVmPortActive(false);
         agent_->controller()->unicast_cleanup_timer()->Fire();
+        agent_->controller()->multicast_cleanup_timer()->Fire();
         WAIT_FOR(10000, 10000, (Agent::GetInstance()->GetVrfTable()->Size() == 1));
         WAIT_FOR(1000, 1000, (Agent::GetInstance()->GetVnTable()->Size() == 0));
     }

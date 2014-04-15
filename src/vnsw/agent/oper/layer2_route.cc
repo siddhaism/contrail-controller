@@ -62,6 +62,7 @@ void Layer2AgentRouteTable::AddLocalVmRouteReq(const Peer *peer,
                                                struct ether_addr &mac,
                                                const Ip4Address &vm_ip,
                                                uint32_t plen) { 
+    assert(peer);
     DBRequest req;
     req.oper = DBRequest::DB_ENTRY_ADD_CHANGE;
 
@@ -88,6 +89,7 @@ void Layer2AgentRouteTable::AddLocalVmRoute(const Peer *peer,
                                             struct ether_addr &mac,
                                             const Ip4Address &vm_ip,
                                             uint32_t plen) { 
+    assert(peer);
     DBRequest req;
     req.oper = DBRequest::DB_ENTRY_ADD_CHANGE;
 
@@ -132,6 +134,7 @@ void Layer2AgentRouteTable::AddRemoteVmRouteReq(const Peer *peer,
                                                 struct ether_addr &mac,
                                                 const Ip4Address &vm_ip,
                                                 uint32_t plen) { 
+    assert(peer);
     DBRequest nh_req;
     nh_req.oper = DBRequest::DB_ENTRY_ADD_CHANGE;
 

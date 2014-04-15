@@ -22,6 +22,12 @@ ControllerRouteWalker::ControllerRouteWalker(Agent *agent, Peer *peer) :
 // At a time peer can be only in one state. 
 bool ControllerRouteWalker::VrfWalkNotify(DBTablePartBase *partition,
                                           DBEntryBase *entry) {
+    VrfEntry *vrf = static_cast<VrfEntry *>(entry);
+    // Notification from deleted VRF should have taken care of all operations
+    // w.r.t. peer, see VrfExport::Notify 
+    if (vrf->IsDeleted()) 
+        return true;
+
     switch (type_) {
     case NOTIFYALL:
         return VrfNotifyAll(partition, entry);

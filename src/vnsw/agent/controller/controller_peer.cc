@@ -602,6 +602,13 @@ void AgentXmppChannel::ReceiveUpdate(const XmppStanza::XmppMessage *msg) {
         safi = strtok_r(NULL, "/", &saveptr);
         vrf_name = saveptr;
 
+        // No BGP peer
+        if (bgp_peer_id() == NULL) {
+            CONTROLLER_TRACE (Trace, GetBgpPeerName(), vrf_name,
+                    "BGP peer not present, agentxmppchannel is inactive");
+            return;
+        }
+
         if (atoi(af) == BgpAf::IPv4 && atoi(safi) == BgpAf::Mcast) {
             ReceiveMulticastUpdate(pugi);
             return;
