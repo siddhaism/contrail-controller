@@ -54,8 +54,14 @@ public:
             boost::bind(&StateMachine::TimerErrorHanlder, this, _1, _2));
     }
 
-    virtual int hold_time_msecs() const { return 30; }
+    virtual int hold_time_msecs() const {
+        if (hold_time_msec_)
+            return hold_time_msec_;
+        return StateMachine::hold_time_msecs();
+    }
 };
+
+int StateMachineTest::hold_time_msec_ = 0;
 
 class BgpServerUnitTest : public ::testing::Test {
 protected:
