@@ -306,21 +306,21 @@ void BgpServerUnitTest::VerifyPeers(int peer_count,
 }
 
 TEST_F(BgpServerUnitTest, Connection) {
-
-    // Enable BgpPeerTest::ToString() to include uuid also in the name of the
-    // peer to maintain unique-ness among multiple peering sessions between
-    // two BgpServers
+    int hold_time_orig = StateMachineTest::hold_time_msec_;
     BgpPeerTest::verbose_name(true);
     SetupPeers(3, a_->session_manager()->GetPort(),
                b_->session_manager()->GetPort(), true);
     VerifyPeers(3, 2);
+    StateMachineTest::hold_time_msec_ = hold_time_orig;
 }
 
 TEST_F(BgpServerUnitTest, LotsOfKeepAlives) {
+    int hold_time_orig = StateMachineTest::hold_time_msec_;
     BgpPeerTest::verbose_name(true);
     SetupPeers(3, a_->session_manager()->GetPort(),
                b_->session_manager()->GetPort(), true);
     VerifyPeers(3, 500);
+    StateMachineTest::hold_time_msec_ = hold_time_orig;
 }
 
 TEST_F(BgpServerUnitTest, ChangeAsNumber1) {
