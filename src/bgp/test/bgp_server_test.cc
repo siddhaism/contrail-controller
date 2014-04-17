@@ -307,6 +307,7 @@ void BgpServerUnitTest::VerifyPeers(int peer_count,
 
 TEST_F(BgpServerUnitTest, Connection) {
     int hold_time_orig = StateMachineTest::hold_time_msec_;
+    StateMachineTest::hold_time_msec_ = 30;
     BgpPeerTest::verbose_name(true);
     SetupPeers(3, a_->session_manager()->GetPort(),
                b_->session_manager()->GetPort(), true);
@@ -316,6 +317,7 @@ TEST_F(BgpServerUnitTest, Connection) {
 
 TEST_F(BgpServerUnitTest, LotsOfKeepAlives) {
     int hold_time_orig = StateMachineTest::hold_time_msec_;
+    StateMachineTest::hold_time_msec_ = 30;
     BgpPeerTest::verbose_name(true);
     SetupPeers(3, a_->session_manager()->GetPort(),
                b_->session_manager()->GetPort(), true);
