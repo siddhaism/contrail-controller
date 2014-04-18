@@ -1216,10 +1216,8 @@ TEST_F(ReplicationTest, UpdateInstanceRouteTargets2) {
     VERIFY_EQ(0, RouteCount("red"));
     TASK_UTIL_EXPECT_TRUE(InetRouteLookup("red", "10.0.1.1/32") == NULL);
 
-    // Verify the VPN route.
-    TASK_UTIL_EXPECT_TRUE(VPNRouteLookup("192.168.0.1:1:10.0.1.1/32") != NULL);
-    rt = VPNRouteLookup("192.168.0.1:1:10.0.1.1/32");
-    VerifyVPNPathRouteTargets(rt->BestPath(), instance_targets);
+    // Verify that the VPN route is gone.
+    TASK_UTIL_EXPECT_TRUE(VPNRouteLookup("192.168.0.1:1:10.0.1.1/32") == NULL);
 
     // Add a new target to blue instance and verify targets.
     AddInstanceRouteTarget("blue", "target:64496:101");
